@@ -267,7 +267,8 @@ else !HAVE_PKCS11
 libdns_la_SOURCES +=		\
 	opensslecdsa_link.c	\
 	openssleddsa_link.c	\
-	opensslrsa_link.c
+	opensslrsa_link.c       \
+	opensslfalcon512_link.c
 endif
 
 if HAVE_GEOIP2

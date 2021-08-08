@@ -102,6 +102,7 @@ typedef enum dst_key_state {
 #define DST_ALG_HMACSHA512   165 /* XXXMPA */
 #define DST_ALG_INDIRECT     252
 #define DST_ALG_PRIVATE	     254
+#define DST_ALG_FALCON512    255
 #define DST_MAX_ALGS	     256
 
 /*% A buffer of this size is large enough to hold any key */
