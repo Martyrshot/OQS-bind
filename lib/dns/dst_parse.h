@@ -30,8 +30,9 @@
 #include <isc/lang.h>
 
 #include <dst/dst.h>
-
-#define MAXFIELDSIZE 512
+// TODO hopefully this doesn't break everything, but changing
+// from 512 to 1281 (size of falcon private key)
+#define MAXFIELDSIZE 1281
 
 /*
  * Maximum number of fields in a private file is 18 (12 algorithm-

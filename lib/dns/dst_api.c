@@ -996,12 +996,14 @@ dst_key_generate(const dns_name_t *name, unsigned int alg, unsigned int bits,
 
 	ret = key->func->generate(key, param, callback);
 	if (ret != ISC_R_SUCCESS) {
+		printf("Failed to generate key\n");
 		dst_key_free(&key);
 		return (ret);
 	}
 
 	ret = computeid(key);
 	if (ret != ISC_R_SUCCESS) {
+		printf("failed computeid");
 		dst_key_free(&key);
 		return (ret);
 	}

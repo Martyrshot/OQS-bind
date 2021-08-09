@@ -359,10 +359,10 @@ check_hmac_sha(const dst_private_t *priv, unsigned int ntags,
 static int
 check_falcon512(const dst_private_t *priv, bool external) {
 	int i, j;
-	bool have[ECDSA_NTAGS];
+	bool have[FALCON512_NTAGS];
 	bool ok;
 	unsigned int mask;
-
+	printf("Checking falcon512 data...\n");
 	if (external) {
 		return ((priv->nelements == 0) ? 0 : -1);
 	}
@@ -373,6 +373,7 @@ check_falcon512(const dst_private_t *priv, bool external) {
 	for (j = 0; j < priv->nelements; j++) {
 		for (i = 0; i < FALCON512_NTAGS; i++) {
 			if (priv->elements[j].tag == TAG(DST_ALG_FALCON512, i)) {
+				printf("Found a tag for falcon512\n");
 				break;
 			}
 		}
@@ -675,6 +676,7 @@ dst__privstruct_writefile(const dst_key_t *key, const dst_private_t *priv,
 
 	ret = check_data(priv, dst_key_alg(key), false, key->external);
 	if (ret < 0) {
+		printf("Failed data check\n");
 		return (DST_R_INVALIDPRIVATEKEY);
 	} else if (ret != ISC_R_SUCCESS) {
 		return (ret);

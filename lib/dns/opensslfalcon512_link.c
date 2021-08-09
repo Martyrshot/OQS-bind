@@ -359,13 +359,14 @@ err:
 static isc_result_t
 opensslfalcon512_generate(dst_key_t *key, int unused, void (*callback)(int)) {
 	isc_result_t ret;
-	EVP_PKEY *pkey;
+	EVP_PKEY *pkey = NULL;
 	EC_KEY *eckey = NULL;
 	EVP_PKEY_CTX *pkctx = NULL;
 	int falcon512_nid;
 	REQUIRE(key->key_alg == DST_ALG_FALCON512);
 	UNUSED(unused);
 	UNUSED(callback);
+	key->key_size = DNS_KEY_FALCON512SIZE;
 /*
 	falcon512_nid = NID_falcon512;
 	key->key_size = DNS_KEY_FALCON512SIZE * 4; //??????? Why 4?
@@ -548,7 +549,7 @@ opensslfalcon512_tofile(const dst_key_t *key, const char *directory) {
 		priv.nelements = 0;
 		return (dst__privstruct_writefile(key, &priv, directory));
 	}
-
+	printf("here\n");
 	pkey = key->keydata.pkey;
 //	eckey = EVP_PKEY_get1_EC_KEY(pkey);
 //	if (eckey == NULL) {
@@ -559,6 +560,7 @@ opensslfalcon512_tofile(const dst_key_t *key, const char *directory) {
 		ret = dst__openssl_toresult(DST_R_OPENSSLFAILURE);
 		goto err;
 	}
+	printf("here\n");
 
 	privkey = isc_mem_get(key->mctx, FACLON512_PRIVATEKEY_SIZE);
 	pubkey = isc_mem_get(key->mctx, FALCON512_PUBLICKEY_SIZE);
@@ -577,10 +579,12 @@ opensslfalcon512_tofile(const dst_key_t *key, const char *directory) {
 	i++;
 	priv.elements[i].tag = TAG_FALCON512_PUBLICKEY;
 	priv.elements[i].length = FALCON512_PUBLICKEY_SIZE;
+	printf("here\n");
 	if (!EVP_PKEY_get_raw_public_key(pkey, pubkey, &publen)) {
 		ret = dst__openssl_toresult(DST_R_OPENSSLFAILURE);
 		goto err;
 	}
+	printf("here\n");
 	priv.elements[i].data = pubkey;
 // Also save public key for now, check if there is a nice function to derive public keys
 // from oqs to make this cleaner
@@ -601,9 +605,11 @@ opensslfalcon512_tofile(const dst_key_t *key, const char *directory) {
 		i++;
 	}
 */
+	i++;
 	priv.nelements = i;
+	printf("here\n");
 	ret = dst__privstruct_writefile(key, &priv, directory);
-
+	if (ISC_R_SUCCESS != ret) printf("failed to write file\n");
 err:
 //	EC_KEY_free(eckey);
 /*
