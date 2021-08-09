@@ -633,13 +633,13 @@ CRYPTO=OpenSSL
 #
 # OpenSSL/LibreSSL is mandatory
 #
-PKG_CHECK_MODULES([OPENSSL], [libssl libcrypto], [],
+PKG_CHECK_MODULES([OPENSSL], [libssl libcrypto liboqs], [],
 		  [AX_CHECK_OPENSSL([:],[AC_MSG_FAILURE([OpenSSL/LibreSSL not found])])])
 
 AX_SAVE_FLAGS([openssl])
 
 CFLAGS="$CFLAGS $OPENSSL_CFLAGS"
-LIBS="$LIBS $OPENSSL_LIBS"
+LIBS="$LIBS $OPENSSL_LIBS -loqs"
 
 AC_MSG_CHECKING([for OpenSSL >= 1.0.0 or LibreSSL >= 2.7.0])
 AC_COMPILE_IFELSE(
