@@ -612,11 +612,12 @@ opensslfalcon512_tofile(const dst_key_t *key, const char *directory) {
 	if (ISC_R_SUCCESS != ret) printf("failed to write file\n");
 err:
 //	EC_KEY_free(eckey);
-/*
-	if (buf != NULL) {
-		isc_mem_put(key->mctx, buf, BN_num_bytes(privkey));
+	if (privkey != NULL) {
+		isc_mem_put(key->mctx, privkey, FACLON512_PRIVATEKEY_SIZE);
 	}
-*/
+	if (pubkey != NULL) {
+		isc_mem_put(key->mctx, pubkey, FALCON512_PUBLICKEY_SIZE);
+	}
 	return (ret);
 }
 
