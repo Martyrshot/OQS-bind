@@ -113,6 +113,7 @@ static struct parse_map map[] = { { TAG_RSA_MODULUS, "Modulus:" },
 				  { TAG_HMACSHA512_BITS, "Bits:" },
 
 				  { TAG_FALCON512_PRIVATEKEY, "PrivateKey:" },
+				  { TAG_FALCON512_PUBLICKEY, "PublicKey:" },
 				  { TAG_FALCON512_ENGINE, "Engine:" }, // Probably won't use for now
 				  { TAG_FALCON512_LABEL, "Label:" }, // Probably won't use for now
 
