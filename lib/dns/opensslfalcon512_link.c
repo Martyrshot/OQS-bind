@@ -186,14 +186,14 @@ BN_bn2bin_fixed(const BIGNUM *bn, unsigned char *buf, int size) {
 static isc_result_t
 opensslfalcon512_sign(dst_context_t *dctx, isc_buffer_t *sig) {
 	isc_result_t ret;
-	dst_key_t *key = dctx->key;
+	//dst_key_t *key = dctx->key;
 	isc_region_t region;
 	//ECDSA_SIG *ecdsasig; // TODO can this be replaced with a falcon specific sig?
 	REQUIRE(dctx->key->key_alg == DST_ALG_FALCON512);
 	EVP_MD_CTX *evp_md_ctx = dctx->ctxdata.evp_md_ctx;
-	EVP_PKEY *pkey = key->keydata.pkey;
+	//EVP_PKEY *pkey = key->keydata.pkey;
 	//EC_KEY *eckey = EVP_PKEY_get1_EC_KEY(pkey); // TODO can this be replaced with a falcon specific key?
-	size_t dgstlen, siglen;
+	size_t siglen;
 	unsigned char digest[EVP_MAX_MD_SIZE];
 	unsigned char *sigout = NULL;
 //	const BIGNUM *r, *s; // need to figure out what the falcon512 equiv is
@@ -243,14 +243,13 @@ opensslfalcon512_verify(dst_context_t *dctx, const isc_region_t *sig) {
 	isc_result_t ret;
 	dst_key_t *key = dctx->key;
 	int status;
-	unsigned char *cp = sig->base;
+	//unsigned char *cp = sig->base;
 	//ECDSA_SIG *ecdsasig = NULL; // TODO replace?
 	REQUIRE(key->key_alg == DST_ALG_FALCON512);
 	EVP_MD_CTX *evp_md_ctx = dctx->ctxdata.evp_md_ctx;
-	EVP_PKEY *pkey = key->keydata.pkey;
+	//EVP_PKEY *pkey = key->keydata.pkey;
 	// EC_KEY *eckey = EVP_PKEY_get1_EC_KEY(pkey); // TODO replace?
-	unsigned int dgstlen, siglen;
-	unsigned char digest[EVP_MAX_MD_SIZE];
+	unsigned int siglen;
 	//BIGNUM *r = NULL, *s = NULL;
 /*
 	if (eckey == NULL) {
@@ -290,7 +289,6 @@ opensslfalcon512_verify(dst_context_t *dctx, const isc_region_t *sig) {
 		break;
 	}
 
-err:
 	// TODO lookup how to free this stuff, if needed
 	/*
 	if (ecdsasig != NULL) {
@@ -303,8 +301,6 @@ err:
 
 static bool
 opensslfalcon512_compare(const dst_key_t *key1, const dst_key_t *key2) {
-	bool ret;
-	int status;
 	
 	EVP_PKEY *pkey1 = key1->keydata.pkey;
 	EVP_PKEY *pkey2 = key2->keydata.pkey;
@@ -360,9 +356,9 @@ static isc_result_t
 opensslfalcon512_generate(dst_key_t *key, int unused, void (*callback)(int)) {
 	isc_result_t ret;
 	EVP_PKEY *pkey = NULL;
-	EC_KEY *eckey = NULL;
+	//EC_KEY *eckey = NULL;
 	EVP_PKEY_CTX *pkctx = NULL;
-	int falcon512_nid;
+	//int falcon512_nid;
 	REQUIRE(key->key_alg == DST_ALG_FALCON512);
 	UNUSED(unused);
 	UNUSED(callback);
@@ -398,7 +394,7 @@ err:
 	EC_KEY_free(eckey);
 	return (ret);
 */
-	if ((pkctx = EVP_PKEY_CTX_new_id(EVP_PKEY_FALCON512, NULL)) <= 0) {
+	if ((pkctx = EVP_PKEY_CTX_new_id(EVP_PKEY_FALCON512, NULL)) == NULL) {
 		return (dst__openssl_toresult2("EVP_PKEY_CTX_new_id",
 							DST_R_OPENSSLFAILURE));
 	}
@@ -425,7 +421,8 @@ opensslfalcon512_isprivate(const dst_key_t *key) {
 static void
 opensslfalcon512_destroy(dst_key_t *key) {
 	EVP_PKEY *pkey = key->keydata.pkey;
-
+	if (key->keydata.pkey == NULL) printf("pkey is NULL\n");
+	printf("In destroy\n");
 	EVP_PKEY_free(pkey);
 	key->keydata.pkey = NULL;
 }
@@ -435,14 +432,11 @@ opensslfalcon512_todns(const dst_key_t *key, isc_buffer_t *data) {
 	isc_result_t ret;
 	EVP_PKEY *pkey;
 //	EC_KEY *eckey = NULL;
+	size_t publen = DNS_KEY_FALCON512SIZE;
 	isc_region_t r;
-	int len;
-	unsigned char *cp;
 	unsigned char buf[DNS_KEY_FALCON512SIZE];
 
 	REQUIRE(key->keydata.pkey != NULL);
-
-	len = FALCON512_PUBLICKEY_SIZE;
 	pkey = key->keydata.pkey;
 	/*eckey = EVP_PKEY_get1_EC_KEY(pkey);
 	if (eckey == NULL) {
@@ -454,23 +448,22 @@ opensslfalcon512_todns(const dst_key_t *key, isc_buffer_t *data) {
 //	len--;
 
 	isc_buffer_availableregion(data, &r);
-	if (r.length < (unsigned int)len) {
+	if (r.length < (unsigned int)publen) {
 		DST_RET(ISC_R_NOSPACE);
 	}
-	cp = buf;
 //	if (!i2o_ECPublicKey(eckey, &cp)) {
 //		DST_RET(dst__openssl_toresult(ISC_R_FAILURE));
 //	}
-	size_t publen = DNS_KEY_FALCON512SIZE;
 	if (!EVP_PKEY_get_raw_public_key(pkey, buf, &publen)) {
 		DST_RET(DST_R_INVALIDPUBLICKEY);
 	}
-	memmove(r.base, buf, len);
-	isc_buffer_add(data, len);
+	memmove(r.base, buf, publen);
+	isc_buffer_add(data, publen);
 	ret = ISC_R_SUCCESS;
 
 err:
 //	EC_KEY_free(eckey);
+	printf("in todns\n");
 	return (ret);
 }
 
@@ -480,7 +473,6 @@ opensslfalcon512_fromdns(dst_key_t *key, isc_buffer_t *data) {
 	EVP_PKEY *pkey;
 	isc_region_t r;
 	unsigned int len;
-	const unsigned char *cp;
 	unsigned char buf[DNS_KEY_FALCON512SIZE];
 
 	len = FALCON512_PUBLICKEY_SIZE;
@@ -496,7 +488,6 @@ opensslfalcon512_fromdns(dst_key_t *key, isc_buffer_t *data) {
 	}
 
 	memmove(buf, r.base, len);
-	cp = buf;
 	// set raw public key
 	//if (o2i_ECPublicKey(&eckey, (const unsigned char **)&cp,
 	//		    (long)len + 1) == NULL) {
@@ -523,7 +514,6 @@ opensslfalcon512_fromdns(dst_key_t *key, isc_buffer_t *data) {
 	key->keydata.pkey = pkey;
 	key->key_size = len; //may need to be *4, but I don't see why yet so leaving it as is
 	ret = ISC_R_SUCCESS;
-err:
 /*
 	if (eckey != NULL) {
 		EC_KEY_free(eckey);
@@ -621,29 +611,6 @@ err:
 	return (ret);
 }
 
-static isc_result_t
-ecdsa_check(EC_KEY *eckey, EC_KEY *pubeckey) {
-	const EC_POINT *pubkey;
-
-	pubkey = EC_KEY_get0_public_key(eckey);
-	if (pubkey != NULL) {
-		return (ISC_R_SUCCESS);
-	} else if (pubeckey != NULL) {
-		pubkey = EC_KEY_get0_public_key(pubeckey);
-		if (pubkey == NULL) {
-			return (ISC_R_SUCCESS);
-		}
-		if (EC_KEY_set_public_key(eckey, pubkey) != 1) {
-			return (ISC_R_SUCCESS);
-		}
-	}
-	if (EC_KEY_check_key(eckey) == 1) {
-		return (ISC_R_SUCCESS);
-	}
-	return (ISC_R_FAILURE);
-}
-
-
 typedef struct
 {
   /* OpenSSL NID */
@@ -664,7 +631,7 @@ typedef struct
 
 
 static isc_result_t
-load_privkey_from_privstruct(EVP_PKEY *key, dst_private_t *priv) {
+load_privkey_from_privstruct(EVP_PKEY **key, dst_private_t *priv) {
 	unsigned char *privkey = priv->elements[0].data;
 	int privLen = priv->elements[0].length;
 	unsigned char *pubkey = priv->elements[1].data;
@@ -675,16 +642,16 @@ load_privkey_from_privstruct(EVP_PKEY *key, dst_private_t *priv) {
 	}
 	// I need a way to derive a public key from a private key. For now, going to break the api
 	// and store the pubkey with the private key
-	if ((key = EVP_PKEY_new_raw_private_key(EVP_PKEY_FALCON512, NULL, privkey, privLen)) == NULL) {
+	if ((*key = EVP_PKEY_new_raw_private_key(EVP_PKEY_FALCON512, NULL, privkey, privLen)) == NULL) {
 		return (ISC_R_NOMEMORY);
 	}
 	// Likely sketchy, check here if bugs!!!
-	OQS_KEY *oqs_key = EVP_PKEY_get0(key);
+	OQS_KEY *oqs_key = EVP_PKEY_get0(*key);
 	if (oqs_key == NULL) {
 		return (ISC_R_NOMEMORY);
 	}
 	oqs_key->pubkey = pubkey;
-
+	
 	return (result);
 }
 /*
@@ -708,8 +675,10 @@ eckey_to_pkey(EC_KEY *eckey, EVP_PKEY **pkey) {
 static isc_result_t
 finalize_pkey(dst_key_t *key, EVP_PKEY *pkey, const char *engine,
 	       const char *label) {
-
+	UNUSED(label);
+	UNUSED(engine);
 	key->keydata.pkey = pkey;
+	if (key->keydata.pkey == NULL) printf("pkey is null in finalize\n");
 // Should never hit here
 /*
 	if (label != NULL) {
@@ -745,9 +714,6 @@ dst__key_to_evp_pkey(dst_key_t *key, EVP_PKEY **eckey) {
 	return (ISC_R_SUCCESS);
 }
 */
-static isc_result_t
-opensslecdsa_fromlabel(dst_key_t *key, const char *engine, const char *label,
-		       const char *pin);
 
 static isc_result_t
 opensslfalcon512_parse(dst_key_t *key, isc_lex_t *lexer, dst_key_t *pub) {
@@ -799,7 +765,7 @@ opensslfalcon512_parse(dst_key_t *key, isc_lex_t *lexer, dst_key_t *pub) {
 		}
 	}
 
-	if (privkey_index < 0) {
+	if (privkey_index < 0 || pubkey_index < 0) {
 		result = DST_R_INVALIDPRIVATEKEY;
 		goto end;
 	}
@@ -830,7 +796,8 @@ opensslfalcon512_parse(dst_key_t *key, isc_lex_t *lexer, dst_key_t *pub) {
 		//	goto end;
 		//}
 		// should just be a pkey
-		result = load_privkey_from_privstruct(pkey, &priv);
+		result = load_privkey_from_privstruct(&pkey, &priv);
+		if (pkey == NULL) printf("pkey is null after load?\n");
 		if (result != ISC_R_SUCCESS) {
 			goto end;
 		}
@@ -848,6 +815,7 @@ opensslfalcon512_parse(dst_key_t *key, isc_lex_t *lexer, dst_key_t *pub) {
 	}
 */
 	if (finalize_key) {
+		printf("Finalizing\n");
 		result = finalize_pkey(key, pkey, engine, label);
 	}
 
@@ -863,104 +831,6 @@ end:
 	dst__privstruct_free(&priv, key->mctx);
 	isc_safe_memwipe(&priv, sizeof(priv));
 	return (result);
-}
-// No plans currently to support this
-static isc_result_t
-opensslecdsa_fromlabel(dst_key_t *key, const char *engine, const char *label,
-		       const char *pin) {
-#if !defined(OPENSSL_NO_ENGINE)
-	isc_result_t ret = ISC_R_SUCCESS;
-	ENGINE *e;
-	EC_KEY *eckey = NULL;
-	EC_KEY *pubeckey = NULL;
-	EVP_PKEY *pkey = NULL;
-	EVP_PKEY *pubkey = NULL;
-	int group_nid = 0;
-
-	UNUSED(pin);
-
-	if (engine == NULL || label == NULL) {
-		return (DST_R_NOENGINE);
-	}
-	e = dst__openssl_getengine(engine);
-	if (e == NULL) {
-		return (DST_R_NOENGINE);
-	}
-
-	if (key->key_alg == DST_ALG_ECDSA256) {
-		group_nid = NID_X9_62_prime256v1;
-	} else {
-		group_nid = NID_secp384r1;
-	}
-
-	/* Load private key. */
-	pkey = ENGINE_load_private_key(e, label, NULL, NULL);
-	if (pkey == NULL) {
-		return (dst__openssl_toresult2("ENGINE_load_private_key",
-					       DST_R_OPENSSLFAILURE));
-	}
-	/* Check base id, group nid */
-	if (EVP_PKEY_base_id(pkey) != EVP_PKEY_EC) {
-		DST_RET(DST_R_INVALIDPRIVATEKEY);
-	}
-	eckey = EVP_PKEY_get1_EC_KEY(pkey);
-	if (eckey == NULL) {
-		DST_RET(dst__openssl_toresult(DST_R_OPENSSLFAILURE));
-	}
-	if (EC_GROUP_get_curve_name(EC_KEY_get0_group(eckey)) != group_nid) {
-		DST_RET(DST_R_INVALIDPRIVATEKEY);
-	}
-
-	/* Load public key. */
-	pubkey = ENGINE_load_public_key(e, label, NULL, NULL);
-	if (pubkey == NULL) {
-		DST_RET(dst__openssl_toresult2("ENGINE_load_public_key",
-					       DST_R_OPENSSLFAILURE));
-	}
-	/* Check base id, group nid */
-	if (EVP_PKEY_base_id(pubkey) != EVP_PKEY_EC) {
-		DST_RET(DST_R_INVALIDPUBLICKEY);
-	}
-	pubeckey = EVP_PKEY_get1_EC_KEY(pubkey);
-	if (pubeckey == NULL) {
-		DST_RET(dst__openssl_toresult(DST_R_OPENSSLFAILURE));
-	}
-	if (EC_GROUP_get_curve_name(EC_KEY_get0_group(pubeckey)) != group_nid) {
-		DST_RET(DST_R_INVALIDPUBLICKEY);
-	}
-
-	if (ecdsa_check(eckey, pubeckey) != ISC_R_SUCCESS) {
-		DST_RET(DST_R_INVALIDPRIVATEKEY);
-	}
-
-	key->label = isc_mem_strdup(key->mctx, label);
-	key->engine = isc_mem_strdup(key->mctx, engine);
-	key->key_size = EVP_PKEY_bits(pkey);
-	key->keydata.pkey = pkey;
-	pkey = NULL;
-
-err:
-	if (pubkey != NULL) {
-		EVP_PKEY_free(pubkey);
-	}
-	if (pkey != NULL) {
-		EVP_PKEY_free(pkey);
-	}
-	if (pubeckey != NULL) {
-		EC_KEY_free(pubeckey);
-	}
-	if (eckey != NULL) {
-		EC_KEY_free(eckey);
-	}
-
-	return (ret);
-#else
-	UNUSED(key);
-	UNUSED(engine);
-	UNUSED(label);
-	UNUSED(pin);
-	return (DST_R_NOENGINE);
-#endif
 }
 
 static dst_func_t opensslfalcon512_functions = {
