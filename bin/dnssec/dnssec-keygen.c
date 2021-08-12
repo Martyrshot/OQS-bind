@@ -651,7 +651,7 @@ keygen(keygen_ctx_t *ctx, isc_mem_t *mctx, int argc, char **argv) {
 
 	do {
 		conflict = false;
-
+		printf("pre dst keygen\n");
 		if (!ctx->quiet && show_progress) {
 			fprintf(stderr, "Generating key pair.");
 			ret = dst_key_generate(name, ctx->alg, ctx->size, param,
@@ -665,7 +665,7 @@ keygen(keygen_ctx_t *ctx, isc_mem_t *mctx, int argc, char **argv) {
 					       flags, ctx->protocol,
 					       ctx->rdclass, mctx, &key, NULL);
 		}
-
+		printf("post dst keygen\n");
 		if (ret != ISC_R_SUCCESS) {
 			char namestr[DNS_NAME_FORMATSIZE];
 			dns_name_format(name, namestr, sizeof(namestr));
@@ -674,7 +674,7 @@ keygen(keygen_ctx_t *ctx, isc_mem_t *mctx, int argc, char **argv) {
 		}
 
 		dst_key_setbits(key, ctx->dbits);
-
+		printf("post set bits\n");
 		/*
 		 * Set key timing metadata (unless using -C)
 		 *
@@ -692,12 +692,14 @@ keygen(keygen_ctx_t *ctx, isc_mem_t *mctx, int argc, char **argv) {
 		 * must be updated before a successor key can be created.
 		 */
 		if (!ctx->oldstyle) {
+		printf("oldstyle?\n");
 			dst_key_settime(key, DST_TIME_CREATED, ctx->now);
 
 			if (ctx->genonly && (ctx->setpub || ctx->setact)) {
 				fatal("cannot use -G together with "
 				      "-P or -A options");
 			}
+			printf("here\n");
 
 			if (ctx->setpub) {
 				dst_key_settime(key, DST_TIME_PUBLISH,
@@ -709,6 +711,7 @@ keygen(keygen_ctx_t *ctx, isc_mem_t *mctx, int argc, char **argv) {
 				dst_key_settime(key, DST_TIME_PUBLISH,
 						ctx->now);
 			}
+			printf("here\n");
 
 			if (ctx->setact) {
 				dst_key_settime(key, DST_TIME_ACTIVATE,
@@ -717,6 +720,7 @@ keygen(keygen_ctx_t *ctx, isc_mem_t *mctx, int argc, char **argv) {
 				dst_key_settime(key, DST_TIME_ACTIVATE,
 						ctx->now);
 			}
+			printf("here\n");
 
 			if (ctx->setrev) {
 				if (ctx->kskflag == 0) {
@@ -730,11 +734,13 @@ keygen(keygen_ctx_t *ctx, isc_mem_t *mctx, int argc, char **argv) {
 				dst_key_settime(key, DST_TIME_REVOKE,
 						ctx->revokekey);
 			}
+			printf("here\n");
 
 			if (ctx->setinact) {
 				dst_key_settime(key, DST_TIME_INACTIVE,
 						ctx->inactive);
 			}
+			printf("here\n");
 
 			if (ctx->setdel) {
 				if (ctx->setinact &&
@@ -749,17 +755,21 @@ keygen(keygen_ctx_t *ctx, isc_mem_t *mctx, int argc, char **argv) {
 				dst_key_settime(key, DST_TIME_DELETE,
 						ctx->deltime);
 			}
+			printf("here\n");
 
 			if (ctx->setsyncadd) {
 				dst_key_settime(key, DST_TIME_SYNCPUBLISH,
 						ctx->syncadd);
 			}
+			printf("here\n");
 
 			if (ctx->setsyncdel) {
 				dst_key_settime(key, DST_TIME_SYNCDELETE,
 						ctx->syncdel);
 			}
+			printf("here\n");
 		} else {
+		printf("not oldstyle\n");
 			if (ctx->setpub || ctx->setact || ctx->setrev ||
 			    ctx->setinact || ctx->setdel || ctx->unsetpub ||
 			    ctx->unsetact || ctx->unsetrev || ctx->unsetinact ||
@@ -775,11 +785,12 @@ keygen(keygen_ctx_t *ctx, isc_mem_t *mctx, int argc, char **argv) {
 			 */
 			dst_key_setprivateformat(key, 1, 2);
 		}
-
+		printf("there\n");
 		/* Set the default key TTL */
 		if (ctx->setttl) {
 			dst_key_setttl(key, ctx->ttl);
 		}
+		printf("there\n");
 
 		/* Set dnssec-policy related metadata */
 		if (ctx->policy != NULL) {
@@ -787,6 +798,7 @@ keygen(keygen_ctx_t *ctx, isc_mem_t *mctx, int argc, char **argv) {
 			dst_key_setbool(key, DST_BOOL_KSK, ctx->ksk);
 			dst_key_setbool(key, DST_BOOL_ZSK, ctx->zsk);
 		}
+		printf("there\n");
 
 		/*
 		 * Do not overwrite an existing key, or create a key
@@ -794,6 +806,7 @@ keygen(keygen_ctx_t *ctx, isc_mem_t *mctx, int argc, char **argv) {
 		 * or another key being revoked.
 		 */
 		if (key_collision(key, name, ctx->directory, mctx, NULL)) {
+			printf("collision?");
 			conflict = true;
 			if (null_key) {
 				dst_key_free(&key);
@@ -813,15 +826,20 @@ keygen(keygen_ctx_t *ctx, isc_mem_t *mctx, int argc, char **argv) {
 						program, filename);
 				}
 			}
-
+			printf("pre key-free\n");
 			dst_key_free(&key);
+			printf("post key-free\n");
+
 		}
+		printf("No conflict\n");
 	} while (conflict);
+		printf("there\n");
 
 	if (conflict) {
 		fatal("cannot generate a null key due to possible key ID "
 		      "collision");
 	}
+		printf("post conflict\n");
 
 	if (ctx->predecessor != NULL && prevkey != NULL) {
 		dst_key_setnum(prevkey, DST_NUM_SUCCESSOR, dst_key_id(key));
@@ -1295,7 +1313,9 @@ main(int argc, char **argv) {
 	}
 
 	cleanup_logging(&lctx);
+	printf("pre dst_lib_destroy\n");
 	dst_lib_destroy();
+	printf("post dst_lib_destroy\n");
 	if (verbose > 10) {
 		isc_mem_stats(mctx, stdout);
 	}

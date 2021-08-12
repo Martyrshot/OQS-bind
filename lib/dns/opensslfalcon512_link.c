@@ -42,7 +42,7 @@
 #endif /* ifndef NID_secp384r1 */
 
 #define FALCON512_PUBLICKEY_SIZE 897
-#define FACLON512_PRIVATEKEY_SIZE 1281
+#define FALCON512_PRIVATEKEY_SIZE 1281
 
 
 #define DST_RET(a)        \
@@ -398,17 +398,19 @@ err:
 		return (dst__openssl_toresult2("EVP_PKEY_CTX_new_id",
 							DST_R_OPENSSLFAILURE));
 	}
-	if (EVP_PKEY_keygen_init(pkctx) <= 0) {
+	if (EVP_PKEY_keygen_init(pkctx) != 1) {
 		return (dst__openssl_toresult2("EVP_PKEY_keygen_init",
 							DST_R_OPENSSLFAILURE));
 	}
-	if (EVP_PKEY_keygen(pkctx, &pkey) <= 0) {
+	if (EVP_PKEY_keygen(pkctx, &pkey) != 1) {
 		return (dst__openssl_toresult2("EVP_PKEY_keygen",
 							DST_R_OPENSSLFAILURE));
 	}
 	key->keydata.pkey = pkey;
 	ret = ISC_R_SUCCESS;
+	printf("pre ctx free\n");
 	EVP_PKEY_CTX_free(pkctx);
+	printf("post ctx free\n");
 	return (ret);
 }
 
@@ -422,14 +424,37 @@ static void
 opensslfalcon512_destroy(dst_key_t *key) {
 	EVP_PKEY *pkey = key->keydata.pkey;
 	if (key->keydata.pkey == NULL) printf("pkey is NULL\n");
-	printf("In destroy\n");
+	printf("In destroy...\n");
 	EVP_PKEY_free(pkey);
 	key->keydata.pkey = NULL;
 }
 
 static isc_result_t
 opensslfalcon512_todns(const dst_key_t *key, isc_buffer_t *data) {
-	isc_result_t ret;
+	EVP_PKEY *pkey = key->keydata.pkey;
+	isc_region_t r;
+	size_t len;
+
+	REQUIRE(pkey != NULL);
+	REQUIRE(key->key_alg == DST_ALG_FALCON512);
+	len = DNS_KEY_FALCON512SIZE;
+/*	if (key->key_alg == DST_ALG_ED25519) {
+		len = DNS_KEY_ED25519SIZE;
+	} else {
+		len = DNS_KEY_ED448SIZE;
+	}*/
+
+	isc_buffer_availableregion(data, &r);
+	if (r.length < len) {
+		return (ISC_R_NOSPACE);
+	}
+
+	if (EVP_PKEY_get_raw_public_key(pkey, r.base, &len) != 1)
+		return (dst__openssl_toresult(ISC_R_FAILURE));
+
+	isc_buffer_add(data, len);
+	return (ISC_R_SUCCESS);
+/*	isc_result_t ret;
 	EVP_PKEY *pkey;
 //	EC_KEY *eckey = NULL;
 	size_t publen = DNS_KEY_FALCON512SIZE;
@@ -438,13 +463,13 @@ opensslfalcon512_todns(const dst_key_t *key, isc_buffer_t *data) {
 
 	REQUIRE(key->keydata.pkey != NULL);
 	pkey = key->keydata.pkey;
-	/*eckey = EVP_PKEY_get1_EC_KEY(pkey);
-	if (eckey == NULL) {
-		return (dst__openssl_toresult(ISC_R_FAILURE));
-	}*/
+	//eckey = EVP_PKEY_get1_EC_KEY(pkey);
+	//if (eckey == NULL) {
+	//	return (dst__openssl_toresult(ISC_R_FAILURE));
+	//}
 	// Use new raw functions here
 //	len = i2o_ECPublicKey(eckey, NULL);
-	/* skip form */
+	// skip form
 //	len--;
 
 	isc_buffer_availableregion(data, &r);
@@ -464,20 +489,48 @@ opensslfalcon512_todns(const dst_key_t *key, isc_buffer_t *data) {
 err:
 //	EC_KEY_free(eckey);
 	printf("in todns\n");
-	return (ret);
+	return (ret); */
 }
-
+// TODO bugs in here!
 static isc_result_t
 opensslfalcon512_fromdns(dst_key_t *key, isc_buffer_t *data) {
+	isc_result_t ret;
+	isc_region_t r;
+	size_t len;
+	EVP_PKEY *pkey;
+
+	REQUIRE(key->key_alg == DST_ALG_FALCON512);
+
+	isc_buffer_remainingregion(data, &r);
+	if (r.length == 0) {
+		return (ISC_R_SUCCESS);
+	}
+
+	len = r.length;
+	if (len < DNS_KEY_FALCON512SIZE) {
+		return (DST_R_INVALIDPUBLICKEY);
+	}
+
+	pkey = EVP_PKEY_new_raw_public_key(EVP_PKEY_FALCON512, NULL, r.base, len);
+	if (pkey == NULL) {
+		return (dst__openssl_toresult(DST_R_INVALIDPUBLICKEY));
+	}
+
+	isc_buffer_forward(data, len);
+	key->keydata.pkey = pkey;
+	key->key_size = len;
+	return (ISC_R_SUCCESS);
+
+/*
+	printf("fromdns called\n");
 	isc_result_t ret;
 	EVP_PKEY *pkey;
 	isc_region_t r;
 	unsigned int len;
 	unsigned char buf[DNS_KEY_FALCON512SIZE];
 
-	len = FALCON512_PUBLICKEY_SIZE;
 	REQUIRE(key->key_alg == DST_ALG_FALCON512);
-	len = DNS_KEY_FALCON512SIZE;
+	len = FALCON512_PUBLICKEY_SIZE;
 
 	isc_buffer_remainingregion(data, &r);
 	if (r.length == 0) {
@@ -514,21 +567,91 @@ opensslfalcon512_fromdns(dst_key_t *key, isc_buffer_t *data) {
 	key->keydata.pkey = pkey;
 	key->key_size = len; //may need to be *4, but I don't see why yet so leaving it as is
 	ret = ISC_R_SUCCESS;
-/*
-	if (eckey != NULL) {
-		EC_KEY_free(eckey);
-	}
-*/
+
+//	if (eckey != NULL) {
+//		EC_KEY_free(eckey);
+//	}
+//
 	return (ret);
+*/
 }
 
 static isc_result_t
 opensslfalcon512_tofile(const dst_key_t *key, const char *directory) {
 	isc_result_t ret;
+	dst_private_t priv;
+	unsigned char *pubbuf = NULL;
+	unsigned char *privbuf = NULL;
+	size_t publen;
+	size_t privlen;
+	int i;
+
+	REQUIRE(key->key_alg == DST_ALG_FALCON512);
+
+	if (key->keydata.pkey == NULL) {
+		return (DST_R_NULLKEY);
+	}
+
+	if (key->external) {
+		priv.nelements = 0;
+		return (dst__privstruct_writefile(key, &priv, directory));
+	}
+
+	i = 0;
+
+	if (opensslfalcon512_isprivate(key)) {
+		privbuf = isc_mem_get(key->mctx, privlen);
+		if (EVP_PKEY_get_raw_private_key(key->keydata.pkey, privbuf,
+						 &privlen) != 1)
+			DST_RET(dst__openssl_toresult(ISC_R_FAILURE));
+		priv.elements[i].tag = TAG_FALCON512_PRIVATEKEY;
+		priv.elements[i].length = privlen;
+		priv.elements[i].data = privbuf;
+		i++;
+		pubbuf = isc_mem_get(key->mctx, publen);
+		if (EVP_PKEY_get_raw_public_key(key->keydata.pkey, pubbuf,
+						 &publen) != 1)
+			DST_RET(dst__openssl_toresult(ISC_R_FAILURE));
+		priv.elements[i].tag = TAG_FALCON512_PUBLICKEY;
+		priv.elements[i].length = publen;
+		priv.elements[i].data = pubbuf;
+		i++;
+	}
+	/*
+	if (key->engine != NULL) {
+		priv.elements[i].tag = TAG_FALCON512_ENGINE;
+		priv.elements[i].length = (unsigned short)strlen(key->engine) +
+					  1;
+		priv.elements[i].data = (unsigned char *)key->engine;
+		i++;
+	}
+	if (key->label != NULL) {
+		priv.elements[i].tag = TAG_FALCON512_LABEL;
+		priv.elements[i].length = (unsigned short)strlen(key->label) +
+					  1;
+		priv.elements[i].data = (unsigned char *)key->label;
+		i++;
+	}
+*/
+	priv.nelements = i;
+	ret = dst__privstruct_writefile(key, &priv, directory);
+
+err:
+	if (privbuf != NULL) {
+		isc_mem_put(key->mctx, privbuf, privlen);
+	}
+	if (pubbuf != NULL) {
+		isc_mem_put(key->mctx, pubbuf, publen);
+	}
+	return (ret);
+
+	
+/*
+	isc_result_t ret;
 	EVP_PKEY *pkey;
 	dst_private_t priv;
-	unsigned char *privkey = malloc(sizeof(char) * FACLON512_PRIVATEKEY_SIZE);
-	unsigned char *pubkey = malloc(sizeof(char) * FALCON512_PUBLICKEY_SIZE);
+	unsigned char *privkey = isc_mem_get(key->mctx, FALCON512_PRIVATEKEY_SIZE);
+	unsigned char *pubkey = isc_mem_get(key->mctx, FALCON512_PUBLICKEY_SIZE);
 	unsigned short i;
 
 	if (key->keydata.pkey == NULL) {
@@ -539,7 +662,6 @@ opensslfalcon512_tofile(const dst_key_t *key, const char *directory) {
 		priv.nelements = 0;
 		return (dst__privstruct_writefile(key, &priv, directory));
 	}
-	printf("here\n");
 	pkey = key->keydata.pkey;
 //	eckey = EVP_PKEY_get1_EC_KEY(pkey);
 //	if (eckey == NULL) {
@@ -550,21 +672,21 @@ opensslfalcon512_tofile(const dst_key_t *key, const char *directory) {
 		ret = dst__openssl_toresult(DST_R_OPENSSLFAILURE);
 		goto err;
 	}
-	printf("here\n");
 
-	privkey = isc_mem_get(key->mctx, FACLON512_PRIVATEKEY_SIZE);
+	privkey = isc_mem_get(key->mctx, FALCON512_PRIVATEKEY_SIZE);
 	pubkey = isc_mem_get(key->mctx, FALCON512_PUBLICKEY_SIZE);
-	size_t privlen = FACLON512_PRIVATEKEY_SIZE;
+	size_t privlen = FALCON512_PRIVATEKEY_SIZE;
 	size_t publen = FALCON512_PUBLICKEY_SIZE;
 	i = 0;
 
 	priv.elements[i].tag = TAG_FALCON512_PRIVATEKEY;
-	priv.elements[i].length = FACLON512_PRIVATEKEY_SIZE;
+	priv.elements[i].length = FALCON512_PRIVATEKEY_SIZE;
 	if (!EVP_PKEY_get_raw_private_key(pkey, privkey, &privlen)) {
 		ret = dst__openssl_toresult(DST_R_OPENSSLFAILURE);
 		goto err;
 	}
 //	BN_bn2bin(privkey, buf);
+	// bug not using thier memory manager...
 	priv.elements[i].data = privkey;
 	i++;
 	priv.elements[i].tag = TAG_FALCON512_PUBLICKEY;
@@ -574,41 +696,39 @@ opensslfalcon512_tofile(const dst_key_t *key, const char *directory) {
 		ret = dst__openssl_toresult(DST_R_OPENSSLFAILURE);
 		goto err;
 	}
-	printf("here\n");
 	priv.elements[i].data = pubkey;
 // Also save public key for now, check if there is a nice function to derive public keys
 // from oqs to make this cleaner
-/*
-	if (key->engine != NULL) {
-		priv.elements[i].tag = TAG_ECDSA_ENGINE;
-		priv.elements[i].length = (unsigned short)strlen(key->engine) +
-					  1;
-		priv.elements[i].data = (unsigned char *)key->engine;
-		i++;
-	}
 
-	if (key->label != NULL) {
-		priv.elements[i].tag = TAG_ECDSA_LABEL;
-		priv.elements[i].length = (unsigned short)strlen(key->label) +
+//	if (key->engine != NULL) {
+//		priv.elements[i].tag = TAG_ECDSA_ENGINE;
+//		priv.elements[i].length = (unsigned short)strlen(key->engine) +
+//					  1;
+//		priv.elements[i].data = (unsigned char *)key->engine;
+//		i++;
+//	}
+
+//	if (key->label != NULL) {
+//		priv.elements[i].tag = TAG_ECDSA_LABEL;
+//		priv.elements[i].length = (unsigned short)strlen(key->label) +
 					  1;
-		priv.elements[i].data = (unsigned char *)key->label;
-		i++;
-	}
-*/
+//		priv.elements[i].data = (unsigned char *)key->label;
+//		i++;
+//	}
+
 	i++;
 	priv.nelements = i;
-	printf("here\n");
 	ret = dst__privstruct_writefile(key, &priv, directory);
 	if (ISC_R_SUCCESS != ret) printf("failed to write file\n");
 err:
 //	EC_KEY_free(eckey);
 	if (privkey != NULL) {
-		isc_mem_put(key->mctx, privkey, FACLON512_PRIVATEKEY_SIZE);
+		isc_mem_put(key->mctx, privkey, FALCON512_PRIVATEKEY_SIZE);
 	}
 	if (pubkey != NULL) {
 		isc_mem_put(key->mctx, pubkey, FALCON512_PUBLICKEY_SIZE);
 	}
-	return (ret);
+	return (ret);*/
 }
 
 typedef struct
@@ -678,7 +798,6 @@ finalize_pkey(dst_key_t *key, EVP_PKEY *pkey, const char *engine,
 	UNUSED(label);
 	UNUSED(engine);
 	key->keydata.pkey = pkey;
-	if (key->keydata.pkey == NULL) printf("pkey is null in finalize\n");
 // Should never hit here
 /*
 	if (label != NULL) {

@@ -1501,6 +1501,7 @@ dns_dnssec_findmatchingkeys(const dns_name_t *origin, const char *directory,
 		dns_dnssec_get_hints(key, now);
 
 		if (key->legacy) {
+			printf("legacy key\n");
 			dns_dnsseckey_destroy(mctx, &key);
 		} else {
 			ISC_LIST_APPEND(list, key, link);

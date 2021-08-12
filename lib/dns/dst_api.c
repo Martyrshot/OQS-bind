@@ -584,7 +584,6 @@ dst_key_fromnamedfile(const char *filename, const char *dirname, int type,
 	if (filename[0] == '/') {
 		dirname = NULL;
 	}
-	if (pubkey == key) printf("pubkey == key 1\n");
 
 	newfilenamelen = strlen(filename) + 5;
 	if (dirname != NULL) {
@@ -611,7 +610,6 @@ dst_key_fromnamedfile(const char *filename, const char *dirname, int type,
 				   filename, ".state");
 		INSIST(result == ISC_R_SUCCESS);
 	}
-	if (pubkey == key) printf("pubkey == key 2\n");
 
 	pubkey->kasp = false;
 	if ((type & DST_TYPE_STATE) != 0) {
@@ -624,7 +622,6 @@ dst_key_fromnamedfile(const char *filename, const char *dirname, int type,
 		}
 		RETERR(result);
 	}
-	if (pubkey == key) printf("pubkey == key 3\n");
 
 	if ((type & (DST_TYPE_PRIVATE | DST_TYPE_PUBLIC)) == DST_TYPE_PUBLIC ||
 	    (pubkey->key_flags & DNS_KEYFLAG_TYPEMASK) == DNS_KEYTYPE_NOKEY)
@@ -634,7 +631,6 @@ dst_key_fromnamedfile(const char *filename, const char *dirname, int type,
 		pubkey = NULL;
 		goto out;
 	}
-	if (pubkey == key) printf("pubkey == key 4\n");
 
 	RETERR(algorithm_status(pubkey->key_alg));
 
@@ -642,7 +638,6 @@ dst_key_fromnamedfile(const char *filename, const char *dirname, int type,
 			     pubkey->key_flags, pubkey->key_proto,
 			     pubkey->key_size, pubkey->key_class,
 			     pubkey->key_ttl, mctx);
-	if (pubkey == key) printf("pubkey == key 5\n");
 	if (key == NULL) {
 		RETERR(ISC_R_NOMEMORY);
 	}
@@ -650,7 +645,6 @@ dst_key_fromnamedfile(const char *filename, const char *dirname, int type,
 	if (key->func->parse == NULL) {
 		RETERR(DST_R_UNSUPPORTEDALG);
 	}
-	if (pubkey == key) printf("pubkey == key 6\n");
 
 	newfilenamelen = strlen(filename) + 9;
 	if (dirname != NULL) {
@@ -664,10 +658,8 @@ dst_key_fromnamedfile(const char *filename, const char *dirname, int type,
 	RETERR(isc_lex_create(mctx, 1500, &lex));
 	RETERR(isc_lex_openfile(lex, newfilename));
 	isc_mem_put(mctx, newfilename, newfilenamelen);
-	if (pubkey == key) printf("pubkey == key 7\n");
 	RETERR(key->func->parse(key, lex, pubkey));
 	isc_lex_destroy(&lex);
-	printf("after lex destroy\n");
 	key->kasp = false;
 	if ((type & DST_TYPE_STATE) != 0) {
 		result = dst_key_read_state(statefilename, mctx, &key);
@@ -681,7 +673,6 @@ dst_key_fromnamedfile(const char *filename, const char *dirname, int type,
 	}
 
 	RETERR(computeid(key));
-	if (pubkey == key) printf("pubkey == key 8\n");
 	if (pubkey->key_id != key->key_id) {
 		printf("pub key id:%d\n", pubkey->key_id);
 		printf("key id:%d\n", key->key_id);
@@ -692,7 +683,6 @@ dst_key_fromnamedfile(const char *filename, const char *dirname, int type,
 	key = NULL;
 
 out:
-	if (pubkey == key) printf("pubkey == key 8\n");
 	printf("freeing pubkey\n");
 	if (pubkey != NULL) {
 		dst_key_free(&pubkey);
@@ -722,26 +712,21 @@ dst_key_todns(const dst_key_t *key, isc_buffer_t *target) {
 	REQUIRE(dst_initialized);
 	REQUIRE(VALID_KEY(key));
 	REQUIRE(target != NULL);
-	printf("todns\n");
 	CHECKALG(key->key_alg);
 
 	if (key->func->todns == NULL) {
 		return (DST_R_UNSUPPORTEDALG);
 	}
 
-	printf("todns\n");
 	if (isc_buffer_availablelength(target) < 4) {
 		return (ISC_R_NOSPACE);
 	}
-	printf("todns before put int\n");
 	isc_buffer_putuint16(target, (uint16_t)(key->key_flags & 0xffff));
 	isc_buffer_putuint8(target, (uint8_t)key->key_proto);
 	isc_buffer_putuint8(target, (uint8_t)key->key_alg);
 
-	printf("todns before flag check\n");
 	if ((key->key_flags & DNS_KEYFLAG_EXTENDED) != 0) {
 		if (isc_buffer_availablelength(target) < 2) {
-	printf("todns avail len\n");
 			return (ISC_R_NOSPACE);
 		}
 		isc_buffer_putuint16(
@@ -749,10 +734,8 @@ dst_key_todns(const dst_key_t *key, isc_buffer_t *target) {
 	}
 
 	if (key->keydata.generic == NULL) { /*%< NULL KEY */
-	printf("todns null\n");
 		return (ISC_R_SUCCESS);
 	}
-	printf("todns\n");
 	return (key->func->todns(key, target));
 }
 
@@ -1010,20 +993,20 @@ dst_key_generate(const dns_name_t *name, unsigned int alg, unsigned int bits,
 	}
 
 	if (key->func->generate == NULL) {
+		printf("No generate?\n");
 		dst_key_free(&key);
 		return (DST_R_UNSUPPORTEDALG);
 	}
 
 	ret = key->func->generate(key, param, callback);
 	if (ret != ISC_R_SUCCESS) {
-		printf("Failed to generate key\n");
+		printf("Generate failed?\n");
 		dst_key_free(&key);
 		return (ret);
 	}
 
 	ret = computeid(key);
 	if (ret != ISC_R_SUCCESS) {
-		printf("failed computeid");
 		dst_key_free(&key);
 		return (ret);
 	}
@@ -1290,16 +1273,12 @@ dst_key_free(dst_key_t **keyp) {
 	REQUIRE(keyp != NULL && VALID_KEY(*keyp));
 	dst_key_t *key = *keyp;
 	*keyp = NULL;
-	printf("Made it past requires\n");
 	if (isc_refcount_decrement(&key->refs) == 1) {
 		isc_refcount_destroy(&key->refs);
-	printf("Made it past refcount destroy\n");
 		isc_mem_t *mctx = key->mctx;
 		if (key->keydata.generic != NULL) {
-			printf("Not null\n");
 			if (key->func->destroy == NULL) printf("destroy is null...\n");
 			INSIST(key->func->destroy != NULL);
-			printf("Made it past func destroy\n");
 			key->func->destroy(key);
 		}
 		if (key->engine != NULL) {
@@ -1308,18 +1287,13 @@ dst_key_free(dst_key_t **keyp) {
 		if (key->label != NULL) {
 			isc_mem_free(mctx, key->label);
 		}
-		printf("name free\n");
 		dns_name_free(key->key_name, mctx);
-		printf("Made it past name free\n");
 		isc_mem_put(mctx, key->key_name, sizeof(dns_name_t));
 		if (key->key_tkeytoken) {
 			isc_buffer_free(&key->key_tkeytoken);
 		}
-		printf("made it past keytoken\n");
 		isc_safe_memwipe(key, sizeof(*key));
-		printf("memwipe\n");
 		isc_mem_putanddetach(&mctx, key, sizeof(*key));
-		printf("made it past putandattach\n");
 	}
 }
 

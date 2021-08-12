@@ -480,7 +480,7 @@ key_collision(dst_key_t *dstkey, dns_name_t *name, const char *dir,
 	id = dst_key_id(dstkey);
 	rid = dst_key_rid(dstkey);
 	alg = dst_key_alg(dstkey);
-
+	printf("1\n");
 	/*
 	 * For Diffie Hellman just check if there is a direct collision as
 	 * they can't be revoked.  Additionally dns_dnssec_findmatchingkeys
@@ -495,6 +495,7 @@ key_collision(dst_key_t *dstkey, dns_name_t *name, const char *dir,
 		}
 		return (isc_file_exists(filename));
 	}
+	printf("2\n");
 
 	ISC_LIST_INIT(matchkeys);
 	isc_stdtime_get(&now);
@@ -502,6 +503,7 @@ key_collision(dst_key_t *dstkey, dns_name_t *name, const char *dir,
 	if (result == ISC_R_NOTFOUND) {
 		return (false);
 	}
+	printf("3\n");
 
 	while (!ISC_LIST_EMPTY(matchkeys) && !conflict) {
 		key = ISC_LIST_HEAD(matchkeys);
@@ -536,6 +538,7 @@ key_collision(dst_key_t *dstkey, dns_name_t *name, const char *dir,
 		ISC_LIST_UNLINK(matchkeys, key, link);
 		dns_dnsseckey_destroy(mctx, &key);
 	}
+	printf("4\n");
 
 	/* Finish freeing the list */
 	while (!ISC_LIST_EMPTY(matchkeys)) {
