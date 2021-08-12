@@ -111,23 +111,26 @@ opensslfalcon512_createctx(dst_key_t *key, dst_context_t *dctx) {
 	if (evp_md_ctx == NULL) {
 		return (ISC_R_NOMEMORY);
 	}
-	type = EVP_get_digestbyname("falcon512");
+	/*
+	type = EVP_get_digestbynid(EVP_PKEY_FALCON512);
 	if (type == NULL) {
+		printf("type not found\n");
 		return (dst__openssl_toresult3(dctx->category, "EVP_DIGEST_TYPE", ISC_R_FAILURE));
 	}
+	*/
 	// What kind of key is this?
 	// TODO This might break something, but assume if the key ***can***
 	// sign things, that it will only every sign things
 	// o.w. it will only verify things
 	EVP_PKEY_CTX *pctx = EVP_PKEY_CTX_new(pkey, NULL);
 	if (isprivate(pkey)) {
-		if (!EVP_DigestSignInit(evp_md_ctx, &pctx, type, NULL, pkey)) {
+		if (!EVP_DigestSignInit(evp_md_ctx, &pctx, EVP_get_digestbynid(EVP_PKEY_FALCON512), NULL, pkey)) {
 			EVP_MD_CTX_destroy(evp_md_ctx);
 			return (dst__openssl_toresult3(
 				dctx->category, "EVP_DigestInit_ex", ISC_R_FAILURE));
 		}
 	} else {
-		if (!EVP_DigestVerifyInit(evp_md_ctx, &pctx, type, NULL, pkey)) {
+		if (!EVP_DigestVerifyInit(evp_md_ctx, &pctx, EVP_get_digestbynid(EVP_PKEY_FALCON512), NULL, pkey)) {
 			EVP_MD_CTX_destroy(evp_md_ctx);
 			return (dst__openssl_toresult3(
 				dctx->category, "EVP_DigestInit_ex", ISC_R_FAILURE));
@@ -207,6 +210,8 @@ opensslfalcon512_sign(dst_context_t *dctx, isc_buffer_t *sig) {
 //	REQUIRE(siglen == DNS_SIG_FALCON512SIZE);
 	EVP_DigestSignFinal(evp_md_ctx, NULL, &siglen);
 	isc_buffer_availableregion(sig, &region);
+	printf("Siglen: %lu\n", siglen);
+	printf("Region length: %u", region.length);
 	if (region.length < siglen) {
 		DST_RET(ISC_R_NOSPACE);
 	}
@@ -231,6 +236,8 @@ opensslfalcon512_sign(dst_context_t *dctx, isc_buffer_t *sig) {
 	}
 
 	memcpy(buff, digest, siglen);
+	isc_region_consume(&region, siglen);
+	isc_buffer_add(sig, siglen);
 	ret = ISC_R_SUCCESS;
 
 err:
@@ -834,6 +841,7 @@ dst__key_to_evp_pkey(dst_key_t *key, EVP_PKEY **eckey) {
 
 static isc_result_t
 opensslfalcon512_parse(dst_key_t *key, isc_lex_t *lexer, dst_key_t *pub) {
+	printf("Made it to custom parse\n");
 	dst_private_t priv;
 	isc_result_t ret;
 	int i, privkey_index, pubkey_index = -1;
@@ -845,8 +853,9 @@ opensslfalcon512_parse(dst_key_t *key, isc_lex_t *lexer, dst_key_t *pub) {
 	REQUIRE(key->key_alg == DST_ALG_FALCON512);
 
 	/* read private key file */
-	ret = dst__privstruct_parse(key, DST_ALG_ED25519, lexer, mctx, &priv);
+	ret = dst__privstruct_parse(key, DST_ALG_FALCON512, lexer, mctx, &priv);
 	if (ret != ISC_R_SUCCESS) {
+	printf("Failed to parse privstruct\n");
 		goto err;
 	}
 
@@ -867,7 +876,7 @@ opensslfalcon512_parse(dst_key_t *key, isc_lex_t *lexer, dst_key_t *pub) {
 	if (pub != NULL) {
 		pubpkey = pub->keydata.pkey;
 	}
-
+	printf("num elements: %d", priv.nelements);
 	for (i = 0; i < priv.nelements; i++) {
 		switch (priv.elements[i].tag) {
 		case TAG_FALCON512_ENGINE:

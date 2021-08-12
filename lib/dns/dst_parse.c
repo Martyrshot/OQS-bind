@@ -122,13 +122,14 @@ static struct parse_map map[] = { { TAG_RSA_MODULUS, "Modulus:" },
 static int
 find_value(const char *s, const unsigned int alg) {
 	int i;
-
 	for (i = 0; map[i].tag != NULL; i++) {
 		if (strcasecmp(s, map[i].tag) == 0 &&
 		    (TAG_ALG(map[i].value) == alg)) {
 			return (map[i].value);
 		}
 	}
+	printf("Failed looking for %s for alg: %u\n", s, alg);
+	printf("Alg number: %u\n", DST_ALG_FALCON512);
 	return (-1);
 }
 
@@ -490,6 +491,7 @@ dst__privstruct_parse(dst_key_t *key, unsigned int alg, isc_lex_t *lex,
 	if (token.type != isc_tokentype_string ||
 	    strcmp(DST_AS_STR(token), PRIVATE_KEY_STR) != 0)
 	{
+		printf("type 1\n");
 		ret = DST_R_INVALIDPRIVATEKEY;
 		goto fail;
 	}
@@ -497,15 +499,18 @@ dst__privstruct_parse(dst_key_t *key, unsigned int alg, isc_lex_t *lex,
 	NEXTTOKEN(lex, opt, &token);
 	if (token.type != isc_tokentype_string || (DST_AS_STR(token))[0] != 'v')
 	{
+		printf("type 2\n");
 		ret = DST_R_INVALIDPRIVATEKEY;
 		goto fail;
 	}
 	if (sscanf(DST_AS_STR(token), "v%d.%d", &major, &minor) != 2) {
+		printf("type 3\n");
 		ret = DST_R_INVALIDPRIVATEKEY;
 		goto fail;
 	}
 
 	if (major > DST_MAJOR_VERSION) {
+		printf("type 4\n");
 		ret = DST_R_INVALIDPRIVATEKEY;
 		goto fail;
 	}
@@ -524,6 +529,7 @@ dst__privstruct_parse(dst_key_t *key, unsigned int alg, isc_lex_t *lex,
 	if (token.type != isc_tokentype_string ||
 	    strcmp(DST_AS_STR(token), ALGORITHM_STR) != 0)
 	{
+		printf("type 5\n");
 		ret = DST_R_INVALIDPRIVATEKEY;
 		goto fail;
 	}
@@ -532,6 +538,7 @@ dst__privstruct_parse(dst_key_t *key, unsigned int alg, isc_lex_t *lex,
 	if (token.type != isc_tokentype_number ||
 	    token.value.as_ulong != (unsigned long)dst_key_alg(key))
 	{
+		printf("type 6\n");
 		ret = DST_R_INVALIDPRIVATEKEY;
 		goto fail;
 	}
@@ -555,6 +562,7 @@ dst__privstruct_parse(dst_key_t *key, unsigned int alg, isc_lex_t *lex,
 		} while (token.type == isc_tokentype_eol);
 
 		if (token.type != isc_tokentype_string) {
+		printf("type 7\n");
 			ret = DST_R_INVALIDPRIVATEKEY;
 			goto fail;
 		}
@@ -571,6 +579,7 @@ dst__privstruct_parse(dst_key_t *key, unsigned int alg, isc_lex_t *lex,
 
 			NEXTTOKEN(lex, opt | ISC_LEXOPT_NUMBER, &token);
 			if (token.type != isc_tokentype_number) {
+		printf("type 8\n");
 				ret = DST_R_INVALIDPRIVATEKEY;
 				goto fail;
 			}
@@ -586,6 +595,7 @@ dst__privstruct_parse(dst_key_t *key, unsigned int alg, isc_lex_t *lex,
 
 			NEXTTOKEN(lex, opt, &token);
 			if (token.type != isc_tokentype_string) {
+		printf("type 9\n");
 				ret = DST_R_INVALIDPRIVATEKEY;
 				goto fail;
 			}
@@ -605,6 +615,7 @@ dst__privstruct_parse(dst_key_t *key, unsigned int alg, isc_lex_t *lex,
 		if (tag < 0 && minor > DST_MINOR_VERSION) {
 			goto next;
 		} else if (tag < 0) {
+		printf("type 10\n");
 			ret = DST_R_INVALIDPRIVATEKEY;
 			goto fail;
 		}
@@ -631,12 +642,14 @@ dst__privstruct_parse(dst_key_t *key, unsigned int alg, isc_lex_t *lex,
 
 done:
 	if (external && priv->nelements != 0) {
+		printf("type 11\n");
 		ret = DST_R_INVALIDPRIVATEKEY;
 		goto fail;
 	}
 
 	check = check_data(priv, alg, true, external);
 	if (check < 0) {
+		printf("type 12\n");
 		ret = DST_R_INVALIDPRIVATEKEY;
 		goto fail;
 	} else if (check != ISC_R_SUCCESS) {

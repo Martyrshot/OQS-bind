@@ -573,7 +573,6 @@ dst_key_fromnamedfile(const char *filename, const char *dirname, int type,
 	char *newfilename = NULL, *statefilename = NULL;
 	int newfilenamelen = 0, statefilenamelen = 0;
 	isc_lex_t *lex = NULL;
-
 	REQUIRE(dst_initialized);
 	REQUIRE(filename != NULL);
 	REQUIRE((type & (DST_TYPE_PRIVATE | DST_TYPE_PUBLIC)) != 0);
@@ -593,14 +592,16 @@ dst_key_fromnamedfile(const char *filename, const char *dirname, int type,
 	result = addsuffix(newfilename, newfilenamelen, dirname, filename,
 			   ".key");
 	INSIST(result == ISC_R_SUCCESS);
-
+	printf("pre read public\n");
 	RETERR(dst_key_read_public(newfilename, type, mctx, &pubkey));
+	printf("post read public\n");
 	isc_mem_put(mctx, newfilename, newfilenamelen);
 
 	/*
 	 * Read the state file, if requested by type.
 	 */
 	if ((type & DST_TYPE_STATE) != 0) {
+		printf("Has state\n");
 		statefilenamelen = strlen(filename) + 7;
 		if (dirname != NULL) {
 			statefilenamelen += strlen(dirname) + 1;
@@ -618,6 +619,7 @@ dst_key_fromnamedfile(const char *filename, const char *dirname, int type,
 			pubkey->kasp = true;
 		} else if (result == ISC_R_FILENOTFOUND) {
 			/* Having no state is valid. */
+			printf("Hopefully no state?\n");
 			result = ISC_R_SUCCESS;
 		}
 		RETERR(result);
@@ -671,11 +673,8 @@ dst_key_fromnamedfile(const char *filename, const char *dirname, int type,
 		}
 		RETERR(result);
 	}
-
 	RETERR(computeid(key));
 	if (pubkey->key_id != key->key_id) {
-		printf("pub key id:%d\n", pubkey->key_id);
-		printf("key id:%d\n", key->key_id);
 		RETERR(DST_R_INVALIDPRIVATEKEY);
 	}
 
@@ -683,27 +682,21 @@ dst_key_fromnamedfile(const char *filename, const char *dirname, int type,
 	key = NULL;
 
 out:
-	printf("freeing pubkey\n");
 	if (pubkey != NULL) {
 		dst_key_free(&pubkey);
 	}
-	printf("freeing newfilename\n");
 	if (newfilename != NULL) {
 		isc_mem_put(mctx, newfilename, newfilenamelen);
 	}
-	printf("freeing statefilename\n");
 	if (statefilename != NULL) {
 		isc_mem_put(mctx, statefilename, statefilenamelen);
 	}
-	printf("freeing lex\n");
 	if (lex != NULL) {
 		isc_lex_destroy(&lex);
 	}
-	printf("freeing key\n");
 	if (key != NULL) {
 		dst_key_free(&key);
 	}
-	printf("done...\n");
 	return (result);
 }
 
@@ -713,7 +706,7 @@ dst_key_todns(const dst_key_t *key, isc_buffer_t *target) {
 	REQUIRE(VALID_KEY(key));
 	REQUIRE(target != NULL);
 	CHECKALG(key->key_alg);
-
+	printf("In dst_todns\n");
 	if (key->func->todns == NULL) {
 		return (DST_R_UNSUPPORTEDALG);
 	}
@@ -736,6 +729,7 @@ dst_key_todns(const dst_key_t *key, isc_buffer_t *target) {
 	if (key->keydata.generic == NULL) { /*%< NULL KEY */
 		return (ISC_R_SUCCESS);
 	}
+	printf("Pre dst_todns\n");
 	return (key->func->todns(key, target));
 }
 
@@ -1358,6 +1352,9 @@ dst_key_sigsize(const dst_key_t *key, unsigned int *n) {
 		break;
 	case DST_ALG_GSSAPI:
 		*n = 128; /*%< XXX */
+		break;
+	case DST_ALG_FALCON512:
+		*n = DNS_SIG_FALCON512SIZE;
 		break;
 	case DST_ALG_DH:
 	default:
@@ -2200,6 +2197,7 @@ buildfilename(dns_name_t *name, dns_keytag_t id, unsigned int alg,
 
 static isc_result_t
 computeid(dst_key_t *key) {
+	printf("computeid\n");
 	isc_buffer_t dnsbuf;
 	unsigned char dns_array[DST_KEY_MAXSIZE];
 	isc_region_t r;
