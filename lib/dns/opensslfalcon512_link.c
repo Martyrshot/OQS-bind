@@ -408,9 +408,7 @@ err:
 	}
 	key->keydata.pkey = pkey;
 	ret = ISC_R_SUCCESS;
-	printf("pre ctx free\n");
 	EVP_PKEY_CTX_free(pkctx);
-	printf("post ctx free\n");
 	return (ret);
 }
 
@@ -582,8 +580,8 @@ opensslfalcon512_tofile(const dst_key_t *key, const char *directory) {
 	dst_private_t priv;
 	unsigned char *pubbuf = NULL;
 	unsigned char *privbuf = NULL;
-	size_t publen;
-	size_t privlen;
+	size_t publen = FALCON512_PUBLICKEY_SIZE;
+	size_t privlen = FALCON512_PRIVATEKEY_SIZE;
 	int i;
 
 	REQUIRE(key->key_alg == DST_ALG_FALCON512);
@@ -837,6 +835,113 @@ dst__key_to_evp_pkey(dst_key_t *key, EVP_PKEY **eckey) {
 static isc_result_t
 opensslfalcon512_parse(dst_key_t *key, isc_lex_t *lexer, dst_key_t *pub) {
 	dst_private_t priv;
+	isc_result_t ret;
+	int i, privkey_index, pubkey_index = -1;
+	const char *engine = NULL, *label = NULL;
+	EVP_PKEY *pkey = NULL, *pubpkey = NULL;
+	size_t len;
+	isc_mem_t *mctx = key->mctx;
+
+	REQUIRE(key->key_alg == DST_ALG_FALCON512);
+
+	/* read private key file */
+	ret = dst__privstruct_parse(key, DST_ALG_ED25519, lexer, mctx, &priv);
+	if (ret != ISC_R_SUCCESS) {
+		goto err;
+	}
+
+	if (key->external) {
+		if (priv.nelements != 0) {
+			DST_RET(DST_R_INVALIDPRIVATEKEY);
+		}
+		if (pub == NULL) {
+			DST_RET(DST_R_INVALIDPRIVATEKEY);
+		}
+		key->keydata.pkey = pub->keydata.pkey;
+		pub->keydata.pkey = NULL;
+		dst__privstruct_free(&priv, mctx);
+		isc_safe_memwipe(&priv, sizeof(priv));
+		return (ISC_R_SUCCESS);
+	}
+
+	if (pub != NULL) {
+		pubpkey = pub->keydata.pkey;
+	}
+
+	for (i = 0; i < priv.nelements; i++) {
+		switch (priv.elements[i].tag) {
+		case TAG_FALCON512_ENGINE:
+			engine = (char *)priv.elements[i].data;
+			break;
+		case TAG_FALCON512_LABEL:
+			label = (char *)priv.elements[i].data;
+			break;
+		case TAG_FALCON512_PRIVATEKEY:
+			privkey_index = i;
+			break;
+		case TAG_FALCON512_PUBLICKEY:
+			pubkey_index = i;
+			break;
+		default:
+			break;
+		}
+	}
+/*
+	if (label != NULL) {
+		ret = openssleddsa_fromlabel(key, engine, label, NULL);
+		if (ret != ISC_R_SUCCESS) {
+			goto err;
+		}
+		if (eddsa_check(key->keydata.pkey, pubpkey) != ISC_R_SUCCESS) {
+			DST_RET(DST_R_INVALIDPRIVATEKEY);
+		}
+		DST_RET(ISC_R_SUCCESS);
+	}
+*/
+	if (privkey_index < 0) {
+		DST_RET(DST_R_INVALIDPRIVATEKEY);
+	}
+	if (pubkey_index < 0) {
+		DST_RET(DST_R_INVALIDPUBLICKEY);
+	}
+
+	len = priv.elements[privkey_index].length;
+	//ret = raw_key_to_ossl(key->key_alg, 1,
+	//		      priv.elements[privkey_index].data, &len, &pkey);
+
+	if (len < FALCON512_PUBLICKEY_SIZE) {
+		return (DST_R_INVALIDPRIVATEKEY);
+	}
+	pkey = EVP_PKEY_new_raw_private_key(EVP_PKEY_FALCON512, NULL, priv.elements[privkey_index].data, len);
+	if (pkey == NULL) {
+		return (dst__openssl_toresult(ret));
+	}
+
+	len = priv.elements[pubkey_index].length;
+	//ret = raw_key_to_ossl(key->key_alg, 0,
+	//		      priv.elements[pubkey_index].data, &len, &pkey);
+	OQS_KEY *oqs_key = EVP_PKEY_get0(pkey);
+	oqs_key->pubkey = OPENSSL_secure_malloc(len);
+	if (oqs_key->pubkey == NULL) {
+		return (dst__openssl_toresult(ISC_R_NOSPACE));
+	}
+	memcpy(oqs_key->pubkey, priv.elements[pubkey_index].data, len);
+	/*
+	if (eddsa_check(pkey, pubpkey) != ISC_R_SUCCESS) {
+		EVP_PKEY_free(pkey);
+		DST_RET(DST_R_INVALIDPRIVATEKEY);
+	}
+	*/
+	key->keydata.pkey = pkey;
+	key->key_size = DNS_KEY_FALCON512SIZE;
+	ret = ISC_R_SUCCESS;
+
+err:
+	dst__privstruct_free(&priv, mctx);
+	isc_safe_memwipe(&priv, sizeof(priv));
+	return (ret);
+	/*
+	dst_private_t priv;
 	isc_result_t result = ISC_R_SUCCESS;
 	EVP_PKEY *pkey = NULL;
 //	EC_KEY *eckey = NULL;
@@ -846,7 +951,7 @@ opensslfalcon512_parse(dst_key_t *key, isc_lex_t *lexer, dst_key_t *pub) {
 	int i, privkey_index, pubkey_index = -1;
 	bool finalize_key = false;
 
-	/* read private key file */
+	// read private key file
 	// TODO, may need to update this function
 	result = dst__privstruct_parse(key, DST_ALG_FALCON512, lexer, key->mctx,
 				       &priv);
@@ -897,7 +1002,7 @@ opensslfalcon512_parse(dst_key_t *key, isc_lex_t *lexer, dst_key_t *pub) {
 
 		printf("Should never get to lable in parse. uh-oh...\n");
 		goto end;
-/*
+
 		result = opensslecdsa_fromlabel(key, engine, label, NULL);
 		if (result != ISC_R_SUCCESS) {
 			goto end;
@@ -908,7 +1013,7 @@ opensslfalcon512_parse(dst_key_t *key, isc_lex_t *lexer, dst_key_t *pub) {
 			result = dst__openssl_toresult(DST_R_OPENSSLFAILURE);
 			goto end;
 		}
-*/
+
 	} else {
 		//result = dst__key_to_eckey(key, &eckey);
 		//if (result != ISC_R_SUCCESS) {
@@ -923,7 +1028,7 @@ opensslfalcon512_parse(dst_key_t *key, isc_lex_t *lexer, dst_key_t *pub) {
 
 		finalize_key = true;
 	}
-/*
+
 	if (pub != NULL && pub->keydata.pkey != NULL) {
 		pubeckey = EVP_PKEY_get1_EC_KEY(pub->keydata.pkey);
 	}
@@ -932,24 +1037,25 @@ opensslfalcon512_parse(dst_key_t *key, isc_lex_t *lexer, dst_key_t *pub) {
 		result = DST_R_INVALIDPRIVATEKEY;
 		goto end;
 	}
-*/
+
 	if (finalize_key) {
 		printf("Finalizing\n");
 		result = finalize_pkey(key, pkey, engine, label);
 	}
 
 end:
-/*
+
 	if (pubeckey != NULL) {
 		EC_KEY_free(pubeckey);
 	}
 	if (eckey != NULL) {
 		EC_KEY_free(eckey);
 	}
-*/
+
 	dst__privstruct_free(&priv, key->mctx);
 	isc_safe_memwipe(&priv, sizeof(priv));
 	return (result);
+	*/
 }
 
 static dst_func_t opensslfalcon512_functions = {

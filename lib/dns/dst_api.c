@@ -993,14 +993,12 @@ dst_key_generate(const dns_name_t *name, unsigned int alg, unsigned int bits,
 	}
 
 	if (key->func->generate == NULL) {
-		printf("No generate?\n");
 		dst_key_free(&key);
 		return (DST_R_UNSUPPORTEDALG);
 	}
 
 	ret = key->func->generate(key, param, callback);
 	if (ret != ISC_R_SUCCESS) {
-		printf("Generate failed?\n");
 		dst_key_free(&key);
 		return (ret);
 	}
@@ -1277,7 +1275,6 @@ dst_key_free(dst_key_t **keyp) {
 		isc_refcount_destroy(&key->refs);
 		isc_mem_t *mctx = key->mctx;
 		if (key->keydata.generic != NULL) {
-			if (key->func->destroy == NULL) printf("destroy is null...\n");
 			INSIST(key->func->destroy != NULL);
 			key->func->destroy(key);
 		}
