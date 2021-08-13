@@ -359,6 +359,7 @@ dns_dnssec_sign(const dns_name_t *name, dns_rdataset_t *set, dst_key_t *key,
 	}
 	isc_buffer_usedregion(&sigbuf, &r);
 	if (r.length != sig.siglen) {
+		printf("r.length: %u, siglen: %u\n", r.length, sig.siglen);
 		printf("Ran out of space here... :(\n");
 		ret = ISC_R_NOSPACE;
 		goto cleanup_array;

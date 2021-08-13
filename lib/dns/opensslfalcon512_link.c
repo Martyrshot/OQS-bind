@@ -51,35 +51,23 @@
 		goto err; \
 	}
 
-//#if !HAVE_ECDSA_SIG_GET0
-/* From OpenSSL 1.1 */
-/*
-static void
-ECDSA_SIG_get0(const ECDSA_SIG *sig, const BIGNUM **pr, const BIGNUM **ps) {
-	if (pr != NULL) {
-		*pr = sig->r;
-	}
-	if (ps != NULL) {
-		*ps = sig->s;
-	}
-}
-
-static int
-ECDSA_SIG_set0(ECDSA_SIG *sig, BIGNUM *r, BIGNUM *s) {
-	if (r == NULL || s == NULL) {
-		return (0);
-	}
-
-	BN_clear_free(sig->r);
-	BN_clear_free(sig->s);
-	sig->r = r;
-	sig->s = s;
-
-	return (1);
-} */
-// #endif /* !HAVE_ECDSA_SIG_GET0 */
 static bool
 isprivate(EVP_PKEY *pkey) {
+	size_t len;
+
+	if (pkey == NULL) {
+		return (false);
+	}
+
+	if (EVP_PKEY_get_raw_private_key(pkey, NULL, &len) == 1 && len > 0) {
+		return (true);
+	}
+	/* can check if first error is EC_R_INVALID_PRIVATE_KEY */
+	while (ERR_get_error() != 0) {
+		/**/
+	}
+
+/*
 	int rc;
 	EVP_MD_CTX *ctx = EVP_MD_CTX_create();
 	size_t size = DNS_SIG_FALCON512SIZE;
@@ -97,10 +85,22 @@ isprivate(EVP_PKEY *pkey) {
 	rc = EVP_DigestSignFinal(ctx, buff, &size);
 	EVP_MD_CTX_free(ctx);
 	return (rc == 1);
+*/
+
 }
 
 static isc_result_t
 opensslfalcon512_createctx(dst_key_t *key, dst_context_t *dctx) {
+	isc_buffer_t *buf = NULL;
+
+	UNUSED(key);
+	REQUIRE(dctx->key->key_alg == DST_ALG_FALCON512);
+
+	isc_buffer_allocate(dctx->mctx, &buf, 64); // Need to figure out how big...
+	dctx->ctxdata.generic = buf;
+
+	return (ISC_R_SUCCESS);
+	/*
 	EVP_MD_CTX *evp_md_ctx;
 	const EVP_MD *type = NULL;
 	UNUSED(key);
@@ -111,13 +111,13 @@ opensslfalcon512_createctx(dst_key_t *key, dst_context_t *dctx) {
 	if (evp_md_ctx == NULL) {
 		return (ISC_R_NOMEMORY);
 	}
-	/*
+	
 	type = EVP_get_digestbynid(EVP_PKEY_FALCON512);
 	if (type == NULL) {
 		printf("type not found\n");
 		return (dst__openssl_toresult3(dctx->category, "EVP_DIGEST_TYPE", ISC_R_FAILURE));
 	}
-	*/
+	
 	// What kind of key is this?
 	// TODO This might break something, but assume if the key ***can***
 	// sign things, that it will only every sign things
@@ -137,20 +137,29 @@ opensslfalcon512_createctx(dst_key_t *key, dst_context_t *dctx) {
 		}
 
 	}
-/*
+
 	if (!EVP_DigestInit_ex(evp_md_ctx, type, NULL)) {
 		EVP_MD_CTX_destroy(evp_md_ctx);
 		return (dst__openssl_toresult3(
 			dctx->category, "EVP_DigestInit_ex", ISC_R_FAILURE));
 	}
-*/
+
 	dctx->ctxdata.evp_md_ctx = evp_md_ctx;
 
 	return (ISC_R_SUCCESS);
+	*/
 }
 
 static void
 opensslfalcon512_destroyctx(dst_context_t *dctx) {
+	isc_buffer_t *buf = (isc_buffer_t *)dctx->ctxdata.generic;
+
+	REQUIRE(dctx->key->key_alg == DST_ALG_FALCON512);
+	if (buf != NULL) {
+		isc_buffer_free(&buf);
+	}
+	dctx->ctxdata.generic = NULL;
+	/*
 	EVP_MD_CTX *evp_md_ctx = dctx->ctxdata.evp_md_ctx;
 
 	REQUIRE(dctx->key->key_alg == DST_ALG_FALCON512);
@@ -159,10 +168,34 @@ opensslfalcon512_destroyctx(dst_context_t *dctx) {
 		EVP_MD_CTX_destroy(evp_md_ctx);
 		dctx->ctxdata.evp_md_ctx = NULL;
 	}
+	*/
 }
 
 static isc_result_t
 opensslfalcon512_adddata(dst_context_t *dctx, const isc_region_t *data) {
+	isc_buffer_t *buf = (isc_buffer_t *)dctx->ctxdata.generic;
+	isc_buffer_t *nbuf = NULL;
+	isc_region_t r;
+	unsigned int length;
+	isc_result_t result;
+
+	REQUIRE(dctx->key->key_alg == DST_ALG_FALCON512);
+	printf("data length %u\n", data->length);
+	result = isc_buffer_copyregion(buf, data);
+	if (result == ISC_R_SUCCESS) {
+		return (ISC_R_SUCCESS);
+	}
+
+	length = isc_buffer_length(buf) + data->length + 64;
+	isc_buffer_allocate(dctx->mctx, &nbuf, length);
+	isc_buffer_usedregion(buf, &r);
+	(void)isc_buffer_copyregion(nbuf, &r);
+	(void)isc_buffer_copyregion(nbuf, data);
+	isc_buffer_free(&buf);
+	dctx->ctxdata.generic = nbuf;
+
+	return (ISC_R_SUCCESS);
+	/*
 	EVP_MD_CTX *evp_md_ctx = dctx->ctxdata.evp_md_ctx;
 
 	REQUIRE(dctx->key->key_alg == DST_ALG_FALCON512);
@@ -174,6 +207,7 @@ opensslfalcon512_adddata(dst_context_t *dctx, const isc_region_t *data) {
 	}
 
 	return (ISC_R_SUCCESS);
+	*/
 }
 /*
 BN_bn2bin_fixed(const BIGNUM *bn, unsigned char *buf, int size) {
@@ -188,6 +222,63 @@ BN_bn2bin_fixed(const BIGNUM *bn, unsigned char *buf, int size) {
 */
 static isc_result_t
 opensslfalcon512_sign(dst_context_t *dctx, isc_buffer_t *sig) {
+	printf("In falcon512_sign\n");
+	isc_result_t ret;
+	dst_key_t *key = dctx->key;
+	isc_region_t tbsreg;
+	isc_region_t sigreg;
+	EVP_PKEY *pkey = key->keydata.pkey;
+	EVP_MD_CTX *ctx = EVP_MD_CTX_new();
+	isc_buffer_t *buf = (isc_buffer_t *)dctx->ctxdata.generic;
+	size_t siglen;
+
+	REQUIRE(key->key_alg == DST_ALG_FALCON512);
+
+	if (ctx == NULL) {
+		return (ISC_R_NOMEMORY);
+	}
+
+	siglen = DNS_SIG_FALCON512SIZE;
+
+	isc_buffer_availableregion(sig, &sigreg);
+	// zero out buffer
+	unsigned char *_sig = sigreg.base;
+	for (size_t i = 0; i < siglen; i++) {
+		_sig[i] = 0;
+	}
+	if (sigreg.length < (unsigned int)siglen) {
+		printf("Failing sanity check\n");
+		DST_RET(ISC_R_NOSPACE);
+	}
+
+	isc_buffer_usedregion(buf, &tbsreg);
+
+	if (EVP_DigestSignInit(ctx, NULL, NULL, NULL, pkey) != 1) {
+		printf("Failed inite\n");
+		printf("%s\n", ERR_reason_error_string(ERR_get_error()));
+		DST_RET(dst__openssl_toresult3(
+			dctx->category, "EVP_DigestSignInit", ISC_R_FAILURE));
+	}
+	if (EVP_DigestSign(ctx, sigreg.base, &siglen, tbsreg.base,
+			   tbsreg.length) != 1) {
+		printf("Failed sign\n");
+		printf("%s\n", ERR_reason_error_string(ERR_get_error()));
+		DST_RET(dst__openssl_toresult3(dctx->category, "EVP_DigestSign",
+					       DST_R_SIGNFAILURE));
+	}
+	printf("siglen: %lu\n", siglen);
+	siglen = 690;
+	isc_buffer_add(sig, (unsigned int)siglen);
+	ret = ISC_R_SUCCESS;
+
+err:
+	EVP_MD_CTX_free(ctx);
+	isc_buffer_free(&buf);
+	dctx->ctxdata.generic = NULL;
+
+	return (ret);
+
+/*
 	isc_result_t ret;
 	//dst_key_t *key = dctx->key;
 	isc_region_t region;
@@ -201,11 +292,11 @@ opensslfalcon512_sign(dst_context_t *dctx, isc_buffer_t *sig) {
 	unsigned char *sigout = NULL;
 //	const BIGNUM *r, *s; // need to figure out what the falcon512 equiv is
 
-/*
+
 	if (eckey == NULL) {
 		return (ISC_R_FAILURE);
 	}
-*/
+
 	// First let's do a sanity check that buffer will fit a signature up to DNS_SIGFLACON512SIZE
 //	REQUIRE(siglen == DNS_SIG_FALCON512SIZE);
 	EVP_DigestSignFinal(evp_md_ctx, NULL, &siglen);
@@ -222,14 +313,14 @@ opensslfalcon512_sign(dst_context_t *dctx, isc_buffer_t *sig) {
 	}
 
 	
-/*	ECDSA_SIG_get0(ecdsasig, &r, &s);
+	ECDSA_SIG_get0(ecdsasig, &r, &s);
 	BN_bn2bin_fixed(r, region.base, siglen / 2);
 	isc_region_consume(&region, siglen / 2);
 	BN_bn2bin_fixed(s, region.base, siglen / 2);
 	isc_region_consume(&region, siglen / 2);
 	ECDSA_SIG_free(ecdsasig);
 	isc_buffer_add(sig, siglen);
-*/
+
 	unsigned char *buff = region.base;
 	for (unsigned long i = 0; i < siglen; i++) {
 		buff[i] = 0;
@@ -243,10 +334,80 @@ opensslfalcon512_sign(dst_context_t *dctx, isc_buffer_t *sig) {
 err:
 //	EC_KEY_free(eckey);
 	return (ret);
+*/
 }
 
 static isc_result_t
 opensslfalcon512_verify(dst_context_t *dctx, const isc_region_t *sig) {
+	isc_result_t ret;
+	dst_key_t *key = dctx->key;
+	int status;
+	isc_region_t tbsreg;
+	EVP_PKEY *pkey = key->keydata.pkey;
+	EVP_MD_CTX *ctx = EVP_MD_CTX_new();
+	isc_buffer_t *buf = (isc_buffer_t *)dctx->ctxdata.generic;
+	unsigned int siglen = 0;
+
+	REQUIRE(key->key_alg == DST_ALG_FALCON512);
+
+	if (ctx == NULL) {
+		return (ISC_R_NOMEMORY);
+	}
+
+	siglen = DNS_SIG_FALCON512SIZE;
+	if (siglen == 0) {
+		return (ISC_R_NOTIMPLEMENTED);
+	}
+
+	if (sig->length != siglen) {
+		return (DST_R_VERIFYFAILURE);
+	}
+	unsigned char *_sig = sig->base;
+	int ending_key = -1;
+        if (siglen == 690) {
+                for (int i = 0; i < siglen; i++) {
+                        if (_sig[i] == 0 && ending_key == -1) ending_key = i;
+                        else if (_sig[i] == 0) continue;
+                        else ending_key = -1;
+                }
+        }
+        if (ending_key != -1) {
+                siglen = ending_key;
+        }
+        printf("siglen post processing %d\n", siglen);
+
+	isc_buffer_usedregion(buf, &tbsreg);
+
+	if (EVP_DigestVerifyInit(ctx, NULL, NULL, NULL, pkey) != 1) {
+		DST_RET(dst__openssl_toresult3(
+			dctx->category, "EVP_DigestVerifyInit", ISC_R_FAILURE));
+	}
+
+	status = EVP_DigestVerify(ctx, sig->base, siglen, tbsreg.base,
+				  tbsreg.length);
+
+	switch (status) {
+	case 1:
+		ret = ISC_R_SUCCESS;
+		break;
+	case 0:
+		printf("Failed to verify\n");
+		printf("%s\n", ERR_reason_error_string(ERR_get_error()));
+		ret = dst__openssl_toresult(DST_R_VERIFYFAILURE);
+		break;
+	default:
+		ret = dst__openssl_toresult3(dctx->category, "EVP_DigestVerify",
+					     DST_R_VERIFYFAILURE);
+		break;
+	}
+
+err:
+	EVP_MD_CTX_free(ctx);
+	isc_buffer_free(&buf);
+	dctx->ctxdata.generic = NULL;
+
+	return (ret);
+	/*
 	isc_result_t ret;
 	dst_key_t *key = dctx->key;
 	int status;
@@ -258,11 +419,11 @@ opensslfalcon512_verify(dst_context_t *dctx, const isc_region_t *sig) {
 	// EC_KEY *eckey = EVP_PKEY_get1_EC_KEY(pkey); // TODO replace?
 	unsigned int siglen;
 	//BIGNUM *r = NULL, *s = NULL;
-/*
+
 	if (eckey == NULL) {
 		return (ISC_R_FAILURE);
 	}
-*/
+
 	siglen = DNS_SIG_FALCON512SIZE;
 
 	if (sig->length != siglen) {
@@ -280,7 +441,7 @@ opensslfalcon512_verify(dst_context_t *dctx, const isc_region_t *sig) {
 	//cp += siglen / 2;
 	//s = BN_bin2bn(cp, siglen / 2, NULL);
 	//ECDSA_SIG_set0(ecdsasig, r, s);
-	/* cp += siglen / 2; */
+	// cp += siglen / 2;
 
 //	status = ECDSA_do_verify(digest, dgstlen, ecdsasig, eckey);
 	switch (status) {
@@ -288,22 +449,25 @@ opensslfalcon512_verify(dst_context_t *dctx, const isc_region_t *sig) {
 		ret = ISC_R_SUCCESS;
 		break;
 	case 0:
+		printf("Failed to verify\n");
+		printf("%s\n", ERR_reason_error_string(ERR_get_error()));
 		ret = dst__openssl_toresult(DST_R_VERIFYFAILURE);
 		break;
 	default:
-		ret = dst__openssl_toresult3(dctx->category, "ECDSA_do_verify",
+		ret = dst__openssl_toresult3(dctx->category, "FALCON512_do_verify",
 					     DST_R_VERIFYFAILURE);
 		break;
 	}
 
 	// TODO lookup how to free this stuff, if needed
-	/*
+	
 	if (ecdsasig != NULL) {
 		ECDSA_SIG_free(ecdsasig);
 	}
 	EC_KEY_free(eckey);
-	*/
+	
 	return (ret);
+	*/
 }
 
 static bool
@@ -942,7 +1106,7 @@ opensslfalcon512_parse(dst_key_t *key, isc_lex_t *lexer, dst_key_t *pub) {
 	}
 	*/
 	key->keydata.pkey = pkey;
-	key->key_size = DNS_KEY_FALCON512SIZE;
+	key->key_size = priv.elements[pubkey_index].length;
 	ret = ISC_R_SUCCESS;
 
 err:

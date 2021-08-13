@@ -102,6 +102,6 @@
 #define DNS_KEY_ED25519SIZE 32
 #define DNS_KEY_ED448SIZE   57
 
-#define DNS_SIG_FALCON512SIZE 690
+#define DNS_SIG_FALCON512SIZE 690 // Talk to douglas about this value? I keep getting 657 but the website says 690
 #define DNS_KEY_FALCON512SIZE 897 // This *should* be the public key, but it might be the private key
 #endif /* DNS_KEYVALUES_H */

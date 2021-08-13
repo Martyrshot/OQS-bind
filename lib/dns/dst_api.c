@@ -356,7 +356,7 @@ dst_context_adddata(dst_context_t *dctx, const isc_region_t *data) {
 isc_result_t
 dst_context_sign(dst_context_t *dctx, isc_buffer_t *sig) {
 	dst_key_t *key;
-
+	printf("Made it to dst_context_sign\n");
 	REQUIRE(VALID_CTX(dctx));
 	REQUIRE(sig != NULL);
 
@@ -367,12 +367,14 @@ dst_context_sign(dst_context_t *dctx, isc_buffer_t *sig) {
 	}
 
 	if (key->func->sign == NULL) {
+		printf("Missing sign function\n");
 		return (DST_R_NOTPRIVATEKEY);
 	}
 	if (key->func->isprivate == NULL || !key->func->isprivate(key)) {
+		printf("Missing is private or is failing private check\n");
 		return (DST_R_NOTPRIVATEKEY);
 	}
-
+	printf("Calling falcon512 sign\n");
 	return (key->func->sign(dctx, sig));
 }
 
