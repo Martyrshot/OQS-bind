@@ -417,37 +417,13 @@ typedef struct
   EVP_MD_CTX * digest;
 } OQS_KEY;
 
-
-static isc_result_t
-load_privkey_from_privstruct(EVP_PKEY **key, dst_private_t *priv) {
-	unsigned char *privkey = priv->elements[0].data;
-	int privLen = priv->elements[0].length;
-	unsigned char *pubkey = priv->elements[1].data;
-	isc_result_t result = ISC_R_SUCCESS;
-
-	if (privkey == NULL || pubkey == NULL) {
-		return (ISC_R_NOMEMORY);
-	}
-	// I need a way to derive a public key from a private key. For now, going to break the api
-	// and store the pubkey with the private key
-	if ((*key = EVP_PKEY_new_raw_private_key(EVP_PKEY_FALCON512, NULL, privkey, privLen)) == NULL) {
-		return (ISC_R_NOMEMORY);
-	}
-	OQS_KEY *oqs_key = EVP_PKEY_get0(*key);
-	if (oqs_key == NULL) {
-		return (ISC_R_NOMEMORY);
-	}
-	oqs_key->pubkey = pubkey;
-	
-	return (result);
-}
-
 static isc_result_t
 opensslfalcon512_parse(dst_key_t *key, isc_lex_t *lexer, dst_key_t *pub) {
 	dst_private_t priv;
 	isc_result_t ret;
 	int i, privkey_index, pubkey_index = -1;
-	EVP_PKEY *pkey = NULL;
+	const char *engine = NULL; *label = NULL;
+	EVP_PKEY *pkey = NULL, *pubkey = NULL;
 	size_t len;
 	isc_mem_t *mctx = key->mctx;
 
