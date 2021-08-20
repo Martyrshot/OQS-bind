@@ -4019,11 +4019,9 @@ main(int argc, char *argv[]) {
 	if (disable_zone_check) {
 		vresult = ISC_R_SUCCESS;
 	} else {
-		printf("Verifying...\n");
 		vresult = dns_zoneverify_dnssec(NULL, gdb, gversion, gorigin,
 						NULL, mctx, ignore_kskflag,
 						keyset_kskonly, report);
-		printf("Done\n");
 		if (vresult != ISC_R_SUCCESS) {
 			fprintf(output_stdout ? stderr : stdout,
 				"Zone verification failed (%s)\n",

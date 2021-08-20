@@ -356,7 +356,6 @@ dst_context_adddata(dst_context_t *dctx, const isc_region_t *data) {
 isc_result_t
 dst_context_sign(dst_context_t *dctx, isc_buffer_t *sig) {
 	dst_key_t *key;
-	printf("Made it to dst_context_sign\n");
 	REQUIRE(VALID_CTX(dctx));
 	REQUIRE(sig != NULL);
 
@@ -367,14 +366,11 @@ dst_context_sign(dst_context_t *dctx, isc_buffer_t *sig) {
 	}
 
 	if (key->func->sign == NULL) {
-		printf("Missing sign function\n");
 		return (DST_R_NOTPRIVATEKEY);
 	}
 	if (key->func->isprivate == NULL || !key->func->isprivate(key)) {
-		printf("Missing is private or is failing private check\n");
 		return (DST_R_NOTPRIVATEKEY);
 	}
-	printf("Calling falcon512 sign\n");
 	return (key->func->sign(dctx, sig));
 }
 
@@ -594,16 +590,13 @@ dst_key_fromnamedfile(const char *filename, const char *dirname, int type,
 	result = addsuffix(newfilename, newfilenamelen, dirname, filename,
 			   ".key");
 	INSIST(result == ISC_R_SUCCESS);
-	printf("pre read public\n");
 	RETERR(dst_key_read_public(newfilename, type, mctx, &pubkey));
-	printf("post read public\n");
 	isc_mem_put(mctx, newfilename, newfilenamelen);
 
 	/*
 	 * Read the state file, if requested by type.
 	 */
 	if ((type & DST_TYPE_STATE) != 0) {
-		printf("Has state\n");
 		statefilenamelen = strlen(filename) + 7;
 		if (dirname != NULL) {
 			statefilenamelen += strlen(dirname) + 1;
@@ -621,7 +614,6 @@ dst_key_fromnamedfile(const char *filename, const char *dirname, int type,
 			pubkey->kasp = true;
 		} else if (result == ISC_R_FILENOTFOUND) {
 			/* Having no state is valid. */
-			printf("Hopefully no state?\n");
 			result = ISC_R_SUCCESS;
 		}
 		RETERR(result);
@@ -708,7 +700,6 @@ dst_key_todns(const dst_key_t *key, isc_buffer_t *target) {
 	REQUIRE(VALID_KEY(key));
 	REQUIRE(target != NULL);
 	CHECKALG(key->key_alg);
-	printf("In dst_todns\n");
 	if (key->func->todns == NULL) {
 		return (DST_R_UNSUPPORTEDALG);
 	}
@@ -731,7 +722,6 @@ dst_key_todns(const dst_key_t *key, isc_buffer_t *target) {
 	if (key->keydata.generic == NULL) { /*%< NULL KEY */
 		return (ISC_R_SUCCESS);
 	}
-	printf("Pre dst_todns\n");
 	return (key->func->todns(key, target));
 }
 
@@ -2199,7 +2189,6 @@ buildfilename(dns_name_t *name, dns_keytag_t id, unsigned int alg,
 
 static isc_result_t
 computeid(dst_key_t *key) {
-	printf("computeid\n");
 	isc_buffer_t dnsbuf;
 	unsigned char dns_array[DST_KEY_MAXSIZE];
 	isc_region_t r;
