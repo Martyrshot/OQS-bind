@@ -310,9 +310,7 @@ keygen(keygen_ctx_t *ctx, isc_mem_t *mctx, int argc, char **argv) {
 	dst_key_t *prevkey = NULL;
 
 	UNUSED(argc);
-
 	dns_secalg_format(ctx->alg, algstr, sizeof(algstr));
-
 	if (ctx->predecessor == NULL) {
 		if (ctx->prepub == -1) {
 			ctx->prepub = 0;
