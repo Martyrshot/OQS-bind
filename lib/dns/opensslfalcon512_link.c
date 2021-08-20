@@ -426,7 +426,9 @@ opensslfalcon512_parse(dst_key_t *key, isc_lex_t *lexer, dst_key_t *pub) {
 	EVP_PKEY *pkey = NULL, *pubpkey = NULL;
 	size_t len;
 	isc_mem_t *mctx = key->mctx;
-
+	UNUSED(engine);
+	UNUSED(label);
+	UNUSED(pubpkey);
 	REQUIRE(key->key_alg == DST_ALG_FALCON512);
 
 	/* read private key file */
@@ -450,8 +452,12 @@ opensslfalcon512_parse(dst_key_t *key, isc_lex_t *lexer, dst_key_t *pub) {
 	}
 
 	if (pub != NULL) {
+		// This is set so that sanity checks can be made,
+		// but currently don't have those checks implemented
 		pubpkey = pub->keydata.pkey;
 	}
+	// Currently donot support HSMs, but leaving the parsing code
+	// in for future use.
 	for (i = 0; i < priv.nelements; i++) {
 		switch (priv.elements[i].tag) {
 		case TAG_FALCON512_ENGINE:
