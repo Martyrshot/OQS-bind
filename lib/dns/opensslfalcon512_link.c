@@ -66,6 +66,7 @@ isprivate(EVP_PKEY *pkey) {
 	while (ERR_get_error() != 0) {
 		/**/
 	}
+	return (false);
 
 }
 
@@ -199,7 +200,7 @@ opensslfalcon512_verify(dst_context_t *dctx, const isc_region_t *sig) {
 	unsigned char *_sig = sig->base;
 	int ending_key = -1;
         if (siglen == 690) {
-                for (int i = 0; i < siglen; i++) {
+                for (unsigned int i = 0; i < siglen; i++) {
                         if (_sig[i] == 0 && ending_key == -1) ending_key = i;
                         else if (_sig[i] == 0) continue;
                         else ending_key = -1;
@@ -316,7 +317,6 @@ opensslfalcon512_todns(const dst_key_t *key, isc_buffer_t *data) {
 
 static isc_result_t
 opensslfalcon512_fromdns(dst_key_t *key, isc_buffer_t *data) {
-	isc_result_t ret;
 	isc_region_t r;
 	size_t len;
 	EVP_PKEY *pkey;
@@ -443,23 +443,13 @@ load_privkey_from_privstruct(EVP_PKEY **key, dst_private_t *priv) {
 }
 
 static isc_result_t
-finalize_pkey(dst_key_t *key, EVP_PKEY *pkey, const char *engine,
-	       const char *label) {
-	UNUSED(label);
-	UNUSED(engine);
-	key->keydata.pkey = pkey;
-	key->key_size = DNS_KEY_FALCON512SIZE;
-
-	return (ISC_R_SUCCESS);
-}
 
 static isc_result_t
 opensslfalcon512_parse(dst_key_t *key, isc_lex_t *lexer, dst_key_t *pub) {
 	dst_private_t priv;
 	isc_result_t ret;
 	int i, privkey_index, pubkey_index = -1;
-	const char *engine = NULL, *label = NULL;
-	EVP_PKEY *pkey = NULL, *pubpkey = NULL;
+	EVP_PKEY *pkey = NULL;
 	size_t len;
 	isc_mem_t *mctx = key->mctx;
 
