@@ -422,8 +422,8 @@ opensslfalcon512_parse(dst_key_t *key, isc_lex_t *lexer, dst_key_t *pub) {
 	dst_private_t priv;
 	isc_result_t ret;
 	int i, privkey_index, pubkey_index = -1;
-	const char *engine = NULL; *label = NULL;
-	EVP_PKEY *pkey = NULL, *pubkey = NULL;
+	const char *engine = NULL, *label = NULL;
+	EVP_PKEY *pkey = NULL, *pubpkey = NULL;
 	size_t len;
 	isc_mem_t *mctx = key->mctx;
 
