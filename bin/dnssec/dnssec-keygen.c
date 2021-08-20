@@ -394,6 +394,7 @@ keygen(keygen_ctx_t *ctx, isc_mem_t *mctx, int argc, char **argv) {
 			case DST_ALG_ECDSA384:
 			case DST_ALG_ED25519:
 			case DST_ALG_ED448:
+			case DST_ALG_FALCON512
 				break;
 			default:
 				fatal("key size not specified (-b option)");
@@ -562,6 +563,8 @@ keygen(keygen_ctx_t *ctx, isc_mem_t *mctx, int argc, char **argv) {
 	case DST_ALG_ED448:
 		ctx->size = 456;
 		break;
+	case DST_ALG_FALCON512:
+		ctx->size = 1281;
 	}
 
 	if (ctx->alg != DNS_KEYALG_DH && ctx->generator != 0) {
