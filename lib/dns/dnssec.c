@@ -252,7 +252,6 @@ dns_dnssec_sign(const dns_name_t *name, dns_rdataset_t *set, dst_key_t *key,
 	sig.keyid = dst_key_id(key);
 	ret = dst_key_sigsize(key, &sigsize);
 	if (ret != ISC_R_SUCCESS) {
-		printf("Failed dst_key_sigsize\n");
 		return (ret);
 	}
 	sig.siglen = sigsize;
@@ -270,11 +269,9 @@ dns_dnssec_sign(const dns_name_t *name, dns_rdataset_t *set, dst_key_t *key,
 	if (ret != ISC_R_SUCCESS) {
 		goto cleanup_databuf;
 	}
-	printf("Making context...\n");
 	ret = dst_context_create(key, mctx, DNS_LOGCATEGORY_DNSSEC, true, 0,
 				 &ctx);
 	if (ret != ISC_R_SUCCESS) {
-	printf("Failed making context...\n");
 		goto cleanup_databuf;
 	}
 
@@ -337,7 +334,6 @@ dns_dnssec_sign(const dns_name_t *name, dns_rdataset_t *set, dst_key_t *key,
 		isc_buffer_usedregion(&lenbuf, &lenr);
 		ret = dst_context_adddata(ctx, &lenr);
 		if (ret != ISC_R_SUCCESS) {
-			printf("Failed to add data to context\n");
 			goto cleanup_array;
 		}
 
@@ -349,18 +345,14 @@ dns_dnssec_sign(const dns_name_t *name, dns_rdataset_t *set, dst_key_t *key,
 			goto cleanup_array;
 		}
 	}
-	printf("Made it past nrdatas\n");
 
 	isc_buffer_init(&sigbuf, sig.signature, sig.siglen);
 	ret = dst_context_sign(ctx, &sigbuf);
 	if (ret != ISC_R_SUCCESS) {
-		printf("Failed to context sign\n");
 		goto cleanup_array;
 	}
 	isc_buffer_usedregion(&sigbuf, &r);
 	if (r.length != sig.siglen) {
-		printf("r.length: %u, siglen: %u\n", r.length, sig.siglen);
-		printf("Ran out of space here... :(\n");
 		ret = ISC_R_NOSPACE;
 		goto cleanup_array;
 	}
@@ -1479,7 +1471,6 @@ dns_dnssec_findmatchingkeys(const dns_name_t *origin, const char *directory,
 			dir.entry.name, directory,
 			DST_TYPE_PUBLIC | DST_TYPE_PRIVATE | DST_TYPE_STATE,
 			mctx, &dstkey);
-		if (result != ISC_R_SUCCESS) printf("failed fromnamedfile\n");
 		switch (alg) {
 		case DST_ALG_HMACMD5:
 		case DST_ALG_HMACSHA1:
@@ -1507,7 +1498,6 @@ dns_dnssec_findmatchingkeys(const dns_name_t *origin, const char *directory,
 		dns_dnssec_get_hints(key, now);
 
 		if (key->legacy) {
-			printf("legacy key\n");
 			dns_dnsseckey_destroy(mctx, &key);
 		} else {
 			ISC_LIST_APPEND(list, key, link);
