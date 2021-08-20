@@ -443,8 +443,6 @@ load_privkey_from_privstruct(EVP_PKEY **key, dst_private_t *priv) {
 }
 
 static isc_result_t
-
-static isc_result_t
 opensslfalcon512_parse(dst_key_t *key, isc_lex_t *lexer, dst_key_t *pub) {
 	dst_private_t priv;
 	isc_result_t ret;
