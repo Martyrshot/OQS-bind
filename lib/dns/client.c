@@ -102,7 +102,7 @@ struct dns_client {
 	ISC_LIST(struct resctx) resctxs;
 };
 
-#define DEF_FIND_TIMEOUT    5
+#define DEF_FIND_TIMEOUT    10
 #define DEF_FIND_UDPRETRIES 3
 
 /*%
