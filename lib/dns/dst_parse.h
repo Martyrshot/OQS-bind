@@ -30,8 +30,7 @@
 #include <isc/lang.h>
 
 #include <dst/dst.h>
-// TODO hopefully this doesn't break everything, but changing
-// from 512 to 1281 (size of falcon private key)
+// updated from 512 to 2528 (dilithium2 private key size)
 #define MAXFIELDSIZE 1281
 
 /*
