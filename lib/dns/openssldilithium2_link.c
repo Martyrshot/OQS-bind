@@ -392,7 +392,7 @@ openssldilithium2_tofile(const dst_key_t *key, const char *directory) {
 		if (oqs_key == NULL) {
 			printf("oqs_key is null\n");
 		}
-		printf("len: %lu\n", len);
+		printf("privlen: %lu\n", privlen);
 		if (EVP_PKEY_get_raw_private_key(key->keydata.pkey, privbuf,
 						 &privlen) != 1) {
 			printf("Failed to get raw private_key\n");
