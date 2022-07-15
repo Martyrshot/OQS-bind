@@ -417,8 +417,9 @@ openssldilithium2_tofile(const dst_key_t *key, const char *directory) {
 		i++;
 	}
 	priv.nelements = i;
+	printf("pre-privstruct_writefile\n");
 	ret = dst__privstruct_writefile(key, &priv, directory);
-	printf("tofile ret = %d\n", ret);
+	printf("!=tofile ret = %d\n", ret);
 err:
 	if (privbuf != NULL) {
 		isc_mem_put(key->mctx, privbuf, privlen);
