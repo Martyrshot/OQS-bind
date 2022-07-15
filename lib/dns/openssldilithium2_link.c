@@ -42,7 +42,7 @@
 #endif /* ifndef NID_secp384r1 */
 
 #define DILITHIUM2_PUBLICKEY_SIZE 1312
-#define DILITHIUM2_PRIVATEKEY_SIZE 2420
+#define DILITHIUM2_PRIVATEKEY_SIZE 2528
 
 
 #define DST_RET(a)        \
