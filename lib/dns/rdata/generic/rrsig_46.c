@@ -373,7 +373,6 @@ compare_rrsig(ARGS_COMPARE) {
 
 static inline isc_result_t
 fromstruct_rrsig(ARGS_FROMSTRUCT) {
-	printf("in fromstruct_rrsig\n");
 	dns_rdata_rrsig_t *sig = source;
 
 	REQUIRE(type == dns_rdatatype_rrsig);
@@ -385,59 +384,52 @@ fromstruct_rrsig(ARGS_FROMSTRUCT) {
 	UNUSED(type);
 	UNUSED(rdclass);
 
-	printf("0\n");
 	/*
 	 * Type covered.
 	 */
 	RETERR(uint16_tobuffer(sig->covered, target));
 
-	printf("1\n");
 	/*
 	 * Algorithm.
 	 */
 	RETERR(uint8_tobuffer(sig->algorithm, target));
 
-	printf("2\n");
 	/*
 	 * Labels.
 	 */
 	RETERR(uint8_tobuffer(sig->labels, target));
 
-	printf("3\n");
 	/*
 	 * Original TTL.
 	 */
 	RETERR(uint32_tobuffer(sig->originalttl, target));
 
-	printf("4\n");
 	/*
 	 * Expire time.
 	 */
 	RETERR(uint32_tobuffer(sig->timeexpire, target));
 
-	printf("5\n");
 	/*
 	 * Time signed.
 	 */
 	RETERR(uint32_tobuffer(sig->timesigned, target));
 
-	printf("6\n");
 	/*
 	 * Key ID.
 	 */
 	RETERR(uint16_tobuffer(sig->keyid, target));
 
-	printf("7\n");
 	/*
 	 * Signer name.
 	 */
 	RETERR(name_tobuffer(&sig->signer, target));
 
-	printf("8\n");
 	/*
 	 * Signature.
 	 */
-	return (mem_tobuffer(target, sig->signature, sig->siglen));
+	isc_result_t ret = (mem_tobuffer(target, sig->signature, sig->siglen));
+	printf("ret: %d\n", ret);
+	return ret;
 }
 
 static inline isc_result_t
