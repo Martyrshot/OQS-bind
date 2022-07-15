@@ -348,6 +348,7 @@ dns_dnssec_sign(const dns_name_t *name, dns_rdataset_t *set, dst_key_t *key,
 
 	isc_buffer_init(&sigbuf, sig.signature, sig.siglen);
 	ret = dst_context_sign(ctx, &sigbuf);
+	printf("failed context sign\n");
 	if (ret != ISC_R_SUCCESS) {
 		goto cleanup_array;
 	}
@@ -356,10 +357,10 @@ dns_dnssec_sign(const dns_name_t *name, dns_rdataset_t *set, dst_key_t *key,
 		ret = ISC_R_NOSPACE;
 		goto cleanup_array;
 	}
-	
 	ret = dns_rdata_fromstruct(sigrdata, sig.common.rdclass,
 				   sig.common.rdtype, &sig, buffer);
 
+	printf("ret post dns_rdata: %d\n", ret);
 cleanup_array:
 	isc_mem_put(mctx, rdatas, nrdatas * sizeof(dns_rdata_t));
 cleanup_context:
