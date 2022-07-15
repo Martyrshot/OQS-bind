@@ -159,7 +159,7 @@ openssldilithium2_sign(dst_context_t *dctx, isc_buffer_t *sig) {
 		DST_RET(dst__openssl_toresult3(dctx->category, "EVP_DigestSign",
 					       DST_R_SIGNFAILURE));
 	}
-	siglen = DST_SIG_DILITHIUM2SIZE;
+	siglen = DNS_SIG_DILITHIUM2SIZE;
 	isc_buffer_add(sig, (unsigned int)siglen);
 	ret = ISC_R_SUCCESS;
 
