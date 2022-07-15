@@ -348,7 +348,6 @@ dns_dnssec_sign(const dns_name_t *name, dns_rdataset_t *set, dst_key_t *key,
 
 	isc_buffer_init(&sigbuf, sig.signature, sig.siglen);
 	ret = dst_context_sign(ctx, &sigbuf);
-	printf("failed context sign\n");
 	if (ret != ISC_R_SUCCESS) {
 		goto cleanup_array;
 	}

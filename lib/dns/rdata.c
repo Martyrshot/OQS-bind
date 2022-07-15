@@ -766,6 +766,7 @@ dns_rdata_fromwire(dns_rdata_t *rdata, dns_rdataclass_t rdclass,
 
 	if (use_default) {
 		if (activelength > isc_buffer_availablelength(target)) {
+			printf("buffer not big enough (target)\n");
 			result = ISC_R_NOSPACE;
 		} else {
 			isc_buffer_putmem(target, isc_buffer_current(source),
