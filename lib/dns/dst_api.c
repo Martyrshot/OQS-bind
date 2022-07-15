@@ -970,6 +970,7 @@ dst_key_generate(const dns_name_t *name, unsigned int alg, unsigned int bits,
 	key = get_key_struct(name, alg, flags, protocol, bits, rdclass, 0,
 			     mctx);
 	if (key == NULL) {
+		printf("key generate key == NULL\n");
 		return (ISC_R_NOMEMORY);
 	}
 

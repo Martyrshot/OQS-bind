@@ -667,6 +667,7 @@ keygen(keygen_ctx_t *ctx, isc_mem_t *mctx, int argc, char **argv) {
 			ret = dst_key_generate(name, ctx->alg, ctx->size, param,
 					       flags, ctx->protocol,
 					       ctx->rdclass, mctx, &key, NULL);
+			printf("ret = %d\n", ret);
 		}
 		if (ret != ISC_R_SUCCESS) {
 			char namestr[DNS_NAME_FORMATSIZE];
