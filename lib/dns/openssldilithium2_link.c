@@ -353,8 +353,9 @@ openssldilithium2_tofile(const dst_key_t *key, const char *directory) {
 	size_t privlen = DILITHIUM2_PRIVATEKEY_SIZE;
 	int i;
 
+	printf("pre require\n");
 	REQUIRE(key->key_alg == DST_ALG_DILITHIUM2);
-
+	printf("post require\n");
 	if (key->keydata.pkey == NULL) {
 		return (DST_R_NULLKEY);
 	}
@@ -386,7 +387,7 @@ openssldilithium2_tofile(const dst_key_t *key, const char *directory) {
 	}
 	priv.nelements = i;
 	ret = dst__privstruct_writefile(key, &priv, directory);
-
+	printf("tofile ret = %d\n", ret);
 err:
 	if (privbuf != NULL) {
 		isc_mem_put(key->mctx, privbuf, privlen);
