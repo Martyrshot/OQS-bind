@@ -267,7 +267,7 @@ libdns_la_SOURCES +=		\
 	opensslecdsa_link.c	\
 	openssleddsa_link.c	\
 	opensslrsa_link.c       \
-	opensslfalcon512_link.c
+	opensslfalcon512_link.c \
 	openssldilithium2_link.c
 endif
 
