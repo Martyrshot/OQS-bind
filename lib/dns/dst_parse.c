@@ -717,6 +717,7 @@ dst__privstruct_writefile(const dst_key_t *key, const dst_private_t *priv,
 
 	ret = check_data(priv, dst_key_alg(key), false, key->external);
 	if (ret < 0) {
+		printf("check_data failed\n");
 		return (DST_R_INVALIDPRIVATEKEY);
 	} else if (ret != ISC_R_SUCCESS) {
 		return (ret);
@@ -725,6 +726,7 @@ dst__privstruct_writefile(const dst_key_t *key, const dst_private_t *priv,
 	isc_buffer_init(&b, filename, sizeof(filename));
 	result = dst_key_buildfilename(key, DST_TYPE_PRIVATE, directory, &b);
 	if (result != ISC_R_SUCCESS) {
+		printf("Failed dst_key_buildfilename\n");
 		return (result);
 	}
 
@@ -743,6 +745,7 @@ dst__privstruct_writefile(const dst_key_t *key, const dst_private_t *priv,
 	}
 
 	if ((fp = fopen(filename, "w")) == NULL) {
+		printf("write error\n");
 		return (DST_R_WRITEERROR);
 	}
 
@@ -761,6 +764,7 @@ dst__privstruct_writefile(const dst_key_t *key, const dst_private_t *priv,
 	fprintf(fp, "%s v%d.%d\n", PRIVATE_KEY_STR, major, minor);
 
 	fprintf(fp, "%s %u ", ALGORITHM_STR, dst_key_alg(key));
+	printf("Pre switch\n");
 
 	/* XXXVIX this switch statement is too sparse to gen a jump table. */
 	switch (dst_key_alg(key)) {
@@ -819,7 +823,7 @@ dst__privstruct_writefile(const dst_key_t *key, const dst_private_t *priv,
 		fprintf(fp, "(?)\n");
 		break;
 	}
-
+	printf("Pre for loop\n");
 	for (i = 0; i < priv->nelements; i++) {
 		const char *s;
 
@@ -837,6 +841,7 @@ dst__privstruct_writefile(const dst_key_t *key, const dst_private_t *priv,
 
 		fprintf(fp, "%s %.*s\n", s, (int)r.length, r.base);
 	}
+	printf("Post for loop\n");
 
 	if (key->external) {
 		fprintf(fp, "External:\n");
@@ -878,6 +883,7 @@ dst__privstruct_writefile(const dst_key_t *key, const dst_private_t *priv,
 	fflush(fp);
 	result = ferror(fp) ? DST_R_WRITEERROR : ISC_R_SUCCESS;
 	fclose(fp);
+	printf("Post result\n");
 	return (result);
 }
 
