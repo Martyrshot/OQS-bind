@@ -986,6 +986,7 @@ dst_key_generate(const dns_name_t *name, unsigned int alg, unsigned int bits,
 	}
 
 	ret = key->func->generate(key, param, callback);
+	printf("generate ret = %d\n", ret);
 	if (ret != ISC_R_SUCCESS) {
 		dst_key_free(&key);
 		return (ret);
