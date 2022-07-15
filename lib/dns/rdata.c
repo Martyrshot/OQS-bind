@@ -1200,7 +1200,6 @@ dns_rdata_fromstruct(dns_rdata_t *rdata, dns_rdataclass_t rdclass,
 	}
 
 	length = isc_buffer_usedlength(target) - isc_buffer_usedlength(&st);
-	printf("length: %u\n", length);
 	if (result == ISC_R_SUCCESS && length > DNS_RDATA_MAXLENGTH) {
 		printf("buffer not big enough (target)\n");
 		result = ISC_R_NOSPACE;
@@ -1212,6 +1211,7 @@ dns_rdata_fromstruct(dns_rdata_t *rdata, dns_rdataclass_t rdclass,
 		dns_rdata_fromregion(rdata, rdclass, type, &region);
 	}
 	if (result != ISC_R_SUCCESS) {
+		printf("result not ISC_R_SUCCESS\n");
 		*target = st;
 	}
 	return (result);
