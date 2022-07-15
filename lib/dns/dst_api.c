@@ -470,7 +470,9 @@ dst_key_tofile(const dst_key_t *key, int type, const char *directory) {
 	if (((type & DST_TYPE_PRIVATE) != 0) &&
 	    (key->key_flags & DNS_KEYFLAG_TYPEMASK) != DNS_KEYTYPE_NOKEY)
 	{
-		return (key->func->tofile(key, directory));
+		ret = (key->func->tofile(key, directory));
+		printf("tofile ret = %d\n", ret);
+		return ret; // TODO remove debugging and revert to returning tofile.
 	}
 	return (ISC_R_SUCCESS);
 }
@@ -970,7 +972,6 @@ dst_key_generate(const dns_name_t *name, unsigned int alg, unsigned int bits,
 	key = get_key_struct(name, alg, flags, protocol, bits, rdclass, 0,
 			     mctx);
 	if (key == NULL) {
-		printf("key generate key == NULL\n");
 		return (ISC_R_NOMEMORY);
 	}
 
@@ -986,14 +987,12 @@ dst_key_generate(const dns_name_t *name, unsigned int alg, unsigned int bits,
 	}
 
 	ret = key->func->generate(key, param, callback);
-	printf("generate ret = %d\n", ret);
 	if (ret != ISC_R_SUCCESS) {
 		dst_key_free(&key);
 		return (ret);
 	}
 
 	ret = computeid(key);
-	printf("computeid ret = %d/n");
 	if (ret != ISC_R_SUCCESS) {
 		dst_key_free(&key);
 		return (ret);
