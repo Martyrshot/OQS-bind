@@ -714,7 +714,7 @@ dst__privstruct_writefile(const dst_key_t *key, const dst_private_t *priv,
 	int i, ret;
 
 	REQUIRE(priv != NULL);
-
+	printf("0\n");
 	ret = check_data(priv, dst_key_alg(key), false, key->external);
 	if (ret < 0) {
 		printf("check_data failed\n");
@@ -723,6 +723,7 @@ dst__privstruct_writefile(const dst_key_t *key, const dst_private_t *priv,
 		return (ret);
 	}
 
+	printf("0\n");
 	isc_buffer_init(&b, filename, sizeof(filename));
 	result = dst_key_buildfilename(key, DST_TYPE_PRIVATE, directory, &b);
 	if (result != ISC_R_SUCCESS) {
@@ -730,6 +731,7 @@ dst__privstruct_writefile(const dst_key_t *key, const dst_private_t *priv,
 		return (result);
 	}
 
+	printf("0\n");
 	result = isc_file_mode(filename, &mode);
 	if (result == ISC_R_SUCCESS && mode != 0600) {
 		/* File exists; warn that we are changing its permissions */
@@ -743,22 +745,26 @@ dst__privstruct_writefile(const dst_key_t *key, const dst_private_t *priv,
 			      "a result of this operation.",
 			      filename, (unsigned int)mode);
 	}
+	printf("0\n");
 
 	if ((fp = fopen(filename, "w")) == NULL) {
 		printf("write error\n");
 		return (DST_R_WRITEERROR);
 	}
+	printf("0\n");
 
 	access = 0;
 	isc_fsaccess_add(ISC_FSACCESS_OWNER,
 			 ISC_FSACCESS_READ | ISC_FSACCESS_WRITE, &access);
 	(void)isc_fsaccess_set(filename, access);
 
+	printf("0\n");
 	dst_key_getprivateformat(key, &major, &minor);
 	if (major == 0 && minor == 0) {
 		major = DST_MAJOR_VERSION;
 		minor = DST_MINOR_VERSION;
 	}
+	printf("0\n");
 
 	/* XXXDCL return value should be checked for full filesystem */
 	fprintf(fp, "%s v%d.%d\n", PRIVATE_KEY_STR, major, minor);
