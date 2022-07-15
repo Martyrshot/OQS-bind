@@ -357,10 +357,12 @@ openssldilithium2_tofile(const dst_key_t *key, const char *directory) {
 	REQUIRE(key->key_alg == DST_ALG_DILITHIUM2);
 	printf("post require\n");
 	if (key->keydata.pkey == NULL) {
+		printf("pkey is null?\n");
 		return (DST_R_NULLKEY);
 	}
 
 	if (key->external) {
+		printf("is external\n");
 		priv.nelements = 0;
 		return (dst__privstruct_writefile(key, &priv, directory));
 	}
@@ -368,6 +370,7 @@ openssldilithium2_tofile(const dst_key_t *key, const char *directory) {
 	i = 0;
 
 	if (openssldilithium2_isprivate(key)) {
+		printf("isprivate\n");
 		privbuf = isc_mem_get(key->mctx, privlen);
 		if (EVP_PKEY_get_raw_private_key(key->keydata.pkey, privbuf,
 						 &privlen) != 1)

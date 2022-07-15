@@ -712,7 +712,7 @@ dst__privstruct_writefile(const dst_key_t *key, const dst_private_t *priv,
 	int major, minor;
 	mode_t mode;
 	int i, ret;
-
+	printf("priv is null?\n");
 	REQUIRE(priv != NULL);
 	printf("0\n");
 	ret = check_data(priv, dst_key_alg(key), false, key->external);
