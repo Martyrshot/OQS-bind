@@ -1193,7 +1193,9 @@ dns_rdata_fromstruct(dns_rdata_t *rdata, dns_rdataclass_t rdclass,
 
 	st = *target;
 
+	printf("result pre: %d\n", result);
 	FROMSTRUCTSWITCH
+	printf("result post: %d\n", result);
 
 	if (use_default) {
 		(void)NULL;
@@ -1211,7 +1213,6 @@ dns_rdata_fromstruct(dns_rdata_t *rdata, dns_rdataclass_t rdclass,
 		dns_rdata_fromregion(rdata, rdclass, type, &region);
 	}
 	if (result != ISC_R_SUCCESS) {
-		printf("result not ISC_R_SUCCESS\n");
 		*target = st;
 	}
 	return (result);
