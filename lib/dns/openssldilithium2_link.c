@@ -41,8 +41,8 @@
 #error "P-384 group is not known (NID_secp384r1)"
 #endif /* ifndef NID_secp384r1 */
 
-#define FALCON512_PUBLICKEY_SIZE 897
-#define FALCON512_PRIVATEKEY_SIZE 1281
+#define DILITHIUM2_PUBLICKEY_SIZE 1312
+#define DILITHIUM2_PRIVATEKEY_SIZE 2528
 
 
 #define DST_RET(a)        \
@@ -71,11 +71,11 @@ isprivate(EVP_PKEY *pkey) {
 }
 
 static isc_result_t
-opensslfalcon512_createctx(dst_key_t *key, dst_context_t *dctx) {
+openssldilithium2_createctx(dst_key_t *key, dst_context_t *dctx) {
 	isc_buffer_t *buf = NULL;
 
 	UNUSED(key);
-	REQUIRE(dctx->key->key_alg == DST_ALG_FALCON512);
+	REQUIRE(dctx->key->key_alg == DST_ALG_DILITHIUM2);
 
 	isc_buffer_allocate(dctx->mctx, &buf, 64); // Need to figure out how big...
 	dctx->ctxdata.generic = buf;
@@ -84,10 +84,10 @@ opensslfalcon512_createctx(dst_key_t *key, dst_context_t *dctx) {
 }
 
 static void
-opensslfalcon512_destroyctx(dst_context_t *dctx) {
+openssldilithium2_destroyctx(dst_context_t *dctx) {
 	isc_buffer_t *buf = (isc_buffer_t *)dctx->ctxdata.generic;
 
-	REQUIRE(dctx->key->key_alg == DST_ALG_FALCON512);
+	REQUIRE(dctx->key->key_alg == DST_ALG_DILITHIUM2);
 	if (buf != NULL) {
 		isc_buffer_free(&buf);
 	}
@@ -95,14 +95,14 @@ opensslfalcon512_destroyctx(dst_context_t *dctx) {
 }
 
 static isc_result_t
-opensslfalcon512_adddata(dst_context_t *dctx, const isc_region_t *data) {
+openssldilithium2_adddata(dst_context_t *dctx, const isc_region_t *data) {
 	isc_buffer_t *buf = (isc_buffer_t *)dctx->ctxdata.generic;
 	isc_buffer_t *nbuf = NULL;
 	isc_region_t r;
 	unsigned int length;
 	isc_result_t result;
 
-	REQUIRE(dctx->key->key_alg == DST_ALG_FALCON512);
+	REQUIRE(dctx->key->key_alg == DST_ALG_DILITHIUM2);
 	result = isc_buffer_copyregion(buf, data);
 	if (result == ISC_R_SUCCESS) {
 		return (ISC_R_SUCCESS);
@@ -120,7 +120,7 @@ opensslfalcon512_adddata(dst_context_t *dctx, const isc_region_t *data) {
 }
 
 static isc_result_t
-opensslfalcon512_sign(dst_context_t *dctx, isc_buffer_t *sig) {
+openssldilithium2_sign(dst_context_t *dctx, isc_buffer_t *sig) {
 	isc_result_t ret;
 	dst_key_t *key = dctx->key;
 	isc_region_t tbsreg;
@@ -130,13 +130,12 @@ opensslfalcon512_sign(dst_context_t *dctx, isc_buffer_t *sig) {
 	isc_buffer_t *buf = (isc_buffer_t *)dctx->ctxdata.generic;
 	size_t siglen;
 
-	REQUIRE(key->key_alg == DST_ALG_FALCON512);
-
+	REQUIRE(key->key_alg == DST_ALG_DILITHIUM2);
 	if (ctx == NULL) {
 		return (ISC_R_NOMEMORY);
 	}
 
-	siglen = DNS_SIG_FALCON512SIZE;
+	siglen = DNS_SIG_DILITHIUM2SIZE;
 
 	isc_buffer_availableregion(sig, &sigreg);
 	// zero out buffer
@@ -147,9 +146,7 @@ opensslfalcon512_sign(dst_context_t *dctx, isc_buffer_t *sig) {
 	if (sigreg.length < (unsigned int)siglen) {
 		DST_RET(ISC_R_NOSPACE);
 	}
-
 	isc_buffer_usedregion(buf, &tbsreg);
-
 	if (EVP_DigestSignInit(ctx, NULL, NULL, NULL, pkey) != 1) {
 		DST_RET(dst__openssl_toresult3(
 			dctx->category, "EVP_DigestSignInit", ISC_R_FAILURE));
@@ -159,7 +156,7 @@ opensslfalcon512_sign(dst_context_t *dctx, isc_buffer_t *sig) {
 		DST_RET(dst__openssl_toresult3(dctx->category, "EVP_DigestSign",
 					       DST_R_SIGNFAILURE));
 	}
-	siglen = DNS_SIG_FALCON512SIZE;
+	siglen = DNS_SIG_DILITHIUM2SIZE;
 	isc_buffer_add(sig, (unsigned int)siglen);
 	ret = ISC_R_SUCCESS;
 
@@ -167,13 +164,12 @@ err:
 	EVP_MD_CTX_free(ctx);
 	isc_buffer_free(&buf);
 	dctx->ctxdata.generic = NULL;
-
 	return (ret);
 
 }
 
 static isc_result_t
-opensslfalcon512_verify(dst_context_t *dctx, const isc_region_t *sig) {
+openssldilithium2_verify(dst_context_t *dctx, const isc_region_t *sig) {
 	isc_result_t ret;
 	dst_key_t *key = dctx->key;
 	int status;
@@ -183,13 +179,13 @@ opensslfalcon512_verify(dst_context_t *dctx, const isc_region_t *sig) {
 	isc_buffer_t *buf = (isc_buffer_t *)dctx->ctxdata.generic;
 	unsigned int siglen = 0;
 
-	REQUIRE(key->key_alg == DST_ALG_FALCON512);
+	REQUIRE(key->key_alg == DST_ALG_DILITHIUM2);
 
 	if (ctx == NULL) {
 		return (ISC_R_NOMEMORY);
 	}
 
-	siglen = DNS_SIG_FALCON512SIZE;
+	siglen = DNS_SIG_DILITHIUM2SIZE;
 	if (siglen == 0) {
 		return (ISC_R_NOTIMPLEMENTED);
 	}
@@ -199,7 +195,7 @@ opensslfalcon512_verify(dst_context_t *dctx, const isc_region_t *sig) {
 	}
 	unsigned char *_sig = sig->base;
 	int ending_key = -1;
-        if (siglen == DNS_SIG_FALCON512SIZE) {
+        if (siglen == DNS_SIG_DILITHIUM2SIZE) {
                 for (unsigned int i = 0; i < siglen; i++) {
                         if (_sig[i] == 0 && ending_key == -1) ending_key = i;
                         else if (_sig[i] == 0) continue;
@@ -242,7 +238,7 @@ err:
 }
 
 static bool
-opensslfalcon512_compare(const dst_key_t *key1, const dst_key_t *key2) {
+openssldilithium2_compare(const dst_key_t *key1, const dst_key_t *key2) {
 	
 	EVP_PKEY *pkey1 = key1->keydata.pkey;
 	EVP_PKEY *pkey2 = key2->keydata.pkey;
@@ -251,18 +247,16 @@ opensslfalcon512_compare(const dst_key_t *key1, const dst_key_t *key2) {
 }
 
 static isc_result_t
-opensslfalcon512_generate(dst_key_t *key, int unused, void (*callback)(int)) {
+openssldilithium2_generate(dst_key_t *key, int unused, void (*callback)(int)) {
 	isc_result_t ret;
 	EVP_PKEY *pkey = NULL;
-	//EC_KEY *eckey = NULL;
 	EVP_PKEY_CTX *pkctx = NULL;
-	//int falcon512_nid;
-	REQUIRE(key->key_alg == DST_ALG_FALCON512);
+	REQUIRE(key->key_alg == DST_ALG_DILITHIUM2);
 	UNUSED(unused);
 	UNUSED(callback);
-	key->key_size = DNS_KEY_FALCON512SIZE;
+	key->key_size = DNS_KEY_DILITHIUM2SIZE;
 
-	if ((pkctx = EVP_PKEY_CTX_new_id(EVP_PKEY_FALCON512, NULL)) == NULL) {
+	if ((pkctx = EVP_PKEY_CTX_new_id(EVP_PKEY_DILITHIUM2, NULL)) == NULL) {
 		return (dst__openssl_toresult2("EVP_PKEY_CTX_new_id",
 							DST_R_OPENSSLFAILURE));
 	}
@@ -281,27 +275,27 @@ opensslfalcon512_generate(dst_key_t *key, int unused, void (*callback)(int)) {
 }
 
 static bool
-opensslfalcon512_isprivate(const dst_key_t *key) {
+openssldilithium2_isprivate(const dst_key_t *key) {
 	EVP_PKEY *pkey = key->keydata.pkey;
 	return isprivate(pkey);
 }
 
 static void
-opensslfalcon512_destroy(dst_key_t *key) {
+openssldilithium2_destroy(dst_key_t *key) {
 	EVP_PKEY *pkey = key->keydata.pkey;
 	EVP_PKEY_free(pkey);
 	key->keydata.pkey = NULL;
 }
 
 static isc_result_t
-opensslfalcon512_todns(const dst_key_t *key, isc_buffer_t *data) {
+openssldilithium2_todns(const dst_key_t *key, isc_buffer_t *data) {
 	EVP_PKEY *pkey = key->keydata.pkey;
 	isc_region_t r;
 	size_t len;
 
 	REQUIRE(pkey != NULL);
-	REQUIRE(key->key_alg == DST_ALG_FALCON512);
-	len = DNS_KEY_FALCON512SIZE;
+	REQUIRE(key->key_alg == DST_ALG_DILITHIUM2);
+	len = DNS_KEY_DILITHIUM2SIZE;
 
 	isc_buffer_availableregion(data, &r);
 	if (r.length < len) {
@@ -316,12 +310,12 @@ opensslfalcon512_todns(const dst_key_t *key, isc_buffer_t *data) {
 }
 
 static isc_result_t
-opensslfalcon512_fromdns(dst_key_t *key, isc_buffer_t *data) {
+openssldilithium2_fromdns(dst_key_t *key, isc_buffer_t *data) {
 	isc_region_t r;
 	size_t len;
 	EVP_PKEY *pkey;
 
-	REQUIRE(key->key_alg == DST_ALG_FALCON512);
+	REQUIRE(key->key_alg == DST_ALG_DILITHIUM2);
 
 	isc_buffer_remainingregion(data, &r);
 	if (r.length == 0) {
@@ -329,11 +323,11 @@ opensslfalcon512_fromdns(dst_key_t *key, isc_buffer_t *data) {
 	}
 
 	len = r.length;
-	if (len < DNS_KEY_FALCON512SIZE) {
+	if (len < DNS_KEY_DILITHIUM2SIZE) {
 		return (DST_R_INVALIDPUBLICKEY);
 	}
 
-	pkey = EVP_PKEY_new_raw_public_key(EVP_PKEY_FALCON512, NULL, r.base, len);
+	pkey = EVP_PKEY_new_raw_public_key(EVP_PKEY_DILITHIUM2, NULL, r.base, len);
 	if (pkey == NULL) {
 		return (dst__openssl_toresult(DST_R_INVALIDPUBLICKEY));
 	}
@@ -343,60 +337,6 @@ opensslfalcon512_fromdns(dst_key_t *key, isc_buffer_t *data) {
 	key->key_size = len;
 	return (ISC_R_SUCCESS);
 
-}
-
-static isc_result_t
-opensslfalcon512_tofile(const dst_key_t *key, const char *directory) {
-	isc_result_t ret;
-	dst_private_t priv;
-	unsigned char *pubbuf = NULL;
-	unsigned char *privbuf = NULL;
-	size_t publen = FALCON512_PUBLICKEY_SIZE;
-	size_t privlen = FALCON512_PRIVATEKEY_SIZE;
-	int i;
-
-	REQUIRE(key->key_alg == DST_ALG_FALCON512);
-
-	if (key->keydata.pkey == NULL) {
-		return (DST_R_NULLKEY);
-	}
-
-	if (key->external) {
-		priv.nelements = 0;
-		return (dst__privstruct_writefile(key, &priv, directory));
-	}
-
-	i = 0;
-
-	if (opensslfalcon512_isprivate(key)) {
-		privbuf = isc_mem_get(key->mctx, privlen);
-		if (EVP_PKEY_get_raw_private_key(key->keydata.pkey, privbuf,
-						 &privlen) != 1)
-			DST_RET(dst__openssl_toresult(ISC_R_FAILURE));
-		priv.elements[i].tag = TAG_FALCON512_PRIVATEKEY;
-		priv.elements[i].length = privlen;
-		priv.elements[i].data = privbuf;
-		i++;
-		pubbuf = isc_mem_get(key->mctx, publen);
-		if (EVP_PKEY_get_raw_public_key(key->keydata.pkey, pubbuf,
-						 &publen) != 1)
-			DST_RET(dst__openssl_toresult(ISC_R_FAILURE));
-		priv.elements[i].tag = TAG_FALCON512_PUBLICKEY;
-		priv.elements[i].length = publen;
-		priv.elements[i].data = pubbuf;
-		i++;
-	}
-	priv.nelements = i;
-	ret = dst__privstruct_writefile(key, &priv, directory);
-
-err:
-	if (privbuf != NULL) {
-		isc_mem_put(key->mctx, privbuf, privlen);
-	}
-	if (pubbuf != NULL) {
-		isc_mem_put(key->mctx, pubbuf, publen);
-	}
-	return (ret);
 }
 
 typedef struct
@@ -418,7 +358,77 @@ typedef struct
 } OQS_KEY;
 
 static isc_result_t
-opensslfalcon512_parse(dst_key_t *key, isc_lex_t *lexer, dst_key_t *pub) {
+openssldilithium2_tofile(const dst_key_t *key, const char *directory) {
+	isc_result_t ret;
+	dst_private_t priv;
+	unsigned char *pubbuf = NULL;
+	unsigned char *privbuf = NULL;
+	size_t publen = DILITHIUM2_PUBLICKEY_SIZE;
+	size_t privlen = DILITHIUM2_PRIVATEKEY_SIZE;
+	int i;
+
+	REQUIRE(key->key_alg == DST_ALG_DILITHIUM2);
+	if (key->keydata.pkey == NULL) {
+		return (DST_R_NULLKEY);
+	}
+
+	if (key->external) {
+		priv.nelements = 0;
+		return (dst__privstruct_writefile(key, &priv, directory));
+	}
+
+	i = 0;
+
+	if (openssldilithium2_isprivate(key)) {
+		privbuf = isc_mem_get(key->mctx, privlen);
+		if (privbuf == NULL) {
+			printf("Failed to get a privbuf\n");
+		}
+		OQS_KEY *oqs_key = EVP_PKEY_get0(key->keydata.pkey);
+		if (oqs_key == NULL) {
+			printf("oqs_key is null\n");
+		}
+		printf("privlen: %lu - %lu\n", privlen, oqs_key->s->length_secret_key);
+		if (EVP_PKEY_get_raw_private_key(key->keydata.pkey, privbuf,
+						 &privlen) != 1) {
+			printf("Failed to get raw private_key\n");
+			DST_RET(dst__openssl_toresult(ISC_R_FAILURE));
+		}
+		priv.elements[i].tag = TAG_DILITHIUM2_PRIVATEKEY;
+		priv.elements[i].length = privlen;
+		priv.elements[i].data = privbuf;
+		i++;
+		pubbuf = isc_mem_get(key->mctx, publen);
+		if (pubbuf == NULL) {
+			printf("Failed to get a pubbuf\n");
+		}
+		if (EVP_PKEY_get_raw_public_key(key->keydata.pkey, pubbuf,
+						 &publen) != 1) {
+			printf("Failed to get raw public_key\n");
+			DST_RET(dst__openssl_toresult(ISC_R_FAILURE));
+		}
+		priv.elements[i].tag = TAG_DILITHIUM2_PUBLICKEY;
+		priv.elements[i].length = publen;
+		priv.elements[i].data = pubbuf;
+		i++;
+	}
+	priv.nelements = i;
+	printf("pre-privstruct_writefile\n");
+	ret = dst__privstruct_writefile(key, &priv, directory);
+	printf("!=tofile ret = %d\n", ret);
+err:
+	if (privbuf != NULL) {
+		isc_mem_put(key->mctx, privbuf, privlen);
+	}
+	if (pubbuf != NULL) {
+		isc_mem_put(key->mctx, pubbuf, publen);
+	}
+	return (ret);
+}
+
+
+static isc_result_t
+openssldilithium2_parse(dst_key_t *key, isc_lex_t *lexer, dst_key_t *pub) {
 	dst_private_t priv;
 	isc_result_t ret;
 	int i, privkey_index, pubkey_index = -1;
@@ -429,10 +439,10 @@ opensslfalcon512_parse(dst_key_t *key, isc_lex_t *lexer, dst_key_t *pub) {
 	UNUSED(engine);
 	UNUSED(label);
 	UNUSED(pubpkey);
-	REQUIRE(key->key_alg == DST_ALG_FALCON512);
+	REQUIRE(key->key_alg == DST_ALG_DILITHIUM2);
 
 	/* read private key file */
-	ret = dst__privstruct_parse(key, DST_ALG_FALCON512, lexer, mctx, &priv);
+	ret = dst__privstruct_parse(key, DST_ALG_DILITHIUM2, lexer, mctx, &priv);
 	if (ret != ISC_R_SUCCESS) {
 		goto err;
 	}
@@ -460,16 +470,16 @@ opensslfalcon512_parse(dst_key_t *key, isc_lex_t *lexer, dst_key_t *pub) {
 	// in for future use.
 	for (i = 0; i < priv.nelements; i++) {
 		switch (priv.elements[i].tag) {
-		case TAG_FALCON512_ENGINE:
+		case TAG_DILITHIUM2_ENGINE:
 			engine = (char *)priv.elements[i].data;
 			break;
-		case TAG_FALCON512_LABEL:
+		case TAG_DILITHIUM2_LABEL:
 			label = (char *)priv.elements[i].data;
 			break;
-		case TAG_FALCON512_PRIVATEKEY:
+		case TAG_DILITHIUM2_PRIVATEKEY:
 			privkey_index = i;
 			break;
-		case TAG_FALCON512_PUBLICKEY:
+		case TAG_DILITHIUM2_PUBLICKEY:
 			pubkey_index = i;
 			break;
 		default:
@@ -485,10 +495,10 @@ opensslfalcon512_parse(dst_key_t *key, isc_lex_t *lexer, dst_key_t *pub) {
 
 	len = priv.elements[privkey_index].length;
 
-	if (len < FALCON512_PUBLICKEY_SIZE) {
+	if (len < DILITHIUM2_PUBLICKEY_SIZE) {
 		return (DST_R_INVALIDPRIVATEKEY);
 	}
-	pkey = EVP_PKEY_new_raw_private_key(EVP_PKEY_FALCON512, NULL, priv.elements[privkey_index].data, len);
+	pkey = EVP_PKEY_new_raw_private_key(EVP_PKEY_DILITHIUM2, NULL, priv.elements[privkey_index].data, len);
 	if (pkey == NULL) {
 		return (dst__openssl_toresult(ret));
 	}
@@ -510,35 +520,35 @@ err:
 	return (ret);
 }
 
-static dst_func_t opensslfalcon512_functions = {
-	opensslfalcon512_createctx,
+static dst_func_t openssldilithium2_functions = {
+	openssldilithium2_createctx,
 	NULL, /*%< createctx2 */
-	opensslfalcon512_destroyctx,
-	opensslfalcon512_adddata,
-	opensslfalcon512_sign,
-	opensslfalcon512_verify,
+	openssldilithium2_destroyctx,
+	openssldilithium2_adddata,
+	openssldilithium2_sign,
+	openssldilithium2_verify,
 	NULL, /*%< verify2 */
 	NULL, /*%< computesecret */
-	opensslfalcon512_compare,
+	openssldilithium2_compare,
 	NULL, /*%< paramcompare */
-	opensslfalcon512_generate,
-	opensslfalcon512_isprivate,
-	opensslfalcon512_destroy, 
-	opensslfalcon512_todns,   // called by dst_key_todns converts a dst_key to a buffer
-	opensslfalcon512_fromdns, // called by from buffer and constructs a key from dns
-	opensslfalcon512_tofile,  // All this does is write the private key, writing public keys are handled elsewhere
-	opensslfalcon512_parse,
+	openssldilithium2_generate,
+	openssldilithium2_isprivate,
+	openssldilithium2_destroy, 
+	openssldilithium2_todns,   // called by dst_key_todns converts a dst_key to a buffer
+	openssldilithium2_fromdns, // called by from buffer and constructs a key from dns
+	openssldilithium2_tofile,  // All this does is write the private key, writing public keys are handled elsewhere
+	openssldilithium2_parse,
 	NULL,			    /*%< cleanup */
-	NULL,			    /*%< fromlabel */ //re-add this line if errors happen, but honestly they shouldn't
+	NULL, 			    /*%< fromlabel */
 	NULL,			    /*%< dump */
 	NULL,			    /*%< restore */
 };
 
 isc_result_t
-dst__opensslfalcon512_init(dst_func_t **funcp) {
+dst__openssldilithium2_init(dst_func_t **funcp) {
 	REQUIRE(funcp != NULL);
 	if (*funcp == NULL) {
-		*funcp = &opensslfalcon512_functions;
+		*funcp = &openssldilithium2_functions;
 	}
 	return (ISC_R_SUCCESS);
 }

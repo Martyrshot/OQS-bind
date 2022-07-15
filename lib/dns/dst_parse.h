@@ -30,9 +30,8 @@
 #include <isc/lang.h>
 
 #include <dst/dst.h>
-// TODO hopefully this doesn't break everything, but changing
-// from 512 to 1281 (size of falcon private key)
-#define MAXFIELDSIZE 1281
+// updated from 512 to 3000 (dilithium2 private key size + extra bytes to be safe)
+#define MAXFIELDSIZE 3000
 
 /*
  * Maximum number of fields in a private file is 18 (12 algorithm-
@@ -103,6 +102,12 @@
 #define TAG_FALCON512_PUBLICKEY  ((DST_ALG_FALCON512 << TAG_SHIFT) + 1)
 #define TAG_FALCON512_ENGINE     ((DST_ALG_FALCON512 << TAG_SHIFT) + 2)
 #define TAG_FALCON512_LABEL	 ((DST_ALG_FALCON512 << TAG_SHIFT) + 3)
+
+#define DILITHIUM2_NTAGS	     4
+#define TAG_DILITHIUM2_PRIVATEKEY ((DST_ALG_DILITHIUM2 << TAG_SHIFT) + 0)
+#define TAG_DILITHIUM2_PUBLICKEY  ((DST_ALG_DILITHIUM2 << TAG_SHIFT) + 1)
+#define TAG_DILITHIUM2_ENGINE     ((DST_ALG_DILITHIUM2 << TAG_SHIFT) + 2)
+#define TAG_DILITHIUM2_LABEL	 ((DST_ALG_DILITHIUM2 << TAG_SHIFT) + 3)
 
 struct dst_private_element {
 	unsigned short tag;

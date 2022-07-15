@@ -116,6 +116,11 @@ static struct parse_map map[] = { { TAG_RSA_MODULUS, "Modulus:" },
 				  { TAG_FALCON512_PUBLICKEY, "PublicKey:" },
 				  { TAG_FALCON512_ENGINE, "Engine:" }, // Probably won't use for now
 				  { TAG_FALCON512_LABEL, "Label:" }, // Probably won't use for now
+				  
+				  { TAG_DILITHIUM2_PRIVATEKEY, "PrivateKey:" },
+				  { TAG_DILITHIUM2_PUBLICKEY, "PublicKey:" },
+				  { TAG_DILITHIUM2_ENGINE, "Engine:" }, // Probably won't use for now
+				  { TAG_DILITHIUM2_LABEL, "Label:" }, // Probably won't use for now
 
 				  { 0, NULL } };
 
@@ -393,6 +398,42 @@ check_falcon512(const dst_private_t *priv, bool external) {
 }
 
 static int
+check_dilithium2(const dst_private_t *priv, bool external) {
+	int i, j;
+	bool have[DILITHIUM2_NTAGS];
+	bool ok;
+	unsigned int mask;
+	if (external) {
+		return ((priv->nelements == 0) ? 0 : -1);
+	}
+
+	for (i = 0; i < DILITHIUM2_NTAGS; i++) {
+		have[i] = false;
+	}
+	for (j = 0; j < priv->nelements; j++) {
+		for (i = 0; i < DILITHIUM2_NTAGS; i++) {
+			if (priv->elements[j].tag == TAG(DST_ALG_DILITHIUM2, i)) {
+				break;
+			}
+		}
+		if (i == DILITHIUM2_NTAGS) {
+			return (-1);
+		}
+		have[i] = true;
+	}
+
+	mask = (1ULL << TAG_SHIFT) - 1;
+
+	if (have[TAG_DILITHIUM2_ENGINE & mask]) {
+		ok = have[TAG_DILITHIUM2_LABEL & mask];
+	} else {
+		ok = have[TAG_DILITHIUM2_PRIVATEKEY & mask]
+			&& have[TAG_DILITHIUM2_PUBLICKEY & mask];
+	}
+	return (ok ? 0 : -1);
+}
+
+static int
 check_data(const dst_private_t *priv, const unsigned int alg, bool old,
 	   bool external) {
 	/* XXXVIX this switch statement is too sparse to gen a jump table. */
@@ -425,6 +466,8 @@ check_data(const dst_private_t *priv, const unsigned int alg, bool old,
 		return (check_hmac_sha(priv, HMACSHA512_NTAGS, alg));
 	case DST_ALG_FALCON512:
 		return (check_falcon512(priv, external));
+	case DST_ALG_DILITHIUM2:
+		return (check_dilithium2(priv, external));
 	default:
 		return (DST_R_UNSUPPORTEDALG);
 	}
@@ -669,22 +712,30 @@ dst__privstruct_writefile(const dst_key_t *key, const dst_private_t *priv,
 	int major, minor;
 	mode_t mode;
 	int i, ret;
-
+	printf("priv is null?\n");
+	fflush(stdout);
 	REQUIRE(priv != NULL);
-
+	printf("0\n");
+	fflush(stdout);
 	ret = check_data(priv, dst_key_alg(key), false, key->external);
 	if (ret < 0) {
+		printf("check_data failed\n");
+		fflush(stdout);
 		return (DST_R_INVALIDPRIVATEKEY);
 	} else if (ret != ISC_R_SUCCESS) {
 		return (ret);
 	}
 
+	printf("1\n");
+	fflush(stdout);
 	isc_buffer_init(&b, filename, sizeof(filename));
 	result = dst_key_buildfilename(key, DST_TYPE_PRIVATE, directory, &b);
 	if (result != ISC_R_SUCCESS) {
+		printf("Failed dst_key_buildfilename\n");
 		return (result);
 	}
 
+	printf("2\n");
 	result = isc_file_mode(filename, &mode);
 	if (result == ISC_R_SUCCESS && mode != 0600) {
 		/* File exists; warn that we are changing its permissions */
@@ -698,26 +749,32 @@ dst__privstruct_writefile(const dst_key_t *key, const dst_private_t *priv,
 			      "a result of this operation.",
 			      filename, (unsigned int)mode);
 	}
+	printf("3\n");
 
 	if ((fp = fopen(filename, "w")) == NULL) {
+		printf("write error\n");
 		return (DST_R_WRITEERROR);
 	}
+	printf("4\n");
 
 	access = 0;
 	isc_fsaccess_add(ISC_FSACCESS_OWNER,
 			 ISC_FSACCESS_READ | ISC_FSACCESS_WRITE, &access);
 	(void)isc_fsaccess_set(filename, access);
 
+	printf("5\n");
 	dst_key_getprivateformat(key, &major, &minor);
 	if (major == 0 && minor == 0) {
 		major = DST_MAJOR_VERSION;
 		minor = DST_MINOR_VERSION;
 	}
+	printf("6\n");
 
 	/* XXXDCL return value should be checked for full filesystem */
 	fprintf(fp, "%s v%d.%d\n", PRIVATE_KEY_STR, major, minor);
 
 	fprintf(fp, "%s %u ", ALGORITHM_STR, dst_key_alg(key));
+	printf("Pre switch\n");
 
 	/* XXXVIX this switch statement is too sparse to gen a jump table. */
 	switch (dst_key_alg(key)) {
@@ -769,11 +826,14 @@ dst__privstruct_writefile(const dst_key_t *key, const dst_private_t *priv,
 	case DST_ALG_FALCON512:
 		fprintf(fp, "(FALCON512)\n");
 		break;
+	case DST_ALG_DILITHIUM2:
+		fprintf(fp, "(DILITHIUM2)\n");
+		break;
 	default:
 		fprintf(fp, "(?)\n");
 		break;
 	}
-
+	printf("Pre for loop\n");
 	for (i = 0; i < priv->nelements; i++) {
 		const char *s;
 
@@ -791,6 +851,7 @@ dst__privstruct_writefile(const dst_key_t *key, const dst_private_t *priv,
 
 		fprintf(fp, "%s %.*s\n", s, (int)r.length, r.base);
 	}
+	printf("Post for loop\n");
 
 	if (key->external) {
 		fprintf(fp, "External:\n");
@@ -832,6 +893,7 @@ dst__privstruct_writefile(const dst_key_t *key, const dst_private_t *priv,
 	fflush(fp);
 	result = ferror(fp) ? DST_R_WRITEERROR : ISC_R_SUCCESS;
 	fclose(fp);
+	printf("Post result\n");
 	return (result);
 }
 

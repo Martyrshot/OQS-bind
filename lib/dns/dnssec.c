@@ -356,7 +356,6 @@ dns_dnssec_sign(const dns_name_t *name, dns_rdataset_t *set, dst_key_t *key,
 		ret = ISC_R_NOSPACE;
 		goto cleanup_array;
 	}
-	
 	ret = dns_rdata_fromstruct(sigrdata, sig.common.rdclass,
 				   sig.common.rdtype, &sig, buffer);
 

@@ -68,6 +68,7 @@
 #define DNS_KEYALG_ED25519	15
 #define DNS_KEYALG_ED448	16
 #define DNS_KEYALG_FALCON512	250
+#define DNS_KEYALG_DILITHIUM2	251
 #define DNS_KEYALG_INDIRECT	252
 #define DNS_KEYALG_PRIVATEDNS	253
 #define DNS_KEYALG_PRIVATEOID	254 /*%< Key begins with OID giving alg */
@@ -102,6 +103,9 @@
 #define DNS_KEY_ED25519SIZE 32
 #define DNS_KEY_ED448SIZE   57
 
-#define DNS_SIG_FALCON512SIZE 690 // Talk to douglas about this value? I keep getting 657 but the website says 690
-#define DNS_KEY_FALCON512SIZE 897 // This *should* be the public key, but it might be the private key
+#define DNS_SIG_FALCON512SIZE 690
+#define DNS_KEY_FALCON512SIZE 897
+
+#define DNS_SIG_DILITHIUM2SIZE 2420
+#define DNS_KEY_DILITHIUM2SIZE 1312
 #endif /* DNS_KEYVALUES_H */
