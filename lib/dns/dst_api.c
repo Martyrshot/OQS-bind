@@ -237,6 +237,7 @@ dst_lib_init(isc_mem_t *mctx, const char *engine) {
 	RETERR(dst__gssapi_init(&dst_t_func[DST_ALG_GSSAPI]));
 #endif /* HAVE_GSSAPI */
 	RETERR(dst__opensslfalcon512_init(&dst_t_func[DST_ALG_FALCON512]));
+	RETERR(dst__openssldilithium2_init(&dst_t_func[DST_ALG_DILITHIUM2]));
 
 	dst_initialized = true;
 	return (ISC_R_SUCCESS);
@@ -1347,6 +1348,9 @@ dst_key_sigsize(const dst_key_t *key, unsigned int *n) {
 		break;
 	case DST_ALG_FALCON512:
 		*n = DNS_SIG_FALCON512SIZE;
+		break;
+	case DST_ALG_DILITHIUM2:
+		*n = DNS_SIG_DILITHIUM2SIZE;
 		break;
 	case DST_ALG_DH:
 	default:

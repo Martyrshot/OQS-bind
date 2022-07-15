@@ -244,6 +244,8 @@ dst__gssapi_init(struct dst_func **funcp);
 #endif /* HAVE_GSSAPI*/
 isc_result_t
 dst__opensslfalcon512_init(struct dst_func **funcp);
+isc_result_t
+dst__openssldilithium2_init(struct dst_func **funcp);
 
 /*%
  * Destructors
