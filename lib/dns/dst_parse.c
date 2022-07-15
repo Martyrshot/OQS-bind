@@ -713,17 +713,21 @@ dst__privstruct_writefile(const dst_key_t *key, const dst_private_t *priv,
 	mode_t mode;
 	int i, ret;
 	printf("priv is null?\n");
+	fflush(stdout);
 	REQUIRE(priv != NULL);
 	printf("0\n");
+	fflush(stdout);
 	ret = check_data(priv, dst_key_alg(key), false, key->external);
 	if (ret < 0) {
 		printf("check_data failed\n");
+		fflush(stdout);
 		return (DST_R_INVALIDPRIVATEKEY);
 	} else if (ret != ISC_R_SUCCESS) {
 		return (ret);
 	}
 
 	printf("1\n");
+	fflush(stdout);
 	isc_buffer_init(&b, filename, sizeof(filename));
 	result = dst_key_buildfilename(key, DST_TYPE_PRIVATE, directory, &b);
 	if (result != ISC_R_SUCCESS) {
