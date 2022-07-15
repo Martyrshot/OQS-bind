@@ -14,7 +14,7 @@
 #include <stdbool.h>
 
 #include <openssl/bn.h>
-#include <openssl/ecdsa.h> // Need to find out the falcon equiv... :(
+#include <openssl/ecdsa.h>
 #include <openssl/err.h>
 #include <openssl/objects.h>
 #if !defined(OPENSSL_NO_ENGINE)
@@ -529,7 +529,7 @@ static dst_func_t opensslfalcon512_functions = {
 	opensslfalcon512_tofile,  // All this does is write the private key, writing public keys are handled elsewhere
 	opensslfalcon512_parse,
 	NULL,			    /*%< cleanup */
-	NULL, //opensslfalcon512_fromlabel, /*%< fromlabel */ //re-add this line if errors happen, but honestly they shouldn't
+	NULL,			    /*%< fromlabel */ //re-add this line if errors happen, but honestly they shouldn't
 	NULL,			    /*%< dump */
 	NULL,			    /*%< restore */
 };

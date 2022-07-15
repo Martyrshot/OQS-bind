@@ -14,7 +14,7 @@
 #include <stdbool.h>
 
 #include <openssl/bn.h>
-#include <openssl/ecdsa.h> // Need to find out the falcon equiv... :(
+#include <openssl/ecdsa.h>
 #include <openssl/err.h>
 #include <openssl/objects.h>
 #if !defined(OPENSSL_NO_ENGINE)
