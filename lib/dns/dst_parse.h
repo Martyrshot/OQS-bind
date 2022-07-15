@@ -30,8 +30,8 @@
 #include <isc/lang.h>
 
 #include <dst/dst.h>
-// updated from 512 to 2528 (dilithium2 private key size)
-#define MAXFIELDSIZE 2528
+// updated from 512 to 3000 (dilithium2 private key size + extra bytes to be safe)
+#define MAXFIELDSIZE 3000
 
 /*
  * Maximum number of fields in a private file is 18 (12 algorithm-
