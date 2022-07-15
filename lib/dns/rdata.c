@@ -766,7 +766,6 @@ dns_rdata_fromwire(dns_rdata_t *rdata, dns_rdataclass_t rdclass,
 
 	if (use_default) {
 		if (activelength > isc_buffer_availablelength(target)) {
-			printf("buffer not big enough (target)\n");
 			result = ISC_R_NOSPACE;
 		} else {
 			isc_buffer_putmem(target, isc_buffer_current(source),
@@ -1201,7 +1200,9 @@ dns_rdata_fromstruct(dns_rdata_t *rdata, dns_rdataclass_t rdclass,
 	}
 
 	length = isc_buffer_usedlength(target) - isc_buffer_usedlength(&st);
+	printf("length: %u\n", length);
 	if (result == ISC_R_SUCCESS && length > DNS_RDATA_MAXLENGTH) {
+		printf("buffer not big enough (target)\n");
 		result = ISC_R_NOSPACE;
 	}
 
