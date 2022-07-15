@@ -993,6 +993,7 @@ dst_key_generate(const dns_name_t *name, unsigned int alg, unsigned int bits,
 	}
 
 	ret = computeid(key);
+	printf("computeid ret = %d/n");
 	if (ret != ISC_R_SUCCESS) {
 		dst_key_free(&key);
 		return (ret);
