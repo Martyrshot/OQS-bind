@@ -372,16 +372,26 @@ openssldilithium2_tofile(const dst_key_t *key, const char *directory) {
 	if (openssldilithium2_isprivate(key)) {
 		printf("isprivate\n");
 		privbuf = isc_mem_get(key->mctx, privlen);
+		if (privbuf == NULL) {
+			printf("Failed to get a privbuf\n");
+		}
 		if (EVP_PKEY_get_raw_private_key(key->keydata.pkey, privbuf,
-						 &privlen) != 1)
+						 &privlen) != 1) {
+			printf("Failed to get raw private_key\n");
 			DST_RET(dst__openssl_toresult(ISC_R_FAILURE));
+		}
 		priv.elements[i].tag = TAG_DILITHIUM2_PRIVATEKEY;
 		priv.elements[i].length = privlen;
 		priv.elements[i].data = privbuf;
 		i++;
 		pubbuf = isc_mem_get(key->mctx, publen);
+		if (pubbuf == NULL) {
+			printf("Failed to get a pubbuf\n");
+		}
 		if (EVP_PKEY_get_raw_public_key(key->keydata.pkey, pubbuf,
-						 &publen) != 1)
+						 &publen) != 1) {
+			printf("Failed to get raw public_key\n");
+		}
 			DST_RET(dst__openssl_toresult(ISC_R_FAILURE));
 		priv.elements[i].tag = TAG_DILITHIUM2_PUBLICKEY;
 		priv.elements[i].length = publen;
