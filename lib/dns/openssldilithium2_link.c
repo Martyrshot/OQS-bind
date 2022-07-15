@@ -409,8 +409,8 @@ openssldilithium2_tofile(const dst_key_t *key, const char *directory) {
 		if (EVP_PKEY_get_raw_public_key(key->keydata.pkey, pubbuf,
 						 &publen) != 1) {
 			printf("Failed to get raw public_key\n");
-		}
 			DST_RET(dst__openssl_toresult(ISC_R_FAILURE));
+		}
 		priv.elements[i].tag = TAG_DILITHIUM2_PUBLICKEY;
 		priv.elements[i].length = publen;
 		priv.elements[i].data = pubbuf;
