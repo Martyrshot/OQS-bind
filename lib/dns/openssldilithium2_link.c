@@ -146,10 +146,11 @@ openssldilithium2_sign(dst_context_t *dctx, isc_buffer_t *sig) {
 	}
 	printf("sigreg.length: %u siglen: %u\n", sigreg.length, (unsigned int)siglen);
 	if (sigreg.length < (unsigned int)siglen) {
+		printf("Failed?\n");
 		DST_RET(ISC_R_NOSPACE);
 	}
 	isc_buffer_usedregion(buf, &tbsreg);
-
+	printf("pre evp stuff\n");
 	if (EVP_DigestSignInit(ctx, NULL, NULL, NULL, pkey) != 1) {
 		printf("init failed\n");
 		DST_RET(dst__openssl_toresult3(
@@ -161,6 +162,7 @@ openssldilithium2_sign(dst_context_t *dctx, isc_buffer_t *sig) {
 		DST_RET(dst__openssl_toresult3(dctx->category, "EVP_DigestSign",
 					       DST_R_SIGNFAILURE));
 	}
+	printf("post evp stuff\n");
 	siglen = DNS_SIG_DILITHIUM2SIZE;
 	isc_buffer_add(sig, (unsigned int)siglen);
 	ret = ISC_R_SUCCESS;
