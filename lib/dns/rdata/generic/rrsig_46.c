@@ -427,6 +427,7 @@ fromstruct_rrsig(ARGS_FROMSTRUCT) {
 	/*
 	 * Signature.
 	 */
+	printf("target len: %d, sig->siglen: %d\n", tr->length, sig->siglen);
 	isc_result_t ret = (mem_tobuffer(target, sig->signature, sig->siglen));
 	printf("ret: %d\n", ret);
 	return ret;

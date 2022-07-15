@@ -1192,7 +1192,7 @@ dns_rdata_fromstruct(dns_rdata_t *rdata, dns_rdataclass_t rdclass,
 	}
 
 	st = *target;
-
+	
 	printf("result pre: %d\n", result);
 	FROMSTRUCTSWITCH
 	printf("result post: %d\n", result);
