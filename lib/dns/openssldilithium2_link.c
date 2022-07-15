@@ -131,7 +131,7 @@ openssldilithium2_sign(dst_context_t *dctx, isc_buffer_t *sig) {
 	size_t siglen;
 
 	REQUIRE(key->key_alg == DST_ALG_DILITHIUM2);
-
+	printf("in sign\n");
 	if (ctx == NULL) {
 		return (ISC_R_NOMEMORY);
 	}
@@ -144,18 +144,20 @@ openssldilithium2_sign(dst_context_t *dctx, isc_buffer_t *sig) {
 	for (size_t i = 0; i < siglen; i++) {
 		_sig[i] = 0;
 	}
+	printf("sigreg.length: %u siglen: %u\n", sigreg.length, (unsigned int)siglen);
 	if (sigreg.length < (unsigned int)siglen) {
-		printf("sigreg.length: %u siglen: %u\n", sigreg.length, (unsigned int)siglen);
 		DST_RET(ISC_R_NOSPACE);
 	}
 	isc_buffer_usedregion(buf, &tbsreg);
 
 	if (EVP_DigestSignInit(ctx, NULL, NULL, NULL, pkey) != 1) {
+		printf("init failed\n");
 		DST_RET(dst__openssl_toresult3(
 			dctx->category, "EVP_DigestSignInit", ISC_R_FAILURE));
 	}
 	if (EVP_DigestSign(ctx, sigreg.base, &siglen, tbsreg.base,
 			   tbsreg.length) != 1) {
+		printf("sign failed\n");
 		DST_RET(dst__openssl_toresult3(dctx->category, "EVP_DigestSign",
 					       DST_R_SIGNFAILURE));
 	}
