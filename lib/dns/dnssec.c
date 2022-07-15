@@ -264,7 +264,6 @@ dns_dnssec_sign(const dns_name_t *name, dns_rdataset_t *set, dst_key_t *key,
 	isc_buffer_allocate(mctx, &databuf, sigsize + 256 + 18);
 
 	dns_rdata_init(&tmpsigrdata);
-	printf("databuf size: %d, siglen: %d\n", sigsize + 256 + 18, sig.siglen);
 	ret = dns_rdata_fromstruct(&tmpsigrdata, sig.common.rdclass,
 				   sig.common.rdtype, &sig, databuf);
 	if (ret != ISC_R_SUCCESS) {
@@ -360,7 +359,6 @@ dns_dnssec_sign(const dns_name_t *name, dns_rdataset_t *set, dst_key_t *key,
 	ret = dns_rdata_fromstruct(sigrdata, sig.common.rdclass,
 				   sig.common.rdtype, &sig, buffer);
 
-	printf("ret post dns_rdata: %d\n", ret);
 cleanup_array:
 	isc_mem_put(mctx, rdatas, nrdatas * sizeof(dns_rdata_t));
 cleanup_context:

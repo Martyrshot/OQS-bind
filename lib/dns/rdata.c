@@ -1193,9 +1193,7 @@ dns_rdata_fromstruct(dns_rdata_t *rdata, dns_rdataclass_t rdclass,
 
 	st = *target;
 	
-	printf("result pre: %d\n", result);
 	FROMSTRUCTSWITCH
-	printf("result post: %d\n", result);
 
 	if (use_default) {
 		(void)NULL;
@@ -1203,7 +1201,6 @@ dns_rdata_fromstruct(dns_rdata_t *rdata, dns_rdataclass_t rdclass,
 
 	length = isc_buffer_usedlength(target) - isc_buffer_usedlength(&st);
 	if (result == ISC_R_SUCCESS && length > DNS_RDATA_MAXLENGTH) {
-		printf("buffer not big enough (target)\n");
 		result = ISC_R_NOSPACE;
 	}
 

@@ -149,6 +149,7 @@ usage(void) {
 	fprintf(stderr, "        RSASHA256 | RSASHA512 |\n");
 	fprintf(stderr, "        ECDSAP256SHA256 | ECDSAP384SHA384 |\n");
 	fprintf(stderr, "        ED25519 | ED448 | DH\n");
+	fprintf(stderr, "        FALCON512 | DILITHIUM2\n");
 	fprintf(stderr, "    -3: use NSEC3-capable algorithm\n");
 	fprintf(stderr, "    -b <key size in bits>:\n");
 	fprintf(stderr, "        RSASHA1:\t[1024..%d]\n", MAX_RSA);
@@ -160,6 +161,8 @@ usage(void) {
 	fprintf(stderr, "        ECDSAP384SHA384:\tignored\n");
 	fprintf(stderr, "        ED25519:\tignored\n");
 	fprintf(stderr, "        ED448:\tignored\n");
+	fprintf(stderr, "        FALCON512:\tignored\n");
+	fprintf(stderr, "        DILITHIUM2:\tignored\n");
 	fprintf(stderr, "        (key size defaults are set according to\n"
 			"        algorithm and usage (ZSK or KSK)\n");
 	fprintf(stderr, "    -n <nametype>: ZONE | HOST | ENTITY | "

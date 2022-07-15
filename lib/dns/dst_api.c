@@ -470,9 +470,7 @@ dst_key_tofile(const dst_key_t *key, int type, const char *directory) {
 	if (((type & DST_TYPE_PRIVATE) != 0) &&
 	    (key->key_flags & DNS_KEYFLAG_TYPEMASK) != DNS_KEYTYPE_NOKEY)
 	{
-		ret = (key->func->tofile(key, directory));
-		printf("tofile ret = %d\n", ret);
-		return ret; // TODO remove debugging and revert to returning tofile.
+		return (key->func->tofile(key, directory));
 	}
 	return (ISC_R_SUCCESS);
 }
