@@ -343,6 +343,24 @@ openssldilithium2_fromdns(dst_key_t *key, isc_buffer_t *data) {
 
 }
 
+typedef struct
+{
+  /* OpenSSL NID */
+  int nid;
+  /* OQS signature context */
+  OQS_SIG *s;
+  /* OQS public key */
+  uint8_t *pubkey;
+  /* OQS private key */
+  uint8_t *privkey;
+  /* Classical key pair for hybrid schemes; either a private or public key depending on context */
+  EVP_PKEY *classical_pkey;
+  /* Security bits for the scheme */
+  int security_bits;
+  /* digest engine for CMS: */
+  EVP_MD_CTX * digest;
+} OQS_KEY;
+
 static isc_result_t
 openssldilithium2_tofile(const dst_key_t *key, const char *directory) {
 	isc_result_t ret;
@@ -353,16 +371,12 @@ openssldilithium2_tofile(const dst_key_t *key, const char *directory) {
 	size_t privlen = DILITHIUM2_PRIVATEKEY_SIZE;
 	int i;
 
-	printf("pre require\n");
 	REQUIRE(key->key_alg == DST_ALG_DILITHIUM2);
-	printf("post require\n");
 	if (key->keydata.pkey == NULL) {
-		printf("pkey is null?\n");
 		return (DST_R_NULLKEY);
 	}
 
 	if (key->external) {
-		printf("is external\n");
 		priv.nelements = 0;
 		return (dst__privstruct_writefile(key, &priv, directory));
 	}
@@ -370,11 +384,15 @@ openssldilithium2_tofile(const dst_key_t *key, const char *directory) {
 	i = 0;
 
 	if (openssldilithium2_isprivate(key)) {
-		printf("isprivate\n");
 		privbuf = isc_mem_get(key->mctx, privlen);
 		if (privbuf == NULL) {
 			printf("Failed to get a privbuf\n");
 		}
+		OQS_KEY *oqs_key = EVP_PKEY_get0(key->keydata.pkey);
+		if (oqs_key == NULL) {
+			printf("oqs_key is null\n");
+		}
+		printf("len: %lu\n" len);
 		if (EVP_PKEY_get_raw_private_key(key->keydata.pkey, privbuf,
 						 &privlen) != 1) {
 			printf("Failed to get raw private_key\n");
@@ -411,23 +429,6 @@ err:
 	return (ret);
 }
 
-typedef struct
-{
-  /* OpenSSL NID */
-  int nid;
-  /* OQS signature context */
-  OQS_SIG *s;
-  /* OQS public key */
-  uint8_t *pubkey;
-  /* OQS private key */
-  uint8_t *privkey;
-  /* Classical key pair for hybrid schemes; either a private or public key depending on context */
-  EVP_PKEY *classical_pkey;
-  /* Security bits for the scheme */
-  int security_bits;
-  /* digest engine for CMS: */
-  EVP_MD_CTX * digest;
-} OQS_KEY;
 
 static isc_result_t
 openssldilithium2_parse(dst_key_t *key, isc_lex_t *lexer, dst_key_t *pub) {
