@@ -145,9 +145,9 @@ openssldilithium2_sign(dst_context_t *dctx, isc_buffer_t *sig) {
 		_sig[i] = 0;
 	}
 	if (sigreg.length < (unsigned int)siglen) {
+		printf("sigreg.length: %u siglen: %u\n", sigreg.length, (unsigned int)siglen);
 		DST_RET(ISC_R_NOSPACE);
 	}
-
 	isc_buffer_usedregion(buf, &tbsreg);
 
 	if (EVP_DigestSignInit(ctx, NULL, NULL, NULL, pkey) != 1) {
