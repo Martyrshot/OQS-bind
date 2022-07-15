@@ -564,8 +564,10 @@ keygen(keygen_ctx_t *ctx, isc_mem_t *mctx, int argc, char **argv) {
 		break;
 	case DST_ALG_FALCON512:
 		ctx->size = 1281;
+		break;
 	case DST_ALG_DILITHIUM2:
 		ctx->size = 2528;
+		break;
 	}
 
 	if (ctx->alg != DNS_KEYALG_DH && ctx->generator != 0) {
