@@ -518,7 +518,7 @@ towiresorted(dns_rdataset_t *rdataset, const dns_name_t *owner_name,
 			}
 		} else {
 			result = dns_rdataset_next(rdataset);
-			if (result == USC_R_NOSPACE) {
+			if (result == ISC_R_NOSPACE) {
 				printf("!+!+!++!+rdataset_next NOSPACE\n");
 			}
 		}
