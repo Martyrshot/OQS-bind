@@ -692,9 +692,11 @@ ta_fromconfig(const cfg_obj_t *key, bool *initialp, const char **namestrp,
 	dns_rdata_t rdata = DNS_RDATA_INIT;
 	uint32_t rdata1, rdata2, rdata3;
 	const char *datastr = NULL, *namestr = NULL;
-	unsigned char data[4096];
+	// OQS updated from 4096 to 8192
+	unsigned char data[8192];
 	isc_buffer_t databuf;
-	unsigned char rrdata[4096];
+	// OQS updated from 4096 to 8192
+	unsigned char rrdata[8192];
 	isc_buffer_t rrdatabuf;
 	isc_region_t r;
 	dns_fixedname_t fname;
@@ -1340,7 +1342,8 @@ get_view_querysource_dispatch(const cfg_obj_t **maps, int af,
 
 	disp = NULL;
 	result = dns_dispatch_getudp(named_g_dispatchmgr, named_g_socketmgr,
-				     named_g_taskmgr, &sa, 4096,
+				     // OQS updated from 4096 to 8192
+				     named_g_taskmgr, &sa, 8192,
 				     maxdispatchbuffers, 32768, 16411, 16433,
 				     attrs, attrmask, &disp);
 	if (result != ISC_R_SUCCESS) {
@@ -4850,8 +4853,9 @@ configure_view(dns_view_t *view, dns_viewlist_t *viewlist, cfg_obj_t *config,
 	if (udpsize < 512) {
 		udpsize = 512;
 	}
-	if (udpsize > 4096) {
-		udpsize = 4096;
+	// OQS updated from 4096 to 8192
+	if (udpsize > 8192) {
+		udpsize = 8192;
 	}
 	dns_resolver_setudpsize(view->resolver, (uint16_t)udpsize);
 
@@ -4865,8 +4869,9 @@ configure_view(dns_view_t *view, dns_viewlist_t *viewlist, cfg_obj_t *config,
 	if (udpsize < 512) {
 		udpsize = 512;
 	}
-	if (udpsize > 4096) {
-		udpsize = 4096;
+	// OQS updated from 4096 to 8192
+	if (udpsize > 8192) {
+		udpsize = 8192;
 	}
 	view->maxudp = udpsize;
 
@@ -8864,25 +8869,28 @@ load_configuration(const char *filename, named_server_t *server,
 	result = named_config_get(maps, "tcp-receive-buffer", &obj);
 	INSIST(result == ISC_R_SUCCESS);
 	recv_tcp_buffer_size = cfg_obj_asuint32(obj);
-	CAP_IF_NOT_ZERO(recv_tcp_buffer_size, 4096, INT32_MAX);
+	// OQS updated from 4096 to 8192
+	CAP_IF_NOT_ZERO(recv_tcp_buffer_size, 8192, INT32_MAX);
 
 	obj = NULL;
 	result = named_config_get(maps, "tcp-send-buffer", &obj);
 	INSIST(result == ISC_R_SUCCESS);
 	send_tcp_buffer_size = cfg_obj_asuint32(obj);
-	CAP_IF_NOT_ZERO(send_tcp_buffer_size, 4096, INT32_MAX);
+	// OQS updated from 4096 to 8192
+	CAP_IF_NOT_ZERO(send_tcp_buffer_size, 8192, INT32_MAX);
 
 	obj = NULL;
 	result = named_config_get(maps, "udp-receive-buffer", &obj);
 	INSIST(result == ISC_R_SUCCESS);
 	recv_udp_buffer_size = cfg_obj_asuint32(obj);
-	CAP_IF_NOT_ZERO(recv_udp_buffer_size, 4096, INT32_MAX);
+	// OQS updated from 4096 to 8192
+	CAP_IF_NOT_ZERO(recv_udp_buffer_size, 8192, INT32_MAX);
 
 	obj = NULL;
 	result = named_config_get(maps, "udp-send-buffer", &obj);
 	INSIST(result == ISC_R_SUCCESS);
 	send_udp_buffer_size = cfg_obj_asuint32(obj);
-	CAP_IF_NOT_ZERO(send_udp_buffer_size, 4096, INT32_MAX);
+	CAP_IF_NOT_ZERO(send_udp_buffer_size, 8192, INT32_MAX);
 
 	isc_nm_setnetbuffers(named_g_netmgr, recv_tcp_buffer_size,
 			     send_tcp_buffer_size, recv_udp_buffer_size,
@@ -8968,8 +8976,9 @@ load_configuration(const char *filename, named_server_t *server,
 	if (udpsize < 512) {
 		udpsize = 512;
 	}
-	if (udpsize > 4096) {
-		udpsize = 4096;
+	// OQS updated from 4096 to 8192
+	if (udpsize > 8192) {
+		udpsize = 8192;
 	}
 	server->sctx->udpsize = (uint16_t)udpsize;
 
@@ -10520,7 +10529,8 @@ named_add_reserved_dispatch(named_server_t *server,
 	attrmask |= DNS_DISPATCHATTR_IPV6;
 
 	result = dns_dispatch_getudp(named_g_dispatchmgr, named_g_socketmgr,
-				     named_g_taskmgr, &dispatch->addr, 4096,
+				     // OQS updated from 4096 to 8192
+				     named_g_taskmgr, &dispatch->addr, 8192,
 				     UDPBUFFERS, 32768, 16411, 16433, attrs,
 				     attrmask, &dispatch->dispatch);
 	if (result != ISC_R_SUCCESS) {
@@ -15017,7 +15027,8 @@ named_server_dnssec(named_server_t *server, isc_lex_t *lex,
 	uint8_t algorithm = 0;
 	/* variables for -status */
 	bool status = false;
-	char output[4096];
+	// OQS updated from 4096 to 8192
+	char output[8192];
 	isc_stdtime_t now, when;
 	isc_time_t timenow, timewhen;
 	const char *dir;
