@@ -381,17 +381,9 @@ openssldilithium2_tofile(const dst_key_t *key, const char *directory) {
 
 	if (openssldilithium2_isprivate(key)) {
 		privbuf = isc_mem_get(key->mctx, privlen);
-		if (privbuf == NULL) {
-			printf("Failed to get a privbuf\n");
-		}
 		OQS_KEY *oqs_key = EVP_PKEY_get0(key->keydata.pkey);
-		if (oqs_key == NULL) {
-			printf("oqs_key is null\n");
-		}
-		printf("privlen: %lu - %lu\n", privlen, oqs_key->s->length_secret_key);
 		if (EVP_PKEY_get_raw_private_key(key->keydata.pkey, privbuf,
 						 &privlen) != 1) {
-			printf("Failed to get raw private_key\n");
 			DST_RET(dst__openssl_toresult(ISC_R_FAILURE));
 		}
 		priv.elements[i].tag = TAG_DILITHIUM2_PRIVATEKEY;
@@ -399,12 +391,8 @@ openssldilithium2_tofile(const dst_key_t *key, const char *directory) {
 		priv.elements[i].data = privbuf;
 		i++;
 		pubbuf = isc_mem_get(key->mctx, publen);
-		if (pubbuf == NULL) {
-			printf("Failed to get a pubbuf\n");
-		}
 		if (EVP_PKEY_get_raw_public_key(key->keydata.pkey, pubbuf,
 						 &publen) != 1) {
-			printf("Failed to get raw public_key\n");
 			DST_RET(dst__openssl_toresult(ISC_R_FAILURE));
 		}
 		priv.elements[i].tag = TAG_DILITHIUM2_PUBLICKEY;
@@ -413,9 +401,7 @@ openssldilithium2_tofile(const dst_key_t *key, const char *directory) {
 		i++;
 	}
 	priv.nelements = i;
-	printf("pre-privstruct_writefile\n");
 	ret = dst__privstruct_writefile(key, &priv, directory);
-	printf("!=tofile ret = %d\n", ret);
 err:
 	if (privbuf != NULL) {
 		isc_mem_put(key->mctx, privbuf, privlen);

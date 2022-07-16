@@ -2106,7 +2106,6 @@ dns_message_rendersection(dns_message_t *msg, dns_section_t sectionid,
 					return (result);
 				}
 				if (result != ISC_R_SUCCESS) {
-					printf("NOSPACE from rdataset_towiresorted\n");
 					INSIST(st.used < 65536);
 					dns_compress_rollback(
 						msg->cctx, (uint16_t)st.used);
