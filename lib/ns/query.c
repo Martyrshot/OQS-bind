@@ -7225,6 +7225,7 @@ query_checkrpz(query_ctx_t *qctx, isc_result_t result) {
 		switch (qctx->rpz_st->m.policy) {
 		case DNS_RPZ_POLICY_TCP_ONLY:
 			printf("lib/ns/query.c:7227 TC set\n");
+			fflush(stdout);
 			qctx->client->message->flags |= DNS_MESSAGEFLAG_TC;
 			if (result == DNS_R_NXDOMAIN ||
 			    result == DNS_R_NCACHENXDOMAIN) {
