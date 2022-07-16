@@ -2018,12 +2018,14 @@ dns_message_rendersection(dns_message_t *msg, dns_section_t sectionid,
 			}
 			total += count;
 			if (partial && result == ISC_R_NOSPACE) {
+				printf("lib/dns/message:2021 TC flag set\n");
 				msg->flags |= DNS_MESSAGEFLAG_TC;
 				msg->buffer->length += msg->reserved;
 				msg->counts[sectionid] += total;
 				return (result);
 			}
 			if (result == ISC_R_NOSPACE) {
+				printf("lib/dns/message:2027 TC flag set\n");
 				msg->flags |= DNS_MESSAGEFLAG_TC;
 			}
 			if (result != ISC_R_SUCCESS) {

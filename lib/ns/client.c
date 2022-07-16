@@ -496,6 +496,7 @@ ns_client_send(ns_client_t *client) {
 	result = dns_message_rendersection(client->message,
 					   DNS_SECTION_QUESTION, 0);
 	if (result == ISC_R_NOSPACE) {
+		printf("lib/ns/client.c:499 TC flag set\n");
 		client->message->flags |= DNS_MESSAGEFLAG_TC;
 		goto renderend;
 	}
@@ -512,6 +513,7 @@ ns_client_send(ns_client_t *client) {
 					   DNS_MESSAGERENDER_PARTIAL |
 						   render_opts);
 	if (result == ISC_R_NOSPACE) {
+		printf("lib/ns/client.c:515 TC flag set\n");
 		client->message->flags |= DNS_MESSAGEFLAG_TC;
 		goto renderend;
 	}
@@ -522,6 +524,7 @@ ns_client_send(ns_client_t *client) {
 		client->message, DNS_SECTION_AUTHORITY,
 		DNS_MESSAGERENDER_PARTIAL | render_opts);
 	if (result == ISC_R_NOSPACE) {
+		printf("lib/ns/client.c:525 TC flag set\n");
 		client->message->flags |= DNS_MESSAGEFLAG_TC;
 		goto renderend;
 	}
