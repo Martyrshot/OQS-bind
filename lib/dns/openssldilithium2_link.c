@@ -381,7 +381,6 @@ openssldilithium2_tofile(const dst_key_t *key, const char *directory) {
 
 	if (openssldilithium2_isprivate(key)) {
 		privbuf = isc_mem_get(key->mctx, privlen);
-		OQS_KEY *oqs_key = EVP_PKEY_get0(key->keydata.pkey);
 		if (EVP_PKEY_get_raw_private_key(key->keydata.pkey, privbuf,
 						 &privlen) != 1) {
 			DST_RET(dst__openssl_toresult(ISC_R_FAILURE));
