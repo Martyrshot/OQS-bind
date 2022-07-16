@@ -2078,16 +2078,12 @@ dns_message_rendersection(dns_message_t *msg, dns_section_t sectionid,
 
 				count = 0;
 				if (partial) {
-					printf("partial result\n");
-					fflush(stdout);
 					result = dns_rdataset_towirepartial(
 						rdataset, name, msg->cctx,
 						msg->buffer, msg->order,
 						&msg->order_arg, rd_options,
 						&count, NULL);
 				} else {
-					printf("non-partial result\n");
-					fflush(stdout);
 					result = dns_rdataset_towiresorted(
 						rdataset, name, msg->cctx,
 						msg->buffer, msg->order,
@@ -2116,6 +2112,7 @@ dns_message_rendersection(dns_message_t *msg, dns_section_t sectionid,
 					return (result);
 				}
 				if (result != ISC_R_SUCCESS) {
+					printf("NOSPACE from rdataset_towiresorted\n");
 					INSIST(st.used < 65536);
 					dns_compress_rollback(
 						msg->cctx, (uint16_t)st.used);
