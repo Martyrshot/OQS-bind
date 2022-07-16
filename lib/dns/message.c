@@ -1982,8 +1982,6 @@ dns_message_rendersection(dns_message_t *msg, dns_section_t sectionid,
 	 * Shrink the space in the buffer by the reserved amount.
 	 */
 	if (msg->buffer->length - msg->buffer->used < msg->reserved) {
-		printf("NO SPACE! length: %d used: %d reserver: %d\n", msg->buffer->length, msg->buffer->used, msg->reserved);
-		fflush(stdout);
 		return (ISC_R_NOSPACE);
 	}
 	msg->buffer->length -= msg->reserved;
@@ -2020,16 +2018,12 @@ dns_message_rendersection(dns_message_t *msg, dns_section_t sectionid,
 			}
 			total += count;
 			if (partial && result == ISC_R_NOSPACE) {
-				printf("lib/dns/message:2021 TC flag set\n");
-				fflush(stdout);
 				msg->flags |= DNS_MESSAGEFLAG_TC;
 				msg->buffer->length += msg->reserved;
 				msg->counts[sectionid] += total;
 				return (result);
 			}
 			if (result == ISC_R_NOSPACE) {
-				printf("lib/dns/message:2027 TC flag set\n");
-				fflush(stdout);
 				msg->flags |= DNS_MESSAGEFLAG_TC;
 			}
 			if (result != ISC_R_SUCCESS) {

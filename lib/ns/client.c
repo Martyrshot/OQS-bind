@@ -284,6 +284,8 @@ client_allocsendbuf(ns_client_t *client, isc_buffer_t *buffer,
 		data = client->sendbuf;
 		if ((client->attributes & NS_CLIENTATTR_HAVECOOKIE) == 0) {
 			if (client->view != NULL) {
+				printf("Nocookie udp: %d\n", client->view->nocookieudp);
+				fflush(stdout);
 				bufsize = client->view->nocookieudp;
 			} else {
 				bufsize = 512;
