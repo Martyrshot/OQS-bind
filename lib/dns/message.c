@@ -2078,7 +2078,6 @@ dns_message_rendersection(dns_message_t *msg, dns_section_t sectionid,
 
 				count = 0;
 				if (partial) {
-					printf("!+!+partial\n");
 					result = dns_rdataset_towirepartial(
 						rdataset, name, msg->cctx,
 						msg->buffer, msg->order,
@@ -2108,7 +2107,6 @@ dns_message_rendersection(dns_message_t *msg, dns_section_t sectionid,
 				 * to indicate where to continue from.
 				 */
 				if (partial && result == ISC_R_NOSPACE) {
-					printf("partial nospace\n");
 					msg->buffer->length += msg->reserved;
 					msg->counts[sectionid] += total;
 					return (result);
