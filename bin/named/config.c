@@ -83,7 +83,7 @@ options {\n\
 	memstatistics-file \"named.memstats\";\n\
 #	multiple-cnames <obsolete>;\n\
 #	named-xfer <obsolete>;\n\
-	nocookie-udp-size 4096;\n\
+	nocookie-udp-size 8192;\n\
 	notify-rate 20;\n\
 	nta-lifetime 3600;\n\
 	nta-recheck 300;\n\
