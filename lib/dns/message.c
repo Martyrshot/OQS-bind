@@ -1982,7 +1982,7 @@ dns_message_rendersection(dns_message_t *msg, dns_section_t sectionid,
 	 * Shrink the space in the buffer by the reserved amount.
 	 */
 	if (msg->buffer->length - msg->buffer->used < msg->reserved) {
-		printf("NO SPACE! length: %d used: %d reserver: %d\n", msg->buffer->length, msg->buffer-used, msg->reserved);
+		printf("NO SPACE! length: %d used: %d reserver: %d\n", msg->buffer->length, msg->buffer->used, msg->reserved);
 		fflush(stdout);
 		return (ISC_R_NOSPACE);
 	}
