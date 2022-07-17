@@ -272,7 +272,8 @@ static void
 update_log(ns_client_t *client, dns_zone_t *zone, int level, const char *fmt,
 	   ...) {
 	va_list ap;
-	char message[4096];
+	// OQS updated from 4096 to 8192
+	char message[8192];
 	char namebuf[DNS_NAME_FORMATSIZE];
 	char classbuf[DNS_RDATACLASS_FORMATSIZE];
 

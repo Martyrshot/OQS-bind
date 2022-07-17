@@ -1180,7 +1180,8 @@ dlz_lookup(const char *zone, const char *name, void *dbdata,
 		}
 
 		while ((row = mysql_fetch_row(res)) != NULL) {
-			char host[1024], admin[1024], data[4096];
+			// OQS updated from 4096 to 8192
+			char host[1024], admin[1024], data[8192];
 			int ttl;
 
 			sscanf(row[7], "%d", &ttl);

@@ -2802,7 +2802,8 @@ start_tcp(dig_query_t *query) {
 					     query, local_timeout, 0,
 					     query->tlsctx);
 		} else if (query->lookup->https_mode) {
-			char uri[4096] = { 0 };
+			// OQS updated from 4096 to 8192
+			char uri[8192] = { 0 };
 			snprintf(uri, sizeof(uri), "https://%s:%u%s",
 				 query->userarg, (uint16_t)port,
 				 query->lookup->https_path);
