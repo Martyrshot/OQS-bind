@@ -41,8 +41,8 @@
 #error "P-384 group is not known (NID_secp384r1)"
 #endif /* ifndef NID_secp384r1 */
 
-#define SPHINCS128S_PUBLICKEY_SIZE 32
-#define SPHINCS128S_PRIVATEKEY_SIZE 64
+#define SPHINCSSHA256128S_PUBLICKEY_SIZE 32
+#define SPHINCSSHA256128S_PRIVATEKEY_SIZE 64
 
 
 #define DST_RET(a)        \
