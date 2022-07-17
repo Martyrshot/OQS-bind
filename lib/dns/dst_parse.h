@@ -30,8 +30,8 @@
 #include <isc/lang.h>
 
 #include <dst/dst.h>
-// updated from 512 to 3000 (dilithium2 private key size + extra bytes to be safe)
-#define MAXFIELDSIZE 3000
+// OQS: updated from 512 to 8000 (SPHINCS+-SHA256-128S signature size + extra bytes to be safe)
+#define MAXFIELDSIZE 8000
 
 /*
  * Maximum number of fields in a private file is 18 (12 algorithm-
@@ -108,6 +108,13 @@
 #define TAG_DILITHIUM2_PUBLICKEY  ((DST_ALG_DILITHIUM2 << TAG_SHIFT) + 1)
 #define TAG_DILITHIUM2_ENGINE     ((DST_ALG_DILITHIUM2 << TAG_SHIFT) + 2)
 #define TAG_DILITHIUM2_LABEL	 ((DST_ALG_DILITHIUM2 << TAG_SHIFT) + 3)
+
+#define SPHINCSSHA256128S_NTAGS	     4
+#define TAG_SPHINCSSHA256128S_PRIVATEKEY ((DST_ALG_SPHINCSSHA256128S << TAG_SHIFT) + 0)
+#define TAG_SPHINCSSHA256128S_PUBLICKEY  ((DST_ALG_SPHINCSSHA256128S << TAG_SHIFT) + 1)
+#define TAG_SPHINCSSHA256128S_ENGINE     ((DST_ALG_SPHINCSSHA256128S << TAG_SHIFT) + 2)
+#define TAG_SPHINCSSHA256128S_LABEL	 ((DST_ALG_SPHINCSSHA256128S << TAG_SHIFT) + 3)
+
 
 struct dst_private_element {
 	unsigned short tag;

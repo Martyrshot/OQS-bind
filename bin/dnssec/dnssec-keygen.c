@@ -149,7 +149,8 @@ usage(void) {
 	fprintf(stderr, "        RSASHA256 | RSASHA512 |\n");
 	fprintf(stderr, "        ECDSAP256SHA256 | ECDSAP384SHA384 |\n");
 	fprintf(stderr, "        ED25519 | ED448 | DH\n");
-	fprintf(stderr, "        FALCON512 | DILITHIUM2\n");
+	fprintf(stderr, "        FALCON512 | DILITHIUM2 |\n");
+	fprintf(stderr, "        SPHINCS+-SHA256-128S\n");
 	fprintf(stderr, "    -3: use NSEC3-capable algorithm\n");
 	fprintf(stderr, "    -b <key size in bits>:\n");
 	fprintf(stderr, "        RSASHA1:\t[1024..%d]\n", MAX_RSA);
@@ -163,6 +164,7 @@ usage(void) {
 	fprintf(stderr, "        ED448:\tignored\n");
 	fprintf(stderr, "        FALCON512:\tignored\n");
 	fprintf(stderr, "        DILITHIUM2:\tignored\n");
+	fprintf(stderr, "        SPHINCS+-SHA256-128S:\tignored\n");
 	fprintf(stderr, "        (key size defaults are set according to\n"
 			"        algorithm and usage (ZSK or KSK)\n");
 	fprintf(stderr, "    -n <nametype>: ZONE | HOST | ENTITY | "
@@ -397,6 +399,7 @@ keygen(keygen_ctx_t *ctx, isc_mem_t *mctx, int argc, char **argv) {
 			case DST_ALG_ED448:
 			case DST_ALG_FALCON512:
 			case DST_ALG_DILITHIUM2:
+			case DST_ALG_SPHINCSSHA256128S:
 				break;
 			default:
 				fatal("key size not specified (-b option)");
@@ -571,6 +574,9 @@ keygen(keygen_ctx_t *ctx, isc_mem_t *mctx, int argc, char **argv) {
 	case DST_ALG_DILITHIUM2:
 		ctx->size = 2528;
 		break;
+	case DST_ALG_SPHINCSSHA256128S:
+		ctx->size = 64;
+		break;
 	}
 
 	if (ctx->alg != DNS_KEYALG_DH && ctx->generator != 0) {
@@ -672,7 +678,6 @@ keygen(keygen_ctx_t *ctx, isc_mem_t *mctx, int argc, char **argv) {
 			ret = dst_key_generate(name, ctx->alg, ctx->size, param,
 					       flags, ctx->protocol,
 					       ctx->rdclass, mctx, &key, NULL);
-			printf("ret = %d\n", ret);
 		}
 		if (ret != ISC_R_SUCCESS) {
 			char namestr[DNS_NAME_FORMATSIZE];

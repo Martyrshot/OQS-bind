@@ -107,13 +107,13 @@ typedef enum dst_key_state {
 #define DST_MAX_ALGS	     256
 
 /*% A buffer of this size is large enough to hold any key */
-#define DST_KEY_MAXSIZE 5000 //changed from 1280
+#define DST_KEY_MAXSIZE 5120 // OQS changed from 1280
 
 /*%
  * A buffer of this size is large enough to hold the textual representation
  * of any key
  */
-#define DST_KEY_MAXTEXTSIZE 2048
+#define DST_KEY_MAXTEXTSIZE 10240 OQS changed from 2048
 
 /*% 'Type' for dst_read_key() */
 #define DST_TYPE_KEY	 0x1000000 /* KEY key */

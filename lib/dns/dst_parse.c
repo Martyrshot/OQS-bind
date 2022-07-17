@@ -122,6 +122,10 @@ static struct parse_map map[] = { { TAG_RSA_MODULUS, "Modulus:" },
 				  { TAG_DILITHIUM2_ENGINE, "Engine:" }, // Probably won't use for now
 				  { TAG_DILITHIUM2_LABEL, "Label:" }, // Probably won't use for now
 
+				  { TAG_SPHINCSSHA256128S_PRIVATEKEY, "PrivateKey:" },
+				  { TAG_SPHINCSSHA256128S_PUBLICKEY, "PublicKey:" },
+				  { TAG_SPHINCSSHA256128S_ENGINE, "Engine:" }, // Probably won't use for now
+				  { TAG_SPHINCSSHA256128S_LABEL, "Label:" }, // Probably won't use for now
 				  { 0, NULL } };
 
 static int
@@ -434,6 +438,42 @@ check_dilithium2(const dst_private_t *priv, bool external) {
 }
 
 static int
+check_sphincssha256128s(const dst_private_t *priv, bool external) {
+	int i, j;
+	bool have[SPHINCSSHA256128S_NTAGS];
+	bool ok;
+	unsigned int mask;
+	if (external) {
+		return ((priv->nelements == 0) ? 0 : -1);
+	}
+
+	for (i = 0; i < SPHINCSSHA256128S_NTAGS; i++) {
+		have[i] = false;
+	}
+	for (j = 0; j < priv->nelements; j++) {
+		for (i = 0; i < SPHINCSSHA256128S_NTAGS; i++) {
+			if (priv->elements[j].tag == TAG(DST_ALG_SPHINCSSHA256128S, i)) {
+				break;
+			}
+		}
+		if (i == SPHINCSSHA256128S_NTAGS) {
+			return (-1);
+		}
+		have[i] = true;
+	}
+
+	mask = (1ULL << TAG_SHIFT) - 1;
+
+	if (have[TAG_SPHINCSSHA256128S_ENGINE & mask]) {
+		ok = have[TAG_SPHINCSSHA256128S_LABEL & mask];
+	} else {
+		ok = have[TAG_SPHINCSSHA256128S_PRIVATEKEY & mask]
+			&& have[TAG_SPHINCSSHA256128S_PUBLICKEY & mask];
+	}
+	return (ok ? 0 : -1);
+}
+
+static int
 check_data(const dst_private_t *priv, const unsigned int alg, bool old,
 	   bool external) {
 	/* XXXVIX this switch statement is too sparse to gen a jump table. */
@@ -468,6 +508,8 @@ check_data(const dst_private_t *priv, const unsigned int alg, bool old,
 		return (check_falcon512(priv, external));
 	case DST_ALG_DILITHIUM2:
 		return (check_dilithium2(priv, external));
+	case DST_ALG_SPHINCSSHA256128S:
+		return (check_sphincssha256128s(priv, external));
 	default:
 		return (DST_R_UNSUPPORTEDALG);
 	}
@@ -812,6 +854,9 @@ dst__privstruct_writefile(const dst_key_t *key, const dst_private_t *priv,
 		break;
 	case DST_ALG_DILITHIUM2:
 		fprintf(fp, "(DILITHIUM2)\n");
+		break;
+	case DST_ALG_SPHINCSSHA256128S:
+		fprintf(fp, "(SPHINCS+-SHA256-128S)\n");
 		break;
 	default:
 		fprintf(fp, "(?)\n");
