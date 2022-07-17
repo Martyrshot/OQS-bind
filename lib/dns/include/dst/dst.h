@@ -100,8 +100,9 @@ typedef enum dst_key_state {
 #define DST_ALG_HMACSHA256   163 /* XXXMPA */
 #define DST_ALG_HMACSHA384   164 /* XXXMPA */
 #define DST_ALG_HMACSHA512   165 /* XXXMPA */
-#define DST_ALG_FALCON512    250
-#define DST_ALG_DILITHIUM2    251
+#define DST_ALG_FALCON512    249
+#define DST_ALG_DILITHIUM2    250
+#define DST_ALG_SPHINCSSHA256128S    251
 #define DST_ALG_INDIRECT     252
 #define DST_ALG_PRIVATE	     254
 #define DST_MAX_ALGS	     256
@@ -113,7 +114,7 @@ typedef enum dst_key_state {
  * A buffer of this size is large enough to hold the textual representation
  * of any key
  */
-#define DST_KEY_MAXTEXTSIZE 10240 OQS changed from 2048
+#define DST_KEY_MAXTEXTSIZE 10240 // OQS changed from 2048
 
 /*% 'Type' for dst_read_key() */
 #define DST_TYPE_KEY	 0x1000000 /* KEY key */
