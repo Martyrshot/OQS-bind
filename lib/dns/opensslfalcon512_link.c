@@ -77,7 +77,7 @@ opensslfalcon512_createctx(dst_key_t *key, dst_context_t *dctx) {
 	UNUSED(key);
 	REQUIRE(dctx->key->key_alg == DST_ALG_FALCON512);
 
-	isc_buffer_allocate(dctx->mctx, &buf, 64); // Need to figure out how big...
+	isc_buffer_allocate(dctx->mctx, &buf, 64);
 	dctx->ctxdata.generic = buf;
 
 	return (ISC_R_SUCCESS);
@@ -456,7 +456,7 @@ opensslfalcon512_parse(dst_key_t *key, isc_lex_t *lexer, dst_key_t *pub) {
 		// but currently don't have those checks implemented
 		pubpkey = pub->keydata.pkey;
 	}
-	// Currently donot support HSMs, but leaving the parsing code
+	// Currently do not support HSMs, but leaving the parsing code
 	// in for future use.
 	for (i = 0; i < priv.nelements; i++) {
 		switch (priv.elements[i].tag) {

@@ -41,8 +41,8 @@
 #error "P-384 group is not known (NID_secp384r1)"
 #endif /* ifndef NID_secp384r1 */
 
-#define DILITHIUM2_PUBLICKEY_SIZE 1312
-#define DILITHIUM2_PRIVATEKEY_SIZE 2528
+#define SPHINCSSHA256128S_PUBLICKEY_SIZE 32
+#define SPHINCSSHA256128S_PRIVATEKEY_SIZE 64
 
 
 #define DST_RET(a)        \
@@ -71,23 +71,23 @@ isprivate(EVP_PKEY *pkey) {
 }
 
 static isc_result_t
-openssldilithium2_createctx(dst_key_t *key, dst_context_t *dctx) {
+opensslsphincssha256128s_createctx(dst_key_t *key, dst_context_t *dctx) {
 	isc_buffer_t *buf = NULL;
 
 	UNUSED(key);
-	REQUIRE(dctx->key->key_alg == DST_ALG_DILITHIUM2);
+	REQUIRE(dctx->key->key_alg == DST_ALG_SPHINCSSHA256128S);
 
-	isc_buffer_allocate(dctx->mctx, &buf, 64);
+	isc_buffer_allocate(dctx->mctx, &buf, 64); // Need to figure out how big...
 	dctx->ctxdata.generic = buf;
 
 	return (ISC_R_SUCCESS);
 }
 
 static void
-openssldilithium2_destroyctx(dst_context_t *dctx) {
+opensslsphincssha256128s_destroyctx(dst_context_t *dctx) {
 	isc_buffer_t *buf = (isc_buffer_t *)dctx->ctxdata.generic;
 
-	REQUIRE(dctx->key->key_alg == DST_ALG_DILITHIUM2);
+	REQUIRE(dctx->key->key_alg == DST_ALG_SPHINCSSHA256128S);
 	if (buf != NULL) {
 		isc_buffer_free(&buf);
 	}
@@ -95,14 +95,14 @@ openssldilithium2_destroyctx(dst_context_t *dctx) {
 }
 
 static isc_result_t
-openssldilithium2_adddata(dst_context_t *dctx, const isc_region_t *data) {
+opensslsphincssha256128s_adddata(dst_context_t *dctx, const isc_region_t *data) {
 	isc_buffer_t *buf = (isc_buffer_t *)dctx->ctxdata.generic;
 	isc_buffer_t *nbuf = NULL;
 	isc_region_t r;
 	unsigned int length;
 	isc_result_t result;
 
-	REQUIRE(dctx->key->key_alg == DST_ALG_DILITHIUM2);
+	REQUIRE(dctx->key->key_alg == DST_ALG_SPHINCSSHA256128S);
 	result = isc_buffer_copyregion(buf, data);
 	if (result == ISC_R_SUCCESS) {
 		return (ISC_R_SUCCESS);
@@ -120,7 +120,7 @@ openssldilithium2_adddata(dst_context_t *dctx, const isc_region_t *data) {
 }
 
 static isc_result_t
-openssldilithium2_sign(dst_context_t *dctx, isc_buffer_t *sig) {
+opensslsphincssha256128s_sign(dst_context_t *dctx, isc_buffer_t *sig) {
 	isc_result_t ret;
 	dst_key_t *key = dctx->key;
 	isc_region_t tbsreg;
@@ -130,12 +130,12 @@ openssldilithium2_sign(dst_context_t *dctx, isc_buffer_t *sig) {
 	isc_buffer_t *buf = (isc_buffer_t *)dctx->ctxdata.generic;
 	size_t siglen;
 
-	REQUIRE(key->key_alg == DST_ALG_DILITHIUM2);
+	REQUIRE(key->key_alg == DST_ALG_SPHINCSSHA256128S);
 	if (ctx == NULL) {
 		return (ISC_R_NOMEMORY);
 	}
 
-	siglen = DNS_SIG_DILITHIUM2SIZE;
+	siglen = DNS_SIG_SPHINCSSHA256128SSIZE;
 
 	isc_buffer_availableregion(sig, &sigreg);
 	// zero out buffer
@@ -156,7 +156,7 @@ openssldilithium2_sign(dst_context_t *dctx, isc_buffer_t *sig) {
 		DST_RET(dst__openssl_toresult3(dctx->category, "EVP_DigestSign",
 					       DST_R_SIGNFAILURE));
 	}
-	siglen = DNS_SIG_DILITHIUM2SIZE;
+	siglen = DNS_SIG_SPHINCSSHA256128SSIZE;
 	isc_buffer_add(sig, (unsigned int)siglen);
 	ret = ISC_R_SUCCESS;
 
@@ -169,7 +169,7 @@ err:
 }
 
 static isc_result_t
-openssldilithium2_verify(dst_context_t *dctx, const isc_region_t *sig) {
+opensslsphincssha256128s_verify(dst_context_t *dctx, const isc_region_t *sig) {
 	isc_result_t ret;
 	dst_key_t *key = dctx->key;
 	int status;
@@ -179,13 +179,13 @@ openssldilithium2_verify(dst_context_t *dctx, const isc_region_t *sig) {
 	isc_buffer_t *buf = (isc_buffer_t *)dctx->ctxdata.generic;
 	unsigned int siglen = 0;
 
-	REQUIRE(key->key_alg == DST_ALG_DILITHIUM2);
+	REQUIRE(key->key_alg == DST_ALG_SPHINCSSHA256128S);
 
 	if (ctx == NULL) {
 		return (ISC_R_NOMEMORY);
 	}
 
-	siglen = DNS_SIG_DILITHIUM2SIZE;
+	siglen = DNS_SIG_SPHINCSSHA256128SSIZE;
 	if (siglen == 0) {
 		return (ISC_R_NOTIMPLEMENTED);
 	}
@@ -195,7 +195,7 @@ openssldilithium2_verify(dst_context_t *dctx, const isc_region_t *sig) {
 	}
 	unsigned char *_sig = sig->base;
 	int ending_key = -1;
-        if (siglen == DNS_SIG_DILITHIUM2SIZE) {
+        if (siglen == DNS_SIG_SPHINCSSHA256128SSIZE) {
                 for (unsigned int i = 0; i < siglen; i++) {
                         if (_sig[i] == 0 && ending_key == -1) ending_key = i;
                         else if (_sig[i] == 0) continue;
@@ -238,7 +238,7 @@ err:
 }
 
 static bool
-openssldilithium2_compare(const dst_key_t *key1, const dst_key_t *key2) {
+opensslsphincssha256128s_compare(const dst_key_t *key1, const dst_key_t *key2) {
 	
 	EVP_PKEY *pkey1 = key1->keydata.pkey;
 	EVP_PKEY *pkey2 = key2->keydata.pkey;
@@ -247,16 +247,16 @@ openssldilithium2_compare(const dst_key_t *key1, const dst_key_t *key2) {
 }
 
 static isc_result_t
-openssldilithium2_generate(dst_key_t *key, int unused, void (*callback)(int)) {
+opensslsphincssha256128s_generate(dst_key_t *key, int unused, void (*callback)(int)) {
 	isc_result_t ret;
 	EVP_PKEY *pkey = NULL;
 	EVP_PKEY_CTX *pkctx = NULL;
-	REQUIRE(key->key_alg == DST_ALG_DILITHIUM2);
+	REQUIRE(key->key_alg == DST_ALG_SPHINCSSHA256128S);
 	UNUSED(unused);
 	UNUSED(callback);
-	key->key_size = DNS_KEY_DILITHIUM2SIZE;
+	key->key_size = DNS_KEY_SPHINCSSHA256128SSIZE;
 
-	if ((pkctx = EVP_PKEY_CTX_new_id(EVP_PKEY_DILITHIUM2, NULL)) == NULL) {
+	if ((pkctx = EVP_PKEY_CTX_new_id(EVP_PKEY_SPHINCSSHA256128SROBUST, NULL)) == NULL) {
 		return (dst__openssl_toresult2("EVP_PKEY_CTX_new_id",
 							DST_R_OPENSSLFAILURE));
 	}
@@ -275,27 +275,27 @@ openssldilithium2_generate(dst_key_t *key, int unused, void (*callback)(int)) {
 }
 
 static bool
-openssldilithium2_isprivate(const dst_key_t *key) {
+opensslsphincssha256128s_isprivate(const dst_key_t *key) {
 	EVP_PKEY *pkey = key->keydata.pkey;
 	return isprivate(pkey);
 }
 
 static void
-openssldilithium2_destroy(dst_key_t *key) {
+opensslsphincssha256128s_destroy(dst_key_t *key) {
 	EVP_PKEY *pkey = key->keydata.pkey;
 	EVP_PKEY_free(pkey);
 	key->keydata.pkey = NULL;
 }
 
 static isc_result_t
-openssldilithium2_todns(const dst_key_t *key, isc_buffer_t *data) {
+opensslsphincssha256128s_todns(const dst_key_t *key, isc_buffer_t *data) {
 	EVP_PKEY *pkey = key->keydata.pkey;
 	isc_region_t r;
 	size_t len;
 
 	REQUIRE(pkey != NULL);
-	REQUIRE(key->key_alg == DST_ALG_DILITHIUM2);
-	len = DNS_KEY_DILITHIUM2SIZE;
+	REQUIRE(key->key_alg == DST_ALG_SPHINCSSHA256128S);
+	len = DNS_KEY_SPHINCSSHA256128SSIZE;
 
 	isc_buffer_availableregion(data, &r);
 	if (r.length < len) {
@@ -310,12 +310,12 @@ openssldilithium2_todns(const dst_key_t *key, isc_buffer_t *data) {
 }
 
 static isc_result_t
-openssldilithium2_fromdns(dst_key_t *key, isc_buffer_t *data) {
+opensslsphincssha256128s_fromdns(dst_key_t *key, isc_buffer_t *data) {
 	isc_region_t r;
 	size_t len;
 	EVP_PKEY *pkey;
 
-	REQUIRE(key->key_alg == DST_ALG_DILITHIUM2);
+	REQUIRE(key->key_alg == DST_ALG_SPHINCSSHA256128S);
 
 	isc_buffer_remainingregion(data, &r);
 	if (r.length == 0) {
@@ -323,11 +323,11 @@ openssldilithium2_fromdns(dst_key_t *key, isc_buffer_t *data) {
 	}
 
 	len = r.length;
-	if (len < DNS_KEY_DILITHIUM2SIZE) {
+	if (len < DNS_KEY_SPHINCSSHA256128SSIZE) {
 		return (DST_R_INVALIDPUBLICKEY);
 	}
 
-	pkey = EVP_PKEY_new_raw_public_key(EVP_PKEY_DILITHIUM2, NULL, r.base, len);
+	pkey = EVP_PKEY_new_raw_public_key(EVP_PKEY_SPHINCSSHA256128SROBUST, NULL, r.base, len);
 	if (pkey == NULL) {
 		return (dst__openssl_toresult(DST_R_INVALIDPUBLICKEY));
 	}
@@ -358,16 +358,16 @@ typedef struct
 } OQS_KEY;
 
 static isc_result_t
-openssldilithium2_tofile(const dst_key_t *key, const char *directory) {
+opensslsphincssha256128s_tofile(const dst_key_t *key, const char *directory) {
 	isc_result_t ret;
 	dst_private_t priv;
 	unsigned char *pubbuf = NULL;
 	unsigned char *privbuf = NULL;
-	size_t publen = DILITHIUM2_PUBLICKEY_SIZE;
-	size_t privlen = DILITHIUM2_PRIVATEKEY_SIZE;
+	size_t publen = SPHINCSSHA256128S_PUBLICKEY_SIZE;
+	size_t privlen = SPHINCSSHA256128S_PRIVATEKEY_SIZE;
 	int i;
 
-	REQUIRE(key->key_alg == DST_ALG_DILITHIUM2);
+	REQUIRE(key->key_alg == DST_ALG_SPHINCSSHA256128S);
 	if (key->keydata.pkey == NULL) {
 		return (DST_R_NULLKEY);
 	}
@@ -379,13 +379,13 @@ openssldilithium2_tofile(const dst_key_t *key, const char *directory) {
 
 	i = 0;
 
-	if (openssldilithium2_isprivate(key)) {
+	if (opensslsphincssha256128s_isprivate(key)) {
 		privbuf = isc_mem_get(key->mctx, privlen);
 		if (EVP_PKEY_get_raw_private_key(key->keydata.pkey, privbuf,
 						 &privlen) != 1) {
 			DST_RET(dst__openssl_toresult(ISC_R_FAILURE));
 		}
-		priv.elements[i].tag = TAG_DILITHIUM2_PRIVATEKEY;
+		priv.elements[i].tag = TAG_SPHINCSSHA256128S_PRIVATEKEY;
 		priv.elements[i].length = privlen;
 		priv.elements[i].data = privbuf;
 		i++;
@@ -394,7 +394,7 @@ openssldilithium2_tofile(const dst_key_t *key, const char *directory) {
 						 &publen) != 1) {
 			DST_RET(dst__openssl_toresult(ISC_R_FAILURE));
 		}
-		priv.elements[i].tag = TAG_DILITHIUM2_PUBLICKEY;
+		priv.elements[i].tag = TAG_SPHINCSSHA256128S_PUBLICKEY;
 		priv.elements[i].length = publen;
 		priv.elements[i].data = pubbuf;
 		i++;
@@ -413,7 +413,7 @@ err:
 
 
 static isc_result_t
-openssldilithium2_parse(dst_key_t *key, isc_lex_t *lexer, dst_key_t *pub) {
+opensslsphincssha256128s_parse(dst_key_t *key, isc_lex_t *lexer, dst_key_t *pub) {
 	dst_private_t priv;
 	isc_result_t ret;
 	int i, privkey_index, pubkey_index = -1;
@@ -424,10 +424,10 @@ openssldilithium2_parse(dst_key_t *key, isc_lex_t *lexer, dst_key_t *pub) {
 	UNUSED(engine);
 	UNUSED(label);
 	UNUSED(pubpkey);
-	REQUIRE(key->key_alg == DST_ALG_DILITHIUM2);
+	REQUIRE(key->key_alg == DST_ALG_SPHINCSSHA256128S);
 
 	/* read private key file */
-	ret = dst__privstruct_parse(key, DST_ALG_DILITHIUM2, lexer, mctx, &priv);
+	ret = dst__privstruct_parse(key, DST_ALG_SPHINCSSHA256128S, lexer, mctx, &priv);
 	if (ret != ISC_R_SUCCESS) {
 		goto err;
 	}
@@ -455,16 +455,16 @@ openssldilithium2_parse(dst_key_t *key, isc_lex_t *lexer, dst_key_t *pub) {
 	// in for future use.
 	for (i = 0; i < priv.nelements; i++) {
 		switch (priv.elements[i].tag) {
-		case TAG_DILITHIUM2_ENGINE:
+		case TAG_SPHINCSSHA256128S_ENGINE:
 			engine = (char *)priv.elements[i].data;
 			break;
-		case TAG_DILITHIUM2_LABEL:
+		case TAG_SPHINCSSHA256128S_LABEL:
 			label = (char *)priv.elements[i].data;
 			break;
-		case TAG_DILITHIUM2_PRIVATEKEY:
+		case TAG_SPHINCSSHA256128S_PRIVATEKEY:
 			privkey_index = i;
 			break;
-		case TAG_DILITHIUM2_PUBLICKEY:
+		case TAG_SPHINCSSHA256128S_PUBLICKEY:
 			pubkey_index = i;
 			break;
 		default:
@@ -480,10 +480,10 @@ openssldilithium2_parse(dst_key_t *key, isc_lex_t *lexer, dst_key_t *pub) {
 
 	len = priv.elements[privkey_index].length;
 
-	if (len < DILITHIUM2_PUBLICKEY_SIZE) {
+	if (len < SPHINCSSHA256128S_PUBLICKEY_SIZE) {
 		return (DST_R_INVALIDPRIVATEKEY);
 	}
-	pkey = EVP_PKEY_new_raw_private_key(EVP_PKEY_DILITHIUM2, NULL, priv.elements[privkey_index].data, len);
+	pkey = EVP_PKEY_new_raw_private_key(EVP_PKEY_SPHINCSSHA256128SROBUST, NULL, priv.elements[privkey_index].data, len);
 	if (pkey == NULL) {
 		return (dst__openssl_toresult(ret));
 	}
@@ -505,24 +505,24 @@ err:
 	return (ret);
 }
 
-static dst_func_t openssldilithium2_functions = {
-	openssldilithium2_createctx,
+static dst_func_t opensslsphincssha256128s_functions = {
+	opensslsphincssha256128s_createctx,
 	NULL, /*%< createctx2 */
-	openssldilithium2_destroyctx,
-	openssldilithium2_adddata,
-	openssldilithium2_sign,
-	openssldilithium2_verify,
+	opensslsphincssha256128s_destroyctx,
+	opensslsphincssha256128s_adddata,
+	opensslsphincssha256128s_sign,
+	opensslsphincssha256128s_verify,
 	NULL, /*%< verify2 */
 	NULL, /*%< computesecret */
-	openssldilithium2_compare,
+	opensslsphincssha256128s_compare,
 	NULL, /*%< paramcompare */
-	openssldilithium2_generate,
-	openssldilithium2_isprivate,
-	openssldilithium2_destroy, 
-	openssldilithium2_todns,   // called by dst_key_todns converts a dst_key to a buffer
-	openssldilithium2_fromdns, // called by from buffer and constructs a key from dns
-	openssldilithium2_tofile,  // All this does is write the private key, writing public keys are handled elsewhere
-	openssldilithium2_parse,
+	opensslsphincssha256128s_generate,
+	opensslsphincssha256128s_isprivate,
+	opensslsphincssha256128s_destroy, 
+	opensslsphincssha256128s_todns,   // called by dst_key_todns converts a dst_key to a buffer
+	opensslsphincssha256128s_fromdns, // called by from buffer and constructs a key from dns
+	opensslsphincssha256128s_tofile,  // All this does is write the private key, writing public keys are handled elsewhere
+	opensslsphincssha256128s_parse,
 	NULL,			    /*%< cleanup */
 	NULL, 			    /*%< fromlabel */
 	NULL,			    /*%< dump */
@@ -530,10 +530,10 @@ static dst_func_t openssldilithium2_functions = {
 };
 
 isc_result_t
-dst__openssldilithium2_init(dst_func_t **funcp) {
+dst__opensslsphincssha256128s_init(dst_func_t **funcp) {
 	REQUIRE(funcp != NULL);
 	if (*funcp == NULL) {
-		*funcp = &openssldilithium2_functions;
+		*funcp = &opensslsphincssha256128s_functions;
 	}
 	return (ISC_R_SUCCESS);
 }

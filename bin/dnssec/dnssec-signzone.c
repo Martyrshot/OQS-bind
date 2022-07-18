@@ -104,7 +104,7 @@ static int nsec_datatype = dns_rdatatype_nsec;
 
 #define REVOKE(x) ((dst_key_flags(x) & DNS_KEYFLAG_REVOKE) != 0)
 
-#define BUFSIZE	  8192 // Making this large to account for SPHINCS+ signatures if we decide to try them.
+#define BUFSIZE	  8192 // OQS increased from 2049 to 8192 to account for SPHINCS+ 128S signatures.
 #define MAXDSKEYS 8
 
 #define SIGNER_EVENTCLASS  ISC_EVENTCLASS(0x4453)

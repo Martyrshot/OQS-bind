@@ -268,7 +268,8 @@ libdns_la_SOURCES +=		\
 	openssleddsa_link.c	\
 	opensslrsa_link.c       \
 	opensslfalcon512_link.c \
-	openssldilithium2_link.c
+	openssldilithium2_link.c \
+	opensslsphincs+sha256128s_link.c
 endif
 
 if HAVE_GEOIP2
