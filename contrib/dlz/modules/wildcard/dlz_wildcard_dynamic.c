@@ -1,46 +1,31 @@
 /*
- * Copyright (C) 2002 Stichting NLnet, Netherlands, stichting@nlnet.nl.
- * Copyright (C) 2012 Vadim Goncharov, Russia, vadim_nuclight@mail.ru.
+ * Copyright (C) Internet Systems Consortium, Inc. ("ISC")
  *
- * Permission to use, copy, modify, and distribute this software for any
- * purpose with or without fee is hereby granted, provided that the
- * above copyright notice and this permission notice appear in all
- * copies.
+ * SPDX-License-Identifier: MPL-2.0 and ISC
  *
- * THE SOFTWARE IS PROVIDED "AS IS" AND STICHTING NLNET
- * DISCLAIMS ALL WARRANTIES WITH REGARD TO THIS SOFTWARE INCLUDING ALL
- * IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS. IN NO EVENT SHALL
- * STICHTING NLNET BE LIABLE FOR ANY SPECIAL, DIRECT, INDIRECT, OR
- * CONSEQUENTIAL DAMAGES OR ANY DAMAGES WHATSOEVER RESULTING FROM LOSS
- * OF USE, DATA OR PROFITS, WHETHER IN AN ACTION OF CONTRACT, NEGLIGENCE
- * OR OTHER TORTIOUS ACTION, ARISING OUT OF OR IN CONNECTION WITH THE
- * USE OR PERFORMANCE OF THIS SOFTWARE.
+ * This Source Code Form is subject to the terms of the Mozilla Public
+ * License, v. 2.0. If a copy of the MPL was not distributed with this
+ * file, you can obtain one at https://mozilla.org/MPL/2.0/.
+ */
+
+/*
+ * Copyright (C) Stichting NLnet, Netherlands, stichting@nlnet.nl.
+ * Copyright (C) Vadim Goncharov, Russia, vadim_nuclight@mail.ru.
  *
  * The development of Dynamically Loadable Zones (DLZ) for Bind 9 was
  * conceived and contributed by Rob Butler.
  *
- * Permission to use, copy, modify, and distribute this software for any
- * purpose with or without fee is hereby granted, provided that the
- * above copyright notice and this permission notice appear in all
- * copies.
+ * Permission to use, copy, modify, and distribute this software for any purpose
+ * with or without fee is hereby granted, provided that the above copyright
+ * notice and this permission notice appear in all copies.
  *
- * THE SOFTWARE IS PROVIDED "AS IS" AND ROB BUTLER
- * DISCLAIMS ALL WARRANTIES WITH REGARD TO THIS SOFTWARE INCLUDING ALL
- * IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS. IN NO EVENT SHALL
- * ROB BUTLER BE LIABLE FOR ANY SPECIAL, DIRECT, INDIRECT, OR
- * CONSEQUENTIAL DAMAGES OR ANY DAMAGES WHATSOEVER RESULTING FROM LOSS
- * OF USE, DATA OR PROFITS, WHETHER IN AN ACTION OF CONTRACT, NEGLIGENCE
- * OR OTHER TORTIOUS ACTION, ARISING OUT OF OR IN CONNECTION WITH THE
- * USE OR PERFORMANCE OF THIS SOFTWARE.
- */
-
-/*
- * Copyright (C) 1999-2001, 2013, 2016  Internet Systems Consortium, Inc.
- * ("ISC")
- *
- * This Source Code Form is subject to the terms of the Mozilla Public
- * License, v. 2.0. If a copy of the MPL was not distributed with this
- * file, You can obtain one at http://mozilla.org/MPL/2.0/.
+ * THE SOFTWARE IS PROVIDED "AS IS" AND STICHTING NLNET DISCLAIMS ALL WARRANTIES
+ * WITH REGARD TO THIS SOFTWARE INCLUDING ALL IMPLIED WARRANTIES OF
+ * MERCHANTABILITY AND FITNESS. IN NO EVENT SHALL STICHTING NLNET BE LIABLE FOR
+ * ANY SPECIAL, DIRECT, INDIRECT, OR CONSEQUENTIAL DAMAGES OR ANY DAMAGES
+ * WHATSOEVER RESULTING FROM LOSS OF USE, DATA OR PROFITS, WHETHER IN AN ACTION
+ * OF CONTRACT, NEGLIGENCE OR OTHER TORTIOUS ACTION, ARISING OUT OF OR IN
+ * CONNECTION WITH THE USE OR PERFORMANCE OF THIS SOFTWARE.
  */
 
 /*
@@ -58,16 +43,6 @@
 #include <dlz_dbi.h>
 #include <dlz_list.h>
 #include <dlz_minimal.h>
-
-#define DE_CONST(konst, var)           \
-	do {                           \
-		union {                \
-			const void *k; \
-			void *v;       \
-		} _u;                  \
-		_u.k = konst;          \
-		var = _u.v;            \
-	} while (0)
 
 /* fnmatch() return values. */
 #define FNM_NOMATCH 1 /* Match failed. */
@@ -134,7 +109,7 @@ dlz_allnodes(const char *zone, void *dbdata, dns_sdlzallnodes_t *allnodes) {
 	nrr_t *nrec;
 	int i = 0;
 
-	DE_CONST(zone, cd->zone);
+	cd->zone = UNCONST(zone);
 
 	/* Write info message to log */
 	cd->log(ISC_LOG_DEBUG(1), "dlz_wildcard allnodes called for zone '%s'",
@@ -239,7 +214,6 @@ dlz_lookup(const char *zone, const char *name, void *dbdata,
 	const char *p;
 	char *namebuf;
 	nrr_t *nrec;
-	bool origin = true;
 
 #if DLZ_DLOPEN_VERSION >= 2
 	UNUSED(methods);
@@ -251,8 +225,8 @@ dlz_lookup(const char *zone, const char *name, void *dbdata,
 		return (ISC_R_NOTFOUND);
 	}
 
-	DE_CONST(name, cd->record);
-	DE_CONST(p, cd->zone);
+	cd->record = UNCONST(name);
+	cd->zone = UNCONST(p);
 
 	if ((p != zone) && (strcmp(name, "@") == 0 || strcmp(name, zone) == 0))
 	{
@@ -264,9 +238,8 @@ dlz_lookup(const char *zone, const char *name, void *dbdata,
 		strncpy(namebuf, zone, len - 1);
 		namebuf[len - 1] = '\0';
 		cd->record = namebuf;
-		origin = false;
 	} else if (p == zone) {
-		cd->record = "@";
+		cd->record = (char *)"@";
 	}
 
 	/* Write info message to log */
@@ -282,7 +255,8 @@ dlz_lookup(const char *zone, const char *name, void *dbdata,
 		if (strcmp(cd->record, nrec->name) == 0) {
 			/* We handle authority data in dlz_authority() */
 			if (strcmp(nrec->type, "SOA") == 0 ||
-			    strcmp(nrec->type, "NS") == 0) {
+			    strcmp(nrec->type, "NS") == 0)
+			{
 				nrec = next;
 				continue;
 			}
@@ -324,14 +298,14 @@ dlz_authority(const char *zone, void *dbdata, dns_sdlzlookup_t *lookup) {
 	config_data_t *cd = (config_data_t *)dbdata;
 	char *querystring = NULL;
 	nrr_t *nrec;
-	const char *p, *name = "@";
+	const char *p;
 
 	p = shortest_match(cd->zone_pattern, zone);
 	if (p == NULL) {
 		return (ISC_R_NOTFOUND);
 	}
 
-	DE_CONST(p, cd->zone);
+	cd->zone = UNCONST(p);
 
 	/* Write info message to log */
 	cd->log(ISC_LOG_DEBUG(1), "dlz_wildcard_dynamic: authority for '%s'",
@@ -340,7 +314,6 @@ dlz_authority(const char *zone, void *dbdata, dns_sdlzlookup_t *lookup) {
 	result = ISC_R_NOTFOUND;
 	nrec = DLZ_LIST_HEAD(cd->rrs_list);
 	while (nrec != NULL) {
-		bool origin;
 		if (strcmp("@", nrec->name) == 0) {
 			isc_result_t presult;
 
@@ -406,7 +379,8 @@ dlz_create(const char *dlzname, unsigned int argc, char *argv[], void **dbdata,
 	   ...) {
 	config_data_t *cd;
 	char *endp;
-	int i, def_ttl;
+	unsigned int i;
+	int def_ttl;
 	nrr_t *trec = NULL;
 	isc_result_t result;
 	const char *helper_name;
@@ -600,7 +574,7 @@ fnmatch(const char *pattern, const char *string, int flags) {
 	char *newp;
 	char c, test;
 
-	for (stringstart = string;;)
+	for (stringstart = string;;) {
 		switch (c = *pattern++) {
 		case EOS:
 			if ((flags & FNM_LEADING_DIR) && *string == '/') {
@@ -658,7 +632,8 @@ fnmatch(const char *pattern, const char *string, int flags) {
 			/* General case, use recursion. */
 			while ((test = *string) != EOS) {
 				if (!fnmatch(pattern, string,
-					     flags & ~FNM_PERIOD)) {
+					     flags & ~FNM_PERIOD))
+				{
 					return (0);
 				}
 				if (test == '/' && flags & FNM_PATHNAME) {
@@ -699,7 +674,7 @@ fnmatch(const char *pattern, const char *string, int flags) {
 					--pattern;
 				}
 			}
-		/* FALLTHROUGH */
+			FALLTHROUGH;
 		default:
 		norm:
 			if (c == *string) {
@@ -713,7 +688,8 @@ fnmatch(const char *pattern, const char *string, int flags) {
 			string++;
 			break;
 		}
-	/* NOTREACHED */
+	}
+	UNREACHABLE();
 }
 
 static int
@@ -760,7 +736,8 @@ rangematch(const char *pattern, char test, int flags, char **newp) {
 		}
 
 		if (*pattern == '-' && (c2 = *(pattern + 1)) != EOS &&
-		    c2 != ']') {
+		    c2 != ']')
+		{
 			pattern += 2;
 			if (c2 == '\\' && !(flags & FNM_NOESCAPE)) {
 				c2 = *pattern++;

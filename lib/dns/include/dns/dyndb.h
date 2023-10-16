@@ -1,6 +1,8 @@
 /*
  * Copyright (C) Internet Systems Consortium, Inc. ("ISC")
  *
+ * SPDX-License-Identifier: MPL-2.0
+ *
  * This Source Code Form is subject to the terms of the Mozilla Public
  * License, v. 2.0. If a copy of the MPL was not distributed with this
  * file, you can obtain one at https://mozilla.org/MPL/2.0/.
@@ -9,8 +11,7 @@
  * information regarding copyright ownership.
  */
 
-#ifndef DNS_DYNDB_H
-#define DNS_DYNDB_H
+#pragma once
 
 #include <stdbool.h>
 
@@ -32,15 +33,14 @@ ISC_LANG_BEGINDECLS
  * function should detach from them.
  */
 struct dns_dyndbctx {
-	unsigned int	magic;
-	const void *	hashinit;
-	isc_mem_t *	mctx;
-	isc_log_t *	lctx;
-	dns_view_t *	view;
-	dns_zonemgr_t * zmgr;
-	isc_task_t *	task;
-	isc_timermgr_t *timermgr;
-	bool *		refvar;
+	unsigned int   magic;
+	const void    *hashinit;
+	isc_mem_t     *mctx;
+	isc_log_t     *lctx;
+	dns_view_t    *view;
+	dns_zonemgr_t *zmgr;
+	isc_loopmgr_t *loopmgr;
+	const bool    *refvar; /* unused, but retained for API compatibility */
 };
 
 #define DNS_DYNDBCTX_MAGIC    ISC_MAGIC('D', 'd', 'b', 'c')
@@ -55,7 +55,7 @@ struct dns_dyndbctx {
  * if not, set DNS_DYNDB_AGE to 0.
  */
 #ifndef DNS_DYNDB_VERSION
-#define DNS_DYNDB_VERSION 1
+#define DNS_DYNDB_VERSION 2
 #define DNS_DYNDB_AGE	  0
 #endif /* ifndef DNS_DYNDB_VERSION */
 
@@ -132,8 +132,8 @@ dns_dyndb_cleanup(bool exiting);
 
 isc_result_t
 dns_dyndb_createctx(isc_mem_t *mctx, const void *hashinit, isc_log_t *lctx,
-		    dns_view_t *view, dns_zonemgr_t *zmgr, isc_task_t *task,
-		    isc_timermgr_t *tmgr, dns_dyndbctx_t **dctxp);
+		    dns_view_t *view, dns_zonemgr_t *zmgr,
+		    isc_loopmgr_t *loopmgr, dns_dyndbctx_t **dctxp);
 /*%
  * Create a dyndb initialization context structure, with
  * pointers to structures in the server that the dyndb module will
@@ -156,5 +156,3 @@ dns_dyndb_destroyctx(dns_dyndbctx_t **dctxp);
  */
 
 ISC_LANG_ENDDECLS
-
-#endif /* DNS_DYNDB_H */

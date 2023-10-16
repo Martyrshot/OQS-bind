@@ -1,9 +1,11 @@
 #!/bin/sh
-#
+
 # Copyright (C) Internet Systems Consortium, Inc. ("ISC")
 #
+# SPDX-License-Identifier: MPL-2.0
+#
 # This Source Code Form is subject to the terms of the Mozilla Public
-# License, v. 2.0. If a copy of the MPL was not distributed with this
+# License, v. 2.0.  If a copy of the MPL was not distributed with this
 # file, you can obtain one at https://mozilla.org/MPL/2.0/.
 #
 # See the COPYRIGHT file distributed with this work for additional
@@ -11,6 +13,7 @@
 
 set -e
 
+export ALGORITHM_SET="ecc_default"
 #shellcheck source=conf.sh
 . ../conf.sh
 
@@ -38,11 +41,16 @@ mkeys_reload_on() (
 	wait_for_log 20 "loaded serial" "ns${nsidx}"/named.run || return 1
 )
 
-mkeys_loadkeys_on() (
-	nsidx=$1
-	nextpart "ns${nsidx}"/named.run > /dev/null
-	rndccmd "10.53.0.${nsidx}" loadkeys . | sed "s/^/ns${nsidx} /" | cat_i
-	wait_for_log 20 "next key event" "ns${nsidx}"/named.run || return 1
+mkeys_resign_rootzone() (
+	n=$1
+	(
+		cd ns1
+		sleep 1 # ensure modification time changes
+		$SIGNER -PSg -N unixtime -o . root.db > signer.out.test$1 2>&1
+	)
+	nextpart ns1/named.run > /dev/null
+	rndccmd "10.53.0.1" reload . | sed "s/^/ns1 /" | cat_i
+	wait_for_log 20 "loaded serial" ns1/named.run || return 1
 )
 
 mkeys_refresh_on() (
@@ -108,15 +116,17 @@ grep "example..*.RRSIG..*TXT" dig.out.ns2.test$n > /dev/null || ret=1
 if [ $ret != 0 ]; then echo_i "failed"; fi
 status=$((status+ret))
 
-n=$((n+1))
-ret=0
-echo_i "check positive validation using delv ($n)"
-delv_with_opts @10.53.0.1 txt example > delv.out$n || ret=1
-grep "; fully validated" delv.out$n > /dev/null || ret=1	# redundant
-grep "example..*TXT.*This is a test" delv.out$n > /dev/null || ret=1
-grep "example..*.RRSIG..*TXT" delv.out$n > /dev/null || ret=1
-if [ $ret != 0 ]; then echo_i "failed"; fi
-status=$((status+ret))
+if [ -x "$DELV" ]; then
+	n=$((n+1))
+	ret=0
+	echo_i "check positive validation using delv ($n)"
+	delv_with_opts @10.53.0.1 txt example > delv.out$n || ret=1
+	grep "; fully validated" delv.out$n > /dev/null || ret=1	# redundant
+	grep "example..*TXT.*This is a test" delv.out$n > /dev/null || ret=1
+	grep "example..*.RRSIG..*TXT" delv.out$n > /dev/null || ret=1
+	if [ $ret != 0 ]; then echo_i "failed"; fi
+	status=$((status+ret))
+fi
 
 n=$((n+1))
 echo_i "check for failed validation due to wrong key in managed-keys ($n)"
@@ -131,8 +141,8 @@ status=$((status+ret))
 n=$((n+1))
 echo_i "check new trust anchor can be added ($n)"
 ret=0
-standby1=$($KEYGEN -a rsasha256 -qfk -K ns1 .)
-mkeys_loadkeys_on 1 || ret=1
+standby1=$($KEYGEN -a ${DEFAULT_ALGORITHM} -qfk -K ns1 .)
+mkeys_resign_rootzone $n || ret=1
 mkeys_refresh_on 2 || ret=1
 mkeys_status_on 2 > rndc.out.$n 2>&1 || ret=1
 # there should be two keys listed now
@@ -173,7 +183,7 @@ ret=0
 mkeys_sync_on 2 || ret=1
 t1=$(grep "trust pending" ns2/managed-keys.bind) || true
 $SETTIME -D now -K ns1 "$standby1" > /dev/null
-mkeys_loadkeys_on 1 || ret=1
+mkeys_resign_rootzone $n || ret=1
 # Less than a second may have passed since the last time ns2 received a
 # ./DNSKEY response from ns1.  Ensure keys are refreshed at a different
 # timestamp to prevent false negatives caused by the acceptance timer getting
@@ -194,7 +204,7 @@ echo_i "restore untrusted standby key, revoke original key ($n)"
 t1=$t2
 $SETTIME -D none -K ns1 "$standby1" > /dev/null
 $SETTIME -R now -K ns1 "$original" > /dev/null
-mkeys_loadkeys_on 1 || ret=1
+mkeys_resign_rootzone $n || ret=1
 # Less than a second may have passed since the last time ns2 received a
 # ./DNSKEY response from ns1.  Ensure keys are refreshed at a different
 # timestamp to prevent false negatives caused by the acceptance timer getting
@@ -264,9 +274,9 @@ ret=0
 echo_i "restore revoked key, ensure same result ($n)"
 t1=$t2
 $SETTIME -R none -D now -K ns1 "$original" > /dev/null
-mkeys_loadkeys_on 1 || ret=1
+mkeys_resign_rootzone $n || ret=1
 $SETTIME -D none -K ns1 "$original" > /dev/null
-mkeys_loadkeys_on 1 || ret=1
+mkeys_resign_rootzone $n || ret=1
 # Less than a second may have passed since the last time ns2 received a
 # ./DNSKEY response from ns1.  Ensure keys are refreshed at a different
 # timestamp to prevent false negatives caused by the acceptance timer getting
@@ -298,11 +308,11 @@ if [ $ret != 0 ]; then echo_i "failed"; fi
 status=$((status+ret))
 
 echo_i "reinitialize trust anchors, add second key to bind.keys"
-stop_server --use-rndc --port "${CONTROLPORT}" mkeys ns2
+stop_server --use-rndc --port "${CONTROLPORT}" ns2
 rm -f ns2/managed-keys.bind*
 keyfile_to_initial_ds ns1/"$original" ns1/"$standby1" > ns2/managed.conf
 nextpart ns2/named.run > /dev/null
-start_server --noclean --restart --port "${PORT}" mkeys ns2
+start_server --noclean --restart --port "${PORT}" ns2
 
 n=$((n+1))
 echo_i "check that no key from bind.keys is marked as an initializing key ($n)"
@@ -314,11 +324,11 @@ if [ $ret != 0 ]; then echo_i "failed"; fi
 status=$((status+ret))
 
 echo_i "reinitialize trust anchors, revert to one key in bind.keys"
-stop_server --use-rndc --port "${CONTROLPORT}" mkeys ns2
+stop_server --use-rndc --port "${CONTROLPORT}" ns2
 rm -f ns2/managed-keys.bind*
 mv ns2/managed1.conf ns2/managed.conf
 nextpart ns2/named.run > /dev/null
-start_server --noclean --restart --port "${PORT}" mkeys ns2
+start_server --noclean --restart --port "${PORT}" ns2
 
 n=$((n+1))
 echo_i "check that standby key is now trusted ($n)"
@@ -340,9 +350,9 @@ status=$((status+ret))
 n=$((n+1))
 echo_i "revoke original key, add new standby ($n)"
 ret=0
-standby2=$($KEYGEN -a rsasha256 -qfk -K ns1 .)
+standby2=$($KEYGEN -a ${DEFAULT_ALGORITHM} -qfk -K ns1 .)
 $SETTIME -R now -K ns1 "$original" > /dev/null
-mkeys_loadkeys_on 1 || ret=1
+mkeys_resign_rootzone $n || ret=1
 mkeys_refresh_on 2 || ret=1
 mkeys_status_on 2 > rndc.out.$n 2>&1 || ret=1
 # three keys listed
@@ -372,8 +382,8 @@ status=$((status+ret))
 n=$((n+1))
 echo_i "revoke standby before it is trusted ($n)"
 ret=0
-standby3=$($KEYGEN -a rsasha256 -qfk -K ns1 .)
-mkeys_loadkeys_on 1 || ret=1
+standby3=$($KEYGEN -a ${DEFAULT_ALGORITHM} -qfk -K ns1 .)
+mkeys_resign_rootzone $n || ret=1
 mkeys_refresh_on 2 || ret=1
 mkeys_status_on 2 > rndc.out.1.$n 2>&1 || ret=1
 # four keys listed
@@ -386,7 +396,7 @@ count=$(grep -c "trust revoked" rndc.out.1.$n) || true
 count=$(grep -c "trust pending" rndc.out.1.$n) || true
 [ "$count" -eq 2 ] || { echo_i "trust pending count ($count) != 2"; ret=1; }
 $SETTIME -R now -K ns1 "$standby3" > /dev/null
-mkeys_loadkeys_on 1 || ret=1
+mkeys_resign_rootzone $n || ret=1
 mkeys_refresh_on 2 || ret=1
 mkeys_status_on 2 > rndc.out.2.$n 2>&1 || ret=1
 # now three keys listed
@@ -399,7 +409,7 @@ count=$(grep -c "trust revoked" rndc.out.2.$n) || true
 count=$(grep -c "trust pending" rndc.out.2.$n) || true
 [ "$count" -eq 1 ] || { echo_i "trust pending count ($count) != 1"; ret=1; }
 $SETTIME -D now -K ns1 "$standby3" > /dev/null
-mkeys_loadkeys_on 1 || ret=1
+mkeys_resign_rootzone $n || ret=1
 if [ $ret != 0 ]; then echo_i "failed"; fi
 status=$((status+ret))
 
@@ -430,7 +440,7 @@ ret=0
 $SETTIME -D now -K ns1 "$original" > /dev/null
 $SETTIME -R now -K ns1 "$standby1" > /dev/null
 $SETTIME -R now -K ns1 "$standby2" > /dev/null
-mkeys_loadkeys_on 1 || ret=1
+mkeys_resign_rootzone $n || ret=1
 mkeys_refresh_on 2 || ret=1
 mkeys_status_on 2 > rndc.out.$n 2>&1 || ret=1
 # two keys listed
@@ -468,6 +478,7 @@ ret=0
 $SETTIME -D none -R none -K ns1 "$original" > /dev/null
 $SETTIME -D now -K ns1 "$standby1" > /dev/null
 $SETTIME -D now -K ns1 "$standby2" > /dev/null
+sleep 1 # ensure modification time changes
 $SIGNER -Sg -K ns1 -N unixtime -o . ns1/root.db > /dev/null 2>/dev/null
 copy_setports ns1/named2.conf.in ns1/named.conf
 rm -f ns1/root.db.signed.jnl
@@ -477,10 +488,10 @@ if [ $ret != 0 ]; then echo_i "failed"; fi
 status=$((status+ret))
 
 echo_i "reinitialize trust anchors"
-stop_server --use-rndc --port "${CONTROLPORT}" mkeys ns2
+stop_server --use-rndc --port "${CONTROLPORT}" ns2
 rm -f ns2/managed-keys.bind*
 nextpart ns2/named.run > /dev/null
-start_server --noclean --restart --port "${PORT}" mkeys ns2
+start_server --noclean --restart --port "${PORT}" ns2
 
 n=$((n+1))
 echo_i "check positive validation ($n)"
@@ -576,11 +587,11 @@ ret=0
 mkeys_refresh_on 2 || ret=1
 mkeys_status_on 2 > rndc.out.1.$n 2>&1 || ret=1
 t1=$(grep 'next refresh:' rndc.out.1.$n) || true
-stop_server --use-rndc --port "${CONTROLPORT}" mkeys ns1
+stop_server --use-rndc --port "${CONTROLPORT}" ns1
 rm -f ns1/root.db.signed.jnl
 cp ns1/root.db ns1/root.db.signed
 nextpart ns1/named.run > /dev/null
-start_server --noclean --restart --port "${PORT}" mkeys ns1
+start_server --noclean --restart --port "${PORT}" ns1
 wait_for_log 20 "all zones loaded" ns1/named.run || ret=1
 mkeys_refresh_on 2 || ret=1
 mkeys_status_on 2 > rndc.out.2.$n 2>&1 || ret=1
@@ -610,11 +621,11 @@ ret=0
 mkeys_refresh_on 2 || ret=1
 mkeys_status_on 2 > rndc.out.1.$n 2>&1 || ret=1
 t1=$(grep 'next refresh:' rndc.out.1.$n) || true
-stop_server --use-rndc --port "${CONTROLPORT}" mkeys ns1
+stop_server --use-rndc --port "${CONTROLPORT}" ns1
 rm -f ns1/root.db.signed.jnl
 cat ns1/K*.key >> ns1/root.db.signed
 nextpart ns1/named.run > /dev/null
-start_server --noclean --restart --port "${PORT}" mkeys ns1
+start_server --noclean --restart --port "${PORT}" ns1
 wait_for_log 20 "all zones loaded" ns1/named.run || ret=1
 # Less than a second may have passed since the last time ns2 received a
 # ./DNSKEY response from ns1.  Ensure keys are refreshed at a different
@@ -676,8 +687,12 @@ rndccmd 10.53.0.2 managed-keys destroy | sed 's/^/ns2 /' | cat_i
 mkeys_status_on 2 > rndc.out.1.$n 2>&1 || ret=1
 grep "no views with managed keys" rndc.out.1.$n > /dev/null || ret=1
 mkeys_reconfig_on 2 || ret=1
-mkeys_status_on 2 > rndc.out.2.$n 2>&1 || ret=1
-grep "name: \." rndc.out.2.$n > /dev/null || ret=1
+check_root_trust_anchor_is_present_in_status() {
+	mkeys_status_on 2 > rndc.out.2.$n 2>&1 || return 1
+	grep "name: \." rndc.out.2.$n > /dev/null || return 1
+	return 0
+}
+retry_quiet 5 check_root_trust_anchor_is_present_in_status || ret=1
 if [ $ret != 0 ]; then echo_i "failed"; fi
 status=$((status+ret))
 
@@ -688,7 +703,7 @@ ret=0
 # compare against the known key.
 tathex=$(grep "query '_ta-[0-9a-f][0-9a-f]*/NULL/IN' approved" ns1/named.run | awk '{print $6; exit 0}' | sed -e 's/(_ta-\([0-9a-f][0-9a-f]*\)):/\1/') || true
 tatkey=$($PERL -e 'printf("%d\n", hex(@ARGV[0]));' "$tathex")
-realkey=$(rndccmd 10.53.0.2 secroots - | sed -n 's#.*SHA256/\([0-9][0-9]*\) ; .*managed.*#\1#p')
+realkey=$(rndccmd 10.53.0.2 secroots - | sed -n "s#.*${DEFAULT_ALGORITHM}/\([0-9][0-9]*\) ; .*managed.*#\1#p")
 [ "$tatkey" -eq "$realkey" ] || ret=1
 if [ $ret != 0 ]; then echo_i "failed"; fi
 status=$((status+ret))
@@ -712,10 +727,12 @@ ret=0
 # ensure key refresh retry will be scheduled to one actual hour after the first
 # key refresh failure instead of just a few seconds, in order to prevent races
 # between the next scheduled key refresh time and startup time of restarted ns5.
-stop_server --use-rndc --port "${CONTROLPORT}" mkeys ns5
+stop_server --use-rndc --port "${CONTROLPORT}" ns5
 nextpart ns5/named.run > /dev/null
-start_server --noclean --restart --port "${PORT}" mkeys ns5
-wait_for_log 20 "Returned from key fetch in keyfetch_done()" ns5/named.run || ret=1
+start_server --noclean --restart --port "${PORT}" ns5
+wait_for_log_peek 20 "Returned from key fetch in keyfetch_done() for '.':" ns5/named.run || ret=1
+wait_for_log_peek 20 "Returned from key fetch in keyfetch_done() for 'sub.tld':" ns5/named.run || ret=1
+wait_for_log_peek 20 "Returned from key fetch in keyfetch_done() for 'sub.foo':" ns5/named.run || ret=1
 # ns5/named.run will contain logs from both the old instance and the new
 # instance.  In order for the test to pass, both must attempt a fetch.
 count=$(grep -c "Creating key fetch" ns5/named.run) || true
@@ -724,17 +741,36 @@ if [ $ret != 0 ]; then echo_i "failed"; fi
 status=$((status+ret))
 
 n=$((n+1))
+echo_i "check 'rndc managed-keys' and islands of trust root unreachable ($n)"
+ret=0
+mkeys_sync_on 5
+mkeys_status_on 5 > rndc.out.$n 2>&1 || ret=1
+# there should be three keys listed now
+count=$(grep -c "keyid: " rndc.out.$n) || true
+[ "$count" -eq 3 ] || ret=1
+# three lines indicating trust status
+count=$(grep -c "trust" rndc.out.$n) || true
+[ "$count" -eq 3 ] || ret=1
+# one indicates current trust
+count=$(grep -c "trusted since" rndc.out.$n) || true
+[ "$count" -eq 1 ] || ret=1
+if [ $ret != 0 ]; then echo_i "failed"; fi
+status=$((status+ret))
+
+n=$((n+1))
 echo_i "check key refreshes are resumed after root servers become available ($n)"
 ret=0
-stop_server --use-rndc --port "${CONTROLPORT}" mkeys ns5
+stop_server --use-rndc --port "${CONTROLPORT}" ns5
 # Prevent previous check from affecting this one
 rm -f ns5/managed-keys.bind*
 # named2.args adds "-T mkeytimers=2/20/40" to named1.args as we need to wait for
 # an "hour" until keys are refreshed again after initial failure
 cp ns5/named2.args ns5/named.args
 nextpart ns5/named.run > /dev/null
-start_server --noclean --restart --port "${PORT}" mkeys ns5
-wait_for_log 20 "Returned from key fetch in keyfetch_done() for '.': failure" ns5/named.run || ret=1
+start_server --noclean --restart --port "${PORT}" ns5
+wait_for_log_peek 20 "Returned from key fetch in keyfetch_done() for '.': failure" ns5/named.run || ret=1
+wait_for_log_peek 20 "Returned from key fetch in keyfetch_done() for 'sub.tld': failure" ns5/named.run || ret=1
+wait_for_log_peek 20 "Returned from key fetch in keyfetch_done() for 'sub.foo': success" ns5/named.run || ret=1
 mkeys_secroots_on 5 || ret=1
 grep '; initializing managed' ns5/named.secroots > /dev/null 2>&1 || ret=1
 # ns1 should still REFUSE queries from ns5, so resolving should be impossible
@@ -747,7 +783,9 @@ copy_setports ns1/named3.conf.in ns1/named.conf
 rm -f ns1/root.db.signed.jnl
 nextpart ns5/named.run > /dev/null
 mkeys_reconfig_on 1 || ret=1
-wait_for_log 20 "Returned from key fetch in keyfetch_done() for '.': success" ns5/named.run || ret=1
+wait_for_log_peek 20 "Returned from key fetch in keyfetch_done() for '.': success" ns5/named.run || ret=1
+wait_for_log_peek 20 "Returned from key fetch in keyfetch_done() for 'sub.tld': success" ns5/named.run || ret=1
+wait_for_log_peek 20 "Returned from key fetch in keyfetch_done() for 'sub.foo': success" ns5/named.run || ret=1
 mkeys_secroots_on 5 || ret=1
 grep '; managed' ns5/named.secroots > /dev/null || ret=1
 # ns1 should not longer REFUSE queries from ns5, so managed keys should be
@@ -762,10 +800,10 @@ status=$((status+ret))
 n=$((n+1))
 echo_i "reinitialize trust anchors, add unsupported algorithm ($n)"
 ret=0
-stop_server --use-rndc --port "${CONTROLPORT}" mkeys ns6
+stop_server --use-rndc --port "${CONTROLPORT}" ns6
 rm -f ns6/managed-keys.bind*
 nextpart ns6/named.run > /dev/null
-start_server --noclean --restart --port "${PORT}" mkeys ns6
+start_server --noclean --restart --port "${PORT}" ns6
 # log when an unsupported algorithm is encountered during startup
 wait_for_log 20 "ignoring initial-key for 'unsupported.': algorithm is unsupported" ns6/named.run || ret=1
 if [ $ret != 0 ]; then echo_i "failed"; fi
@@ -775,7 +813,7 @@ n=$((n+1))
 echo_i "ignoring unsupported algorithm in managed-keys ($n)"
 ret=0
 mkeys_status_on 6 > rndc.out.$n 2>&1 || ret=1
-# there should still be only two keys listed (for . and rsasha256.)
+# there should still be only two keys listed (for . and island.)
 count=$(grep -c "keyid: " rndc.out.$n) || true
 [ "$count" -eq 2 ] || ret=1
 # two lines indicating trust status
@@ -802,7 +840,7 @@ ret=0
 mkeys_reload_on 1 || ret=1
 mkeys_refresh_on 6 || ret=1
 mkeys_status_on 6 > rndc.out.$n 2>&1 || ret=1
-# there should still be only two keys listed (for . and rsasha256.)
+# there should still be only two keys listed (for . and island.)
 count=$(grep -c "keyid: " rndc.out.$n) || true
 [ "$count" -eq 2 ] || ret=1
 # two lines indicating trust status
@@ -825,6 +863,23 @@ lines=$(wc -l < rndc.out.ns7.view2.test$n)
 grep "refreshing managed keys for 'view1'" rndc.out.ns7.view2.test$n > /dev/null || ret=1
 grep "refreshing managed keys for 'view2'" rndc.out.ns7.view2.test$n > /dev/null || ret=1
 [ "$lines" -eq 2 ] || ret=1
+if [ $ret != 0 ]; then echo_i "failed"; fi
+status=$((status+ret))
+
+n=$((n+1))
+echo_i "check 'rndc managed-keys' and islands of trust now that root is reachable ($n)"
+ret=0
+mkeys_sync_on 5
+mkeys_status_on 5 > rndc.out.$n 2>&1 || ret=1
+# there should be three keys listed now
+count=$(grep -c "keyid: " rndc.out.$n) || true
+[ "$count" -eq 3 ] || ret=1
+# theee lines indicating trust status
+count=$(grep -c "trust" rndc.out.$n) || true
+[ "$count" -eq 3 ] || ret=1
+# three indicates current trust
+count=$(grep -c "trusted since" rndc.out.$n) || true
+[ "$count" -eq 3 ] || ret=1
 if [ $ret != 0 ]; then echo_i "failed"; fi
 status=$((status+ret))
 

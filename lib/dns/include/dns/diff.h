@@ -1,6 +1,8 @@
 /*
  * Copyright (C) Internet Systems Consortium, Inc. ("ISC")
  *
+ * SPDX-License-Identifier: MPL-2.0
+ *
  * This Source Code Form is subject to the terms of the Mozilla Public
  * License, v. 2.0. If a copy of the MPL was not distributed with this
  * file, you can obtain one at https://mozilla.org/MPL/2.0/.
@@ -9,8 +11,7 @@
  * information regarding copyright ownership.
  */
 
-#ifndef DNS_DIFF_H
-#define DNS_DIFF_H 1
+#pragma once
 
 /*****
 ***** Module Info
@@ -66,13 +67,14 @@ typedef enum {
 } dns_diffop_t;
 
 typedef struct dns_difftuple dns_difftuple_t;
+typedef ISC_LIST(dns_difftuple_t) dns_difftuplelist_t;
 
 #define DNS_DIFFTUPLE_MAGIC    ISC_MAGIC('D', 'I', 'F', 'T')
 #define DNS_DIFFTUPLE_VALID(t) ISC_MAGIC_VALID(t, DNS_DIFFTUPLE_MAGIC)
 
 struct dns_difftuple {
 	unsigned int magic;
-	isc_mem_t *  mctx;
+	isc_mem_t   *mctx;
 	dns_diffop_t op;
 	dns_name_t   name;
 	dns_ttl_t    ttl;
@@ -92,9 +94,9 @@ typedef struct dns_diff dns_diff_t;
 #define DNS_DIFF_VALID(t) ISC_MAGIC_VALID(t, DNS_DIFF_MAGIC)
 
 struct dns_diff {
-	unsigned int magic;
-	isc_mem_t *  mctx;
-	ISC_LIST(dns_difftuple_t) tuples;
+	unsigned int	    magic;
+	isc_mem_t	   *mctx;
+	dns_difftuplelist_t tuples;
 };
 
 /* Type of comparison function for sorting diffs. */
@@ -275,5 +277,3 @@ dns_diff_print(dns_diff_t *diff, FILE *file);
  */
 
 ISC_LANG_ENDDECLS
-
-#endif /* DNS_DIFF_H */

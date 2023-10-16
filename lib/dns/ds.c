@@ -1,6 +1,8 @@
 /*
  * Copyright (C) Internet Systems Consortium, Inc. ("ISC")
  *
+ * SPDX-License-Identifier: MPL-2.0
+ *
  * This Source Code Form is subject to the terms of the Mozilla Public
  * License, v. 2.0. If a copy of the MPL was not distributed with this
  * file, you can obtain one at https://mozilla.org/MPL/2.0/.
@@ -16,6 +18,7 @@
 #include <isc/buffer.h>
 #include <isc/md.h>
 #include <isc/region.h>
+#include <isc/result.h>
 #include <isc/util.h>
 
 #include <dns/ds.h>
@@ -23,7 +26,6 @@
 #include <dns/name.h>
 #include <dns/rdata.h>
 #include <dns/rdatastruct.h>
-#include <dns/result.h>
 
 #include <dst/dst.h>
 
@@ -61,8 +63,7 @@ dns_ds_fromkeyrdata(const dns_name_t *owner, dns_rdata_t *key,
 		break;
 
 	default:
-		INSIST(0);
-		ISC_UNREACHABLE();
+		UNREACHABLE();
 	}
 
 	name = dns_fixedname_initname(&fname);

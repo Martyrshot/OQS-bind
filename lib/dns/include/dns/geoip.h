@@ -1,6 +1,8 @@
 /*
  * Copyright (C) Internet Systems Consortium, Inc. ("ISC")
  *
+ * SPDX-License-Identifier: MPL-2.0
+ *
  * This Source Code Form is subject to the terms of the Mozilla Public
  * License, v. 2.0. If a copy of the MPL was not distributed with this
  * file, you can obtain one at https://mozilla.org/MPL/2.0/.
@@ -9,8 +11,7 @@
  * information regarding copyright ownership.
  */
 
-#ifndef DNS_GEOIP_H
-#define DNS_GEOIP_H 1
+#pragma once
 
 /*****
 ***** Module Info
@@ -79,7 +80,7 @@ typedef enum {
 
 typedef struct dns_geoip_elem {
 	dns_geoip_subtype_t subtype;
-	void *		    db;
+	void		   *db;
 	union {
 		char as_string[256];
 		int  as_int;
@@ -101,12 +102,10 @@ struct dns_geoip_databases {
 ISC_LANG_BEGINDECLS
 
 bool
-dns_geoip_match(const isc_netaddr_t *	     reqaddr,
+dns_geoip_match(const isc_netaddr_t	    *reqaddr,
 		const dns_geoip_databases_t *geoip,
-		const dns_geoip_elem_t *     elt);
+		const dns_geoip_elem_t	    *elt);
 
 ISC_LANG_ENDDECLS
 
 #endif /* HAVE_GEOIP2 */
-
-#endif /* DNS_GEOIP_H */

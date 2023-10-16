@@ -1,6 +1,8 @@
 /*
  * Copyright (C) Internet Systems Consortium, Inc. ("ISC")
  *
+ * SPDX-License-Identifier: MPL-2.0
+ *
  * This Source Code Form is subject to the terms of the Mozilla Public
  * License, v. 2.0. If a copy of the MPL was not distributed with this
  * file, you can obtain one at https://mozilla.org/MPL/2.0/.
@@ -9,8 +11,7 @@
  * information regarding copyright ownership.
  */
 
-#ifndef DIG_H
-#define DIG_H
+#pragma once
 
 /*! \file */
 
@@ -22,13 +23,13 @@
 #include <isc/formatcheck.h>
 #include <isc/lang.h>
 #include <isc/list.h>
+#include <isc/loop.h>
 #include <isc/magic.h>
 #include <isc/mem.h>
 #include <isc/netmgr.h>
-#include <isc/print.h>
 #include <isc/refcount.h>
 #include <isc/sockaddr.h>
-#include <isc/socket.h>
+#include <isc/time.h>
 
 #include <dns/rdatalist.h>
 
@@ -76,7 +77,6 @@
 #define DEFAULT_EDNS_VERSION 0
 #define DEFAULT_EDNS_BUFSIZE 1232
 
-#define DEFAULT_HTTPS_PATH  "/dns-query"
 #define DEFAULT_HTTPS_QUERY "?dns="
 
 /*%
@@ -105,24 +105,25 @@ typedef struct dig_searchlist dig_searchlist_t;
 struct dig_lookup {
 	unsigned int magic;
 	isc_refcount_t references;
-	bool aaonly, adflag, badcookie, besteffort, cdflag, comments,
+	bool aaonly, adflag, badcookie, besteffort, cdflag, cleared, comments,
 		dns64prefix, dnssec, doing_xfr, done_as_is, ednsneg, expandaaaa,
-		expire, header_only, identify, /*%< Append an "on server <foo>"
-						  message */
-		identify_previous_line,	       /*% Prepend a "Nameserver <foo>:"
-						  message, with newline and tab */
-		idnin, idnout, ignore, mapped, multiline, need_search,
-		new_search, noclass, nocrypto, nottl,
-		ns_search_only,	 /*%< dig +nssearch, host -C */
-		nsid,		 /*% Name Server ID (RFC 5001) */
-		onesoa, pending, /*%< Pending a successful answer */
+		expire, fuzzing, header_only, identify, /*%< Append an "on
+							   server <foo>" message
+							 */
+		identify_previous_line, /*% Prepend a "Nameserver <foo>:"
+					   message, with newline and tab */
+		idnin, idnout, ignore, multiline, need_search, new_search,
+		noclass, nocrypto, nottl, ns_search_only, /*%< dig +nssearch,
+							     host -C */
+		ns_search_success, nsid, /*% Name Server ID (RFC 5001) */
+		onesoa, pending,	 /*%< Pending a successful answer */
 		print_unknown_format, qr, raflag, recurse, section_additional,
 		section_answer, section_authority, section_question,
 		seenbadcookie, sendcookie, servfail_stops,
 		setqid, /*% use a speciied query ID */
-		stats, tcflag, tcp_keepalive, tcp_mode, tcp_mode_set,
-		tls_mode,   /*% connect using TLS */
-		trace,	    /*% dig +trace */
+		showbadcookie, stats, tcflag, tcp_keepalive, tcp_mode,
+		tcp_mode_set, tls_mode, /*% connect using TLS */
+		trace,			/*% dig +trace */
 		trace_root, /*% initial query for either +trace or +nssearch */
 		ttlunits, use_usec, waiting_connect, zflag;
 	char textname[MXNAME]; /*% Name we're going to be looking up */
@@ -165,11 +166,9 @@ struct dig_lookup {
 	char *cookie;
 	dns_ednsopt_t *ednsopts;
 	unsigned int ednsoptscnt;
-	isc_dscp_t dscp;
 	unsigned int ednsflags;
 	dns_opcode_t opcode;
 	int rrcomments;
-	unsigned int eoferr;
 	uint16_t qid;
 	struct {
 		bool http_plain;
@@ -177,17 +176,30 @@ struct dig_lookup {
 		bool https_get;
 		char *https_path;
 	};
+	struct {
+		bool tls_ca_set;
+		char *tls_ca_file;
+		bool tls_hostname_set;
+		char *tls_hostname;
+		bool tls_cert_file_set;
+		char *tls_cert_file;
+		bool tls_key_file_set;
+		char *tls_key_file;
+		isc_tlsctx_cache_t *tls_ctx_cache;
+	};
+	isc_stdtime_t fuzztime;
 };
 
 /*% The dig_query structure */
 struct dig_query {
 	unsigned int magic;
 	dig_lookup_t *lookup;
-	bool first_pass;
+	bool started;
 	bool first_soa_rcvd;
 	bool second_rr_rcvd;
 	bool first_repeat_rcvd;
 	bool warn_id;
+	bool canceled;
 	uint32_t first_rr_serial;
 	uint32_t second_rr_serial;
 	uint32_t msg_count;
@@ -208,7 +220,6 @@ struct dig_query {
 	isc_time_t time_recv;
 	uint64_t byte_count;
 	isc_timer_t *timer;
-	isc_tlsctx_t *tlsctx;
 };
 
 struct dig_server {
@@ -248,12 +259,12 @@ extern isc_sockaddr_t localaddr;
 extern char keynametext[MXNAME];
 extern char keyfile[MXNAME];
 extern char keysecret[MXNAME];
-extern const dns_name_t *hmacname;
+extern dst_algorithm_t hmac;
 extern unsigned int digestbits;
 extern dns_tsigkey_t *tsigkey;
 extern bool validated;
-extern isc_taskmgr_t *taskmgr;
-extern isc_task_t *global_task;
+extern isc_loopmgr_t *loopmgr;
+extern isc_loop_t *mainloop;
 extern bool free_now;
 extern bool debugging, debugtiming, memdebugging;
 extern bool keep_open;
@@ -275,14 +286,17 @@ getaddresses(dig_lookup_t *lookup, const char *host, isc_result_t *resultp);
 isc_result_t
 get_reverse(char *reverse, size_t len, char *value, bool strict);
 
-ISC_NORETURN void
+noreturn void
 fatal(const char *format, ...) ISC_FORMAT_PRINTF(1, 2);
 
 void
 warn(const char *format, ...) ISC_FORMAT_PRINTF(1, 2);
 
-ISC_NORETURN void
+noreturn void
 digexit(void);
+
+void
+cleanup_openssl_refs(void);
 
 void
 debug(const char *format, ...) ISC_FORMAT_PRINTF(1, 2);
@@ -303,7 +317,10 @@ void
 start_lookup(void);
 
 void
-onrun_callback(isc_task_t *task, isc_event_t *event);
+onrun_callback(void *arg);
+
+void
+run_loop(void *arg);
 
 int
 dhmain(int argc, char **argv);
@@ -324,7 +341,7 @@ isc_result_t
 parse_netprefix(isc_sockaddr_t **sap, const char *value);
 
 void
-parse_hmac(const char *hmacstr);
+parse_hmac(const char *algname);
 
 dig_lookup_t *
 requeue_lookup(dig_lookup_t *lookold, bool servers);
@@ -429,12 +446,6 @@ void
 dig_startup(void);
 
 /*%
- * Initiates the next lookup cycle
- */
-void
-dig_query_start(void);
-
-/*%
  * Activate/deactivate IDN filtering of output.
  */
 void
@@ -446,6 +457,7 @@ dig_idnsetup(dig_lookup_t *lookup, bool active);
 void
 dig_shutdown(void);
 
-ISC_LANG_ENDDECLS
+bool
+dig_lookup_is_tls(const dig_lookup_t *lookup);
 
-#endif /* ifndef DIG_H */
+ISC_LANG_ENDDECLS

@@ -1,5 +1,7 @@
 /*
- * Portions Copyright (C) Internet Systems Consortium, Inc. ("ISC")
+ * Copyright (C) Internet Systems Consortium, Inc. ("ISC")
+ *
+ * SPDX-License-Identifier: MPL-2.0 AND ISC
  *
  * This Source Code Form is subject to the terms of the Mozilla Public
  * License, v. 2.0. If a copy of the MPL was not distributed with this
@@ -7,8 +9,10 @@
  *
  * See the COPYRIGHT file distributed with this work for additional
  * information regarding copyright ownership.
- *
- * Portions Copyright (C) Network Associates, Inc.
+ */
+
+/*
+ * Copyright (C) Network Associates, Inc.
  *
  * Permission to use, copy, modify, and/or distribute this software for any
  * purpose with or without fee is hereby granted, provided that the above
@@ -24,8 +28,7 @@
  */
 
 /*! \file */
-#ifndef DST_DST_PARSE_H
-#define DST_DST_PARSE_H 1
+#pragma once
 
 #include <isc/lang.h>
 
@@ -55,12 +58,6 @@
 #define TAG_RSA_COEFFICIENT	((DST_ALG_RSA << TAG_SHIFT) + 7)
 #define TAG_RSA_ENGINE		((DST_ALG_RSA << TAG_SHIFT) + 8)
 #define TAG_RSA_LABEL		((DST_ALG_RSA << TAG_SHIFT) + 9)
-
-#define DH_NTAGS	 4
-#define TAG_DH_PRIME	 ((DST_ALG_DH << TAG_SHIFT) + 0)
-#define TAG_DH_GENERATOR ((DST_ALG_DH << TAG_SHIFT) + 1)
-#define TAG_DH_PRIVATE	 ((DST_ALG_DH << TAG_SHIFT) + 2)
-#define TAG_DH_PUBLIC	 ((DST_ALG_DH << TAG_SHIFT) + 3)
 
 #define ECDSA_NTAGS	     4
 #define TAG_ECDSA_PRIVATEKEY ((DST_ALG_ECDSA256 << TAG_SHIFT) + 0)
@@ -145,5 +142,3 @@ dst__privstruct_writefile(const dst_key_t *key, const dst_private_t *priv,
 			  const char *directory);
 
 ISC_LANG_ENDDECLS
-
-#endif /* DST_DST_PARSE_H */

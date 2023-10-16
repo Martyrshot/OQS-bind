@@ -1,18 +1,23 @@
 #!/bin/sh
-#
+
 # Copyright (C) Internet Systems Consortium, Inc. ("ISC")
 #
+# SPDX-License-Identifier: MPL-2.0
+#
 # This Source Code Form is subject to the terms of the Mozilla Public
-# License, v. 2.0. If a copy of the MPL was not distributed with this
+# License, v. 2.0.  If a copy of the MPL was not distributed with this
 # file, you can obtain one at https://mozilla.org/MPL/2.0/.
 #
 # See the COPYRIGHT file distributed with this work for additional
 # information regarding copyright ownership.
 
+set -e
+
 . ../conf.sh
 
 DIGOPTS="+tcp +noadd +nosea +nostat +noquest +nocomm +nocmd -p ${PORT}"
 RNDCCMD="$RNDC -c ../common/rndc.conf -p ${CONTROLPORT} -s"
+NS_PARAMS="-X named.lock -m record -c named.conf -d 99 -g -U 4 -T maxcachesize=2097152"
 
 status=0
 n=0
@@ -33,27 +38,38 @@ tmp=0
 # Spin to allow the zone to transfer.
 #
 wait_for_xfer () {
-	$DIG $DIGOPTS example. @10.53.0.3 axfr > dig.out.ns3.test$n || return 1
-	grep "^;" dig.out.ns3.test$n > /dev/null && return 1
+	ZONE=$1
+	SERVER=$2
+	$DIG $DIGOPTS $ZONE @$SERVER axfr > dig.out.test$n || return 1
+	grep "^;" dig.out.test$n > /dev/null && return 1
 	return 0
 }
-retry_quiet 25 wait_for_xfer || tmp=1
-grep "^;" dig.out.ns3.test$n | cat_i
-digcomp dig1.good dig.out.ns3.test$n || tmp=1
+retry_quiet 25 wait_for_xfer example. 10.53.0.3 || tmp=1
+grep "^;" dig.out.test$n | cat_i
+digcomp dig1.good dig.out.test$n || tmp=1
+if test $tmp != 0 ; then echo_i "failed"; fi
+status=$((status+tmp))
+
+n=$((n+1))
+echo_i "testing zone transfer functionality (fallback to DNS after DoT failed) ($n)"
+tmp=0
+retry_quiet 25 wait_for_xfer dot-fallback. 10.53.0.2 || tmp=1
+grep "^;" dig.out.test$n | cat_i
+digcomp dig3.good dig.out.test$n || tmp=1
 if test $tmp != 0 ; then echo_i "failed"; fi
 status=$((status+tmp))
 
 n=$((n+1))
 echo_i "testing TSIG signed zone transfers ($n)"
 tmp=0
-$DIG $DIGOPTS tsigzone. @10.53.0.2 axfr -y tsigzone.:1234abcd8765 > dig.out.ns2.test$n || tmp=1
+$DIG $DIGOPTS tsigzone. @10.53.0.2 axfr -y "${DEFAULT_HMAC}:tsigzone.:1234abcd8765" > dig.out.ns2.test$n || tmp=1
 grep "^;" dig.out.ns2.test$n | cat_i
 
 #
 # Spin to allow the zone to transfer.
 #
 wait_for_xfer_tsig () {
-	$DIG $DIGOPTS tsigzone. @10.53.0.3 axfr -y tsigzone.:1234abcd8765 > dig.out.ns3.test$n || return 1
+	$DIG $DIGOPTS tsigzone. @10.53.0.3 axfr -y "${DEFAULT_HMAC}:tsigzone.:1234abcd8765" > dig.out.ns3.test$n || return 1
 	grep "^;" dig.out.ns3.test$n > /dev/null && return 1
 	return 0
 }
@@ -240,7 +256,7 @@ status=$((status+tmp))
 n=$((n+1))
 echo_i "check that a multi-message uncompressable zone transfers ($n)"
 $DIG axfr . -p ${PORT} @10.53.0.4 | grep SOA > axfr.out
-if test `wc -l < axfr.out` != 2
+if test $(wc -l < axfr.out) != 2
 then
 	 echo_i "failed"
          status=$((status+1))
@@ -412,13 +428,13 @@ echo_i "bad message id ($n)"
 sendcmd < ans5/badmessageid
 
 # Uncomment to see AXFR stream with mismatching IDs.
-# $DIG $DIGOPTS @10.53.0.5 -y tsig_key:LSAnCU+Z nil. AXFR +all
+# $DIG $DIGOPTS @10.53.0.5 -y "${DEFAULT_HMAC}:tsig_key:LSAnCU+Z" nil. AXFR +all
 
 $RNDCCMD 10.53.0.4 retransfer nil | sed 's/^/ns4 /' | cat_i
 
 sleep 2
 
-nextpart ns4/named.run | grep "unexpected message id" > /dev/null || {
+nextpart ns4/named.run | grep "Transfer status: unexpected error" > /dev/null || {
     echo_i "failed: expected status was not logged"
     status=$((status+1))
 }
@@ -448,13 +464,21 @@ $DIGCMD nil. TXT | grep 'SOA mismatch AXFR' >/dev/null && {
 }
 
 n=$((n+1))
-echo_i "check that we ask for and get a EDNS EXPIRE response ($n)"
+echo_i "check that we ask for and got a EDNS EXPIRE response when transfering from a secondary ($n)"
+tmp=0
+msg="zone edns-expire/IN: zone transfer finished: success, expire=1814[0-4][0-9][0-9]"
+grep "$msg" ns7/named.run > /dev/null || tmp=1
+[ "$tmp" -ne 0 ] && echo_i "failed"
+status=$((status+tmp))
+
+n=$((n+1))
+echo_i "check that we ask for and get a EDNS EXPIRE response when refreshing ($n)"
 # force a refresh query
 $RNDCCMD 10.53.0.7 refresh edns-expire 2>&1 | sed 's/^/ns7 /' | cat_i
 sleep 10
 
 # there may be multiple log entries so get the last one.
-expire=`awk '/edns-expire\/IN: got EDNS EXPIRE of/ { x=$9 } END { print x }' ns7/named.run`
+expire=$(awk '/edns-expire\/IN: got EDNS EXPIRE of/ { x=$9 } END { print x }' ns7/named.run)
 test ${expire:-0} -gt 0 -a ${expire:-0} -lt 1814400 || {
     echo_i "failed (expire=${expire:-0})"
     status=$((status+1))
@@ -463,17 +487,15 @@ test ${expire:-0} -gt 0 -a ${expire:-0} -lt 1814400 || {
 n=$((n+1))
 echo_i "test smaller transfer TCP message size ($n)"
 $DIG $DIGOPTS example. @10.53.0.8 axfr \
-	-y key1.:1234abcd8765 > dig.out.msgsize.test$n || status=1
+	-y "${DEFAULT_HMAC}:key1.:1234abcd8765" > dig.out.msgsize.test$n || status=1
 
-$DOS2UNIX dig.out.msgsize.test$n >/dev/null 2>&1
-
-bytes=`wc -c < dig.out.msgsize.test$n`
+bytes=$(wc -c < dig.out.msgsize.test$n)
 if [ $bytes -ne 459357 ]; then
 	echo_i "failed axfr size check"
         status=$((status+1))
 fi
 
-num_messages=`cat ns8/named.run | grep "sending TCP message of" | wc -l`
+num_messages=$(cat ns8/named.run | grep "sending TCP message of" | wc -l)
 if [ $num_messages -le 300 ]; then
 	echo_i "failed transfer message count check"
         status=$((status+1))
@@ -484,8 +506,8 @@ echo_i "test mapped zone with out of zone data ($n)"
 tmp=0
 $DIG -p ${PORT} txt mapped @10.53.0.3 > dig.out.1.test$n
 grep "status: NOERROR," dig.out.1.test$n > /dev/null || tmp=1
-$PERL ../stop.pl xfer ns3
-start_server --noclean --restart --port ${PORT} xfer ns3
+stop_server ns3
+start_server --noclean --restart --port ${PORT} ns3
 check_mapped () {
 	$DIG -p ${PORT} txt mapped @10.53.0.3 > dig.out.2.test$n
 	grep "status: NOERROR," dig.out.2.test$n > /dev/null || return 1
@@ -527,7 +549,7 @@ tmp=0
 # Use -b so that we can discern between incoming and outgoing transfers in ns3
 # logs later on.
 wait_for_xfer() (
-	$DIG $DIGOPTS +noedns +stat -b 10.53.0.2 @10.53.0.3 xfer-stats. AXFR > dig.out.ns3.test$n
+	$DIG $DIGOPTS +edns +nocookie +noexpire +stat -b 10.53.0.2 @10.53.0.3 xfer-stats. AXFR > dig.out.ns3.test$n
 	grep "; Transfer failed" dig.out.ns3.test$n > /dev/null || return 0
 	return 1
 )
@@ -560,6 +582,53 @@ check_xfer_stats() {
 }
 retry_quiet 10 check_xfer_stats || tmp=1
 if test $tmp != 0 ; then echo_i "failed"; fi
+status=$((status+tmp))
+
+n=$((n+1))
+echo_i "test that transfer-source uses port option correctly ($n)"
+tmp=0
+grep "10.53.0.3#${EXTRAPORT1} (primary): query 'primary/SOA/IN' approved" ns6/named.run > /dev/null || tmp=1
+if test $tmp != 0 ; then echo_i "failed"; fi
+status=$((status+tmp))
+
+wait_for_message() (
+	nextpartpeek ns6/named.run > wait_for_message.$n
+	grep -F "$1" wait_for_message.$n >/dev/null
+)
+
+nextpart ns6/named.run > /dev/null
+
+n=$((n+1))
+echo_i "test max-transfer-time-in with 1 second timeout ($n)"
+stop_server ns1
+copy_setports ns1/named2.conf.in ns1/named.conf
+start_server --noclean --restart --port ${PORT} ns1 -- "-D xfer-ns1 $NS_PARAMS -T transferinsecs -T transferslowly"
+sleep 1
+$RNDCCMD 10.53.0.6 retransfer axfr-max-transfer-time 2>&1 | sed 's/^/ns6 /' | cat_i
+tmp=0
+retry_quiet 10 wait_for_message "maximum transfer time exceeded: timed out" || tmp=1
+status=$((status+tmp))
+
+nextpart ns6/named.run > /dev/null
+
+n=$((n+1))
+echo_i "test max-transfer-idle-in with 50 seconds timeout ($n)"
+stop_server ns1
+copy_setports ns1/named3.conf.in ns1/named.conf
+start_server --noclean --restart --port ${PORT} ns1 -- "-D xfer-ns1 $NS_PARAMS -T transferinsecs -T transferstuck"
+sleep 1
+start=$(date +%s)
+$RNDCCMD 10.53.0.6 retransfer axfr-max-idle-time 2>&1 | sed 's/^/ns6 /' | cat_i
+tmp=0
+retry_quiet 60 wait_for_message "maximum idle time exceeded: timed out" || tmp=1
+if [ $tmp -eq 0 ]; then
+	now=$(date +%s)
+	diff=$((now - start))
+	# we expect a timeout in 50 seconds
+	test $diff -lt 50 && tmp=1
+	test $diff -ge 59 && tmp=1
+	if test $tmp != 0 ; then echo_i "unexpected diff value: ${diff}"; fi
+fi
 status=$((status+tmp))
 
 echo_i "exit status: $status"

@@ -1,6 +1,8 @@
 /*
  * Copyright (C) Internet Systems Consortium, Inc. ("ISC")
  *
+ * SPDX-License-Identifier: MPL-2.0
+ *
  * This Source Code Form is subject to the terms of the Mozilla Public
  * License, v. 2.0. If a copy of the MPL was not distributed with this
  * file, you can obtain one at https://mozilla.org/MPL/2.0/.
@@ -9,8 +11,7 @@
  * information regarding copyright ownership.
  */
 
-#ifndef DST_DST_H
-#define DST_DST_H 1
+#pragma once
 
 /*! \file dst/dst.h */
 
@@ -77,35 +78,46 @@ typedef enum dst_key_state {
 } dst_key_state_t;
 
 /* DST algorithm codes */
-#define DST_ALG_UNKNOWN	     0
-#define DST_ALG_RSA	     1 /* Used for parsing RSASHA1, RSASHA256 and RSASHA512 */
-#define DST_ALG_RSAMD5	     1
-#define DST_ALG_DH	     2
-#define DST_ALG_DSA	     3
-#define DST_ALG_ECC	     4
-#define DST_ALG_RSASHA1	     5
-#define DST_ALG_NSEC3DSA     6
-#define DST_ALG_NSEC3RSASHA1 7
-#define DST_ALG_RSASHA256    8
-#define DST_ALG_RSASHA512    10
-#define DST_ALG_ECCGOST	     12
-#define DST_ALG_ECDSA256     13
-#define DST_ALG_ECDSA384     14
-#define DST_ALG_ED25519	     15
-#define DST_ALG_ED448	     16
-#define DST_ALG_HMACMD5	     157
-#define DST_ALG_GSSAPI	     160
-#define DST_ALG_HMACSHA1     161 /* XXXMPA */
-#define DST_ALG_HMACSHA224   162 /* XXXMPA */
-#define DST_ALG_HMACSHA256   163 /* XXXMPA */
-#define DST_ALG_HMACSHA384   164 /* XXXMPA */
-#define DST_ALG_HMACSHA512   165 /* XXXMPA */
-#define DST_ALG_FALCON512    249
-#define DST_ALG_DILITHIUM2    250
-#define DST_ALG_SPHINCSSHA256128S    251
-#define DST_ALG_INDIRECT     252
-#define DST_ALG_PRIVATE	     254
-#define DST_MAX_ALGS	     256
+typedef enum dst_algorithm {
+	DST_ALG_UNKNOWN = 0,
+	DST_ALG_RSA = 1, /* Used for parsing RSASHA1, RSASHA256 and RSASHA512 */
+	DST_ALG_RSAMD5 = 1,
+	DST_ALG_DH = 2, /* Deprecated */
+	DST_ALG_DSA = 3,
+	DST_ALG_ECC = 4,
+	DST_ALG_RSASHA1 = 5,
+	DST_ALG_NSEC3DSA = 6,
+	DST_ALG_NSEC3RSASHA1 = 7,
+	DST_ALG_RSASHA256 = 8,
+	DST_ALG_RSASHA512 = 10,
+	DST_ALG_ECCGOST = 12,
+	DST_ALG_ECDSA256 = 13,
+	DST_ALG_ECDSA384 = 14,
+	DST_ALG_ED25519 = 15,
+	DST_ALG_ED448 = 16,
+
+	/*
+	 * Do not renumber HMAC algorithms as they are used externally to named
+	 * in legacy K* key pair files.
+	 * Do not add non HMAC between DST_ALG_HMACMD5 and DST_ALG_HMACSHA512.
+	 */
+	DST_ALG_HMACMD5 = 157,
+	DST_ALG_HMAC_FIRST = DST_ALG_HMACMD5,
+	DST_ALG_GSSAPI = 160,	  /* Internal use only. Exception. */
+	DST_ALG_HMACSHA1 = 161,	  /* XXXMPA */
+	DST_ALG_HMACSHA224 = 162, /* XXXMPA */
+	DST_ALG_HMACSHA256 = 163, /* XXXMPA */
+	DST_ALG_HMACSHA384 = 164, /* XXXMPA */
+	DST_ALG_HMACSHA512 = 165, /* XXXMPA */
+	DST_ALG_HMAC_LAST = DST_ALG_HMACSHA512,
+	DST_ALG_FALCON512    249
+	DST_ALG_DILITHIUM2    250
+	DST_ALG_SPHINCSSHA256128S    251
+
+	DST_ALG_INDIRECT = 252,
+	DST_ALG_PRIVATE = 254,
+	DST_MAX_ALGS = 256,
+} dst_algorithm_t;
 
 /*% A buffer of this size is large enough to hold any key */
 #define DST_KEY_MAXSIZE 5120 // OQS changed from 1280
@@ -117,10 +129,11 @@ typedef enum dst_key_state {
 #define DST_KEY_MAXTEXTSIZE 10240 // OQS changed from 2048
 
 /*% 'Type' for dst_read_key() */
-#define DST_TYPE_KEY	 0x1000000 /* KEY key */
-#define DST_TYPE_PRIVATE 0x2000000
-#define DST_TYPE_PUBLIC	 0x4000000
-#define DST_TYPE_STATE	 0x8000000
+#define DST_TYPE_KEY	  0x1000000 /* KEY key */
+#define DST_TYPE_PRIVATE  0x2000000
+#define DST_TYPE_PUBLIC	  0x4000000
+#define DST_TYPE_STATE	  0x8000000
+#define DST_TYPE_TEMPLATE 0x10000000
 
 /* Key timing metadata definitions */
 #define DST_TIME_CREATED     0
@@ -145,7 +158,9 @@ typedef enum dst_key_state {
 #define DST_NUM_MAXTTL	    2
 #define DST_NUM_ROLLPERIOD  3
 #define DST_NUM_LIFETIME    4
-#define DST_MAX_NUMERIC	    4
+#define DST_NUM_DSPUBCOUNT  5
+#define DST_NUM_DSDELCOUNT  6
+#define DST_MAX_NUMERIC	    6
 
 /* Boolean metadata definitions */
 #define DST_BOOL_KSK	0
@@ -627,10 +642,6 @@ dst_key_generate(const dns_name_t *name, unsigned int alg, unsigned int bits,
  * 	RSA:	exponent
  * 		0	use exponent 3
  * 		!0	use Fermat4 (2^16 + 1)
- * 	DH:	generator
- * 		0	default - use well known prime if bits == 768 or 1024,
- * 			otherwise use 2 as the generator.
- * 		!0	use this value as the generator.
  * 	DSA:	unused
  * 	HMACMD5: entropy
  *		0	default - require good entropy
@@ -766,17 +777,38 @@ dst_key_iszonekey(const dst_key_t *key);
 bool
 dst_key_isnullkey(const dst_key_t *key);
 
+bool
+dst_key_have_ksk_and_zsk(dst_key_t **keys, unsigned int nkeys, unsigned int i,
+			 bool check_offline, bool ksk, bool zsk, bool *have_ksk,
+			 bool *have_zsk);
+/*%<
+ *
+ * Check the list of 'keys' to see if both a KSK and ZSK are present, given key
+ * 'i'. The values stored in 'ksk' and 'zsk' tell whether key 'i' is a KSK, ZSK,
+ * or both (CSK). If 'check_offline' is true, don't consider KSKs that are
+ * currently offline (e.g. their private key file is not available).
+ *
+ * Requires:
+ *\li	"keys" is not NULL.
+ *
+ * Returns:
+ *\li	true if there is one or more keys such that both the KSK and ZSK roles
+ *are covered, false otherwise.
+ */
+
 isc_result_t
 dst_key_buildfilename(const dst_key_t *key, int type, const char *directory,
 		      isc_buffer_t *out);
 /*%<
  * Generates the filename used by dst to store the specified key.
  * If directory is NULL, the current directory is assumed.
+ * If tmp is not NULL, generates a template for mkstemp().
  *
  * Requires:
  *\li	"key" is a valid key
  *\li	"type" is either DST_TYPE_PUBLIC, DST_TYPE_PRIVATE, or 0 for no suffix.
  *\li	"out" is a valid buffer
+ *\li	"tmp" is a valid buffer or NULL
  *
  * Ensures:
  *\li	the file name will be written to "out", and the used pointer will
@@ -798,23 +830,6 @@ dst_key_sigsize(const dst_key_t *key, unsigned int *n);
  *
  * Ensures:
  *\li	"n" stores the size of a generated signature
- */
-
-isc_result_t
-dst_key_secretsize(const dst_key_t *key, unsigned int *n);
-/*%<
- * Computes the size of a shared secret generated by the given key.
- *
- * Requires:
- *\li	"key" is a valid key.
- *\li	"n" is not NULL
- *
- * Returns:
- *\li	#ISC_R_SUCCESS
- *\li	DST_R_UNSUPPORTEDALG
- *
- * Ensures:
- *\li	"n" stores the size of a generated shared secret
  */
 
 uint16_t
@@ -1106,6 +1121,26 @@ dst_key_isexternal(dst_key_t *key);
  *	'key' to be valid.
  */
 
+void
+dst_key_setmodified(dst_key_t *key, bool value);
+/*%<
+ * If 'value' is true, this marks the key to indicate that key file metadata
+ * has been modified. If 'value' is false, this resets the value, for example
+ * after you have written the key to file.
+ *
+ * Requires:
+ *	'key' to be valid.
+ */
+
+bool
+dst_key_ismodified(const dst_key_t *key);
+/*%<
+ * Check if the key file has been modified.
+ *
+ * Requires:
+ *	'key' to be valid.
+ */
+
 bool
 dst_key_haskasp(dst_key_t *key);
 /*%<
@@ -1183,6 +1218,15 @@ dst_key_goal(dst_key_t *key);
  *	'key' to be valid.
  */
 
+isc_result_t
+dst_key_role(dst_key_t *key, bool *ksk, bool *zsk);
+/*%<
+ * Get the key role. A key can have the KSK or the ZSK role, or both.
+ *
+ * Requires:
+ *	'key' to be valid.
+ */
+
 void
 dst_key_copy_metadata(dst_key_t *to, dst_key_t *from);
 /*%<
@@ -1192,6 +1236,11 @@ dst_key_copy_metadata(dst_key_t *to, dst_key_t *from);
  *	'to' and 'from' to be valid.
  */
 
-ISC_LANG_ENDDECLS
+const char *
+dst_hmac_algorithm_totext(dst_algorithm_t alg);
+/*$<
+ * Return the name associtated with the HMAC algorithm 'alg'
+ * or return "unknown".
+ */
 
-#endif /* DST_DST_H */
+ISC_LANG_ENDDECLS

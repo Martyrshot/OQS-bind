@@ -1,6 +1,8 @@
 /*
  * Copyright (C) Internet Systems Consortium, Inc. ("ISC")
  *
+ * SPDX-License-Identifier: MPL-2.0
+ *
  * This Source Code Form is subject to the terms of the Mozilla Public
  * License, v. 2.0. If a copy of the MPL was not distributed with this
  * file, you can obtain one at https://mozilla.org/MPL/2.0/.
@@ -18,7 +20,7 @@
 #include <isc/buffer.h>
 #include <isc/file.h>
 #include <isc/mem.h>
-#include <isc/print.h>
+#include <isc/result.h>
 #include <isc/string.h>
 #include <isc/util.h>
 
@@ -30,7 +32,6 @@
 #include <dns/rdataset.h>
 #include <dns/rdatastruct.h>
 #include <dns/rdatatype.h>
-#include <dns/result.h>
 #include <dns/time.h>
 
 #define CHECK(op)                            \
@@ -174,8 +175,7 @@ dns_diff_appendminimal(dns_diff_t *diff, dns_difftuple_t **tuplep) {
 		{
 			ISC_LIST_UNLINK(diff->tuples, ot, link);
 			if ((*tuplep)->op == ot->op) {
-				UNEXPECTED_ERROR(__FILE__, __LINE__,
-						 "unexpected non-minimal diff");
+				UNEXPECTED_ERROR("unexpected non-minimal diff");
 			} else {
 				dns_difftuple_free(tuplep);
 			}
@@ -302,7 +302,8 @@ diff_apply(dns_diff_t *diff, dns_db_t *db, dns_dbversion_t *ver, bool warn) {
 
 			node = NULL;
 			if (type != dns_rdatatype_nsec3 &&
-			    covers != dns_rdatatype_nsec3) {
+			    covers != dns_rdatatype_nsec3)
+			{
 				CHECK(dns_db_findnode(db, name, true, &node));
 			} else {
 				CHECK(dns_db_findnsec3node(db, name, true,
@@ -347,7 +348,7 @@ diff_apply(dns_diff_t *diff, dns_db_t *db, dns_dbversion_t *ver, bool warn) {
 			 */
 			dns_rdataset_init(&rds);
 			dns_rdataset_init(&ardataset);
-			CHECK(dns_rdatalist_tordataset(&rdl, &rds));
+			dns_rdatalist_tordataset(&rdl, &rds);
 			rds.trust = dns_trust_ultimate;
 
 			/*
@@ -370,8 +371,7 @@ diff_apply(dns_diff_t *diff, dns_db_t *db, dns_dbversion_t *ver, bool warn) {
 								 &ardataset);
 				break;
 			default:
-				INSIST(0);
-				ISC_UNREACHABLE();
+				UNREACHABLE();
 			}
 
 			if (result == ISC_R_SUCCESS) {
@@ -385,11 +385,13 @@ diff_apply(dns_diff_t *diff, dns_db_t *db, dns_dbversion_t *ver, bool warn) {
 							      resign);
 				}
 				if (op == DNS_DIFFOP_ADD ||
-				    op == DNS_DIFFOP_ADDRESIGN) {
+				    op == DNS_DIFFOP_ADDRESIGN)
+				{
 					setownercase(&ardataset, name);
 				}
 				if (op == DNS_DIFFOP_DEL ||
-				    op == DNS_DIFFOP_DELRESIGN) {
+				    op == DNS_DIFFOP_DELRESIGN)
+				{
 					getownercase(&ardataset, name);
 				}
 			} else if (result == DNS_R_UNCHANGED) {
@@ -415,11 +417,13 @@ diff_apply(dns_diff_t *diff, dns_db_t *db, dns_dbversion_t *ver, bool warn) {
 						      namebuf, classbuf);
 				}
 				if (op == DNS_DIFFOP_ADD ||
-				    op == DNS_DIFFOP_ADDRESIGN) {
+				    op == DNS_DIFFOP_ADDRESIGN)
+				{
 					setownercase(&ardataset, name);
 				}
 				if (op == DNS_DIFFOP_DEL ||
-				    op == DNS_DIFFOP_DELRESIGN) {
+				    op == DNS_DIFFOP_DELRESIGN)
+				{
 					getownercase(&ardataset, name);
 				}
 			} else if (result == DNS_R_NXRRSET) {
@@ -427,7 +431,8 @@ diff_apply(dns_diff_t *diff, dns_db_t *db, dns_dbversion_t *ver, bool warn) {
 				 * OK.
 				 */
 				if (op == DNS_DIFFOP_DEL ||
-				    op == DNS_DIFFOP_DELRESIGN) {
+				    op == DNS_DIFFOP_DELRESIGN)
+				{
 					getownercase(&ardataset, name);
 				}
 				if (dns_rdataset_isassociated(&ardataset)) {
@@ -508,18 +513,20 @@ dns_diff_load(dns_diff_t *diff, dns_addrdatasetfunc_t addfunc,
 			 * Convert the rdatalist into a rdataset.
 			 */
 			dns_rdataset_init(&rds);
-			CHECK(dns_rdatalist_tordataset(&rdl, &rds));
+			dns_rdatalist_tordataset(&rdl, &rds);
 			rds.trust = dns_trust_ultimate;
 
 			INSIST(op == DNS_DIFFOP_ADD);
-			result = (*addfunc)(add_private, name, &rds);
+			result = (*addfunc)(add_private, name,
+					    &rds DNS__DB_FILELINE);
 			if (result == DNS_R_UNCHANGED) {
 				isc_log_write(DIFF_COMMON_LOGARGS,
 					      ISC_LOG_WARNING,
 					      "dns_diff_load: "
 					      "update with no effect");
 			} else if (result == ISC_R_SUCCESS ||
-				   result == DNS_R_NXRRSET) {
+				   result == DNS_R_NXRRSET)
+			{
 				/*
 				 * OK.
 				 */
@@ -546,13 +553,14 @@ dns_diff_sort(dns_diff_t *diff, dns_diff_compare_func *compare) {
 	REQUIRE(DNS_DIFF_VALID(diff));
 
 	for (p = ISC_LIST_HEAD(diff->tuples); p != NULL;
-	     p = ISC_LIST_NEXT(p, link)) {
+	     p = ISC_LIST_NEXT(p, link))
+	{
 		length++;
 	}
 	if (length == 0) {
 		return (ISC_R_SUCCESS);
 	}
-	v = isc_mem_get(diff->mctx, length * sizeof(dns_difftuple_t *));
+	v = isc_mem_cget(diff->mctx, length, sizeof(dns_difftuple_t *));
 	for (i = 0; i < length; i++) {
 		p = ISC_LIST_HEAD(diff->tuples);
 		v[i] = p;
@@ -563,7 +571,7 @@ dns_diff_sort(dns_diff_t *diff, dns_diff_compare_func *compare) {
 	for (i = 0; i < length; i++) {
 		ISC_LIST_APPEND(diff->tuples, v[i], link);
 	}
-	isc_mem_put(diff->mctx, v, length * sizeof(dns_difftuple_t *));
+	isc_mem_cput(diff->mctx, v, length, sizeof(dns_difftuple_t *));
 	return (ISC_R_SUCCESS);
 }
 
@@ -573,7 +581,7 @@ dns_diff_sort(dns_diff_t *diff, dns_diff_compare_func *compare) {
  * an rdatalist structure for it to refer to.
  */
 
-static isc_result_t
+static void
 diff_tuple_tordataset(dns_difftuple_t *t, dns_rdata_t *rdata,
 		      dns_rdatalist_t *rdl, dns_rdataset_t *rds) {
 	REQUIRE(DNS_DIFFTUPLE_VALID(t));
@@ -588,7 +596,7 @@ diff_tuple_tordataset(dns_difftuple_t *t, dns_rdata_t *rdata,
 	ISC_LINK_INIT(rdata, link);
 	dns_rdata_clone(&t->rdata, rdata);
 	ISC_LIST_APPEND(rdl->rdata, rdata, link);
-	return (dns_rdatalist_tordataset(rdl, rds));
+	dns_rdatalist_tordataset(rdl, rds);
 }
 
 isc_result_t
@@ -604,7 +612,8 @@ dns_diff_print(dns_diff_t *diff, FILE *file) {
 	mem = isc_mem_get(diff->mctx, size);
 
 	for (t = ISC_LIST_HEAD(diff->tuples); t != NULL;
-	     t = ISC_LIST_NEXT(t, link)) {
+	     t = ISC_LIST_NEXT(t, link))
+	{
 		isc_buffer_t buf;
 		isc_region_t r;
 
@@ -612,14 +621,7 @@ dns_diff_print(dns_diff_t *diff, FILE *file) {
 		dns_rdataset_t rds;
 		dns_rdata_t rd = DNS_RDATA_INIT;
 
-		result = diff_tuple_tordataset(t, &rd, &rdl, &rds);
-		if (result != ISC_R_SUCCESS) {
-			UNEXPECTED_ERROR(__FILE__, __LINE__,
-					 "diff_tuple_tordataset failed: %s",
-					 dns_result_totext(result));
-			result = ISC_R_UNEXPECTED;
-			goto cleanup;
-		}
+		diff_tuple_tordataset(t, &rd, &rdl, &rds);
 	again:
 		isc_buffer_init(&buf, mem, size);
 		result = dns_rdataset_totext(&rds, &t->name, false, false,

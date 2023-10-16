@@ -1,4 +1,16 @@
 #!/usr/bin/perl -w
+
+# Copyright (C) Internet Systems Consortium, Inc. ("ISC")
+#
+# SPDX-License-Identifier: MPL-2.0
+#
+# This Source Code Form is subject to the terms of the Mozilla Public
+# License, v. 2.0.  If a copy of the MPL was not distributed with this
+# file, you can obtain one at https://mozilla.org/MPL/2.0/.
+#
+# See the COPYRIGHT file distributed with this work for additional
+# information regarding copyright ownership.
+
 use strict;
 use BerkeleyDB;
 use Getopt::Long;
@@ -53,10 +65,10 @@ foreach my $zone (@zones) {
         my $ttl = $r->{ttl};
         my $type = $r->{type};
         my $data = $r->{data};
-        
+
         $data =~ s/\%zone\%/$zone/g;
         $data =~ s/\%driver\%/bdbhpt-dynamic/g;
-        
+
         my $row_name  = "$zone $name";
         my $row_value = "$replId $name $ttl $type $data";
         if ($dns_data->db_put($row_name, $row_value) != 0) {
@@ -171,7 +183,7 @@ sub validate_record {
     foreach my $t (@TYPES) {
         $VALID_TYPE->{$t} = 1;
     }
-    
+
     if (!defined $r->{name} || $r->{name} eq '') {
         die "Record name must be set";
     }

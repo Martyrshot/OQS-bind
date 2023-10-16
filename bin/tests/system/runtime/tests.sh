@@ -1,21 +1,23 @@
 #!/bin/sh
-#
+
 # Copyright (C) Internet Systems Consortium, Inc. ("ISC")
 #
+# SPDX-License-Identifier: MPL-2.0
+#
 # This Source Code Form is subject to the terms of the Mozilla Public
-# License, v. 2.0. If a copy of the MPL was not distributed with this
+# License, v. 2.0.  If a copy of the MPL was not distributed with this
 # file, you can obtain one at https://mozilla.org/MPL/2.0/.
 #
 # See the COPYRIGHT file distributed with this work for additional
 # information regarding copyright ownership.
 
+set -e
+
 # shellcheck source=conf.sh
 . ../conf.sh
 
-set -e
-
 RNDCCMD="$RNDC -c ../common/rndc.conf -p ${CONTROLPORT} -s"
-NAMED_DEFAULT_ARGS="-m record,size,mctx -d 99 -g -U 4"
+NAMED_DEFAULT_ARGS="-m record -d 99 -g -U 4"
 
 kill_named() {
 	pidfile="${1}"
@@ -25,10 +27,10 @@ kill_named() {
 
 	pid=$(cat "${pidfile}" 2>/dev/null)
 	if [ "${pid:+set}" = "set" ]; then
-		$KILL -15 "${pid}" >/dev/null 2>&1
+		kill -15 "${pid}" >/dev/null 2>&1
 		retries=10
 		while [ "$retries" -gt 0 ]; do
-			if ! $KILL -0 "${pid}" >/dev/null 2>&1; then
+			if ! kill -0 "${pid}" >/dev/null 2>&1; then
 				break
 			fi
 			sleep 1
@@ -61,7 +63,7 @@ run_named() (
 )
 
 check_pid() (
-	return $(! $KILL -0 "${1}" >/dev/null 2>&1)
+	return $(! kill -0 "${1}" >/dev/null 2>&1)
 )
 
 status=0
@@ -83,7 +85,7 @@ testpid=$(run_named ns2 named$n.run -c named-alt2.conf -D runtime-ns2-extra-2 -X
 test -n "$testpid" || ret=1
 retry_quiet 10 check_named_log "another named process" ns2/named$n.run || ret=1
 test -n "$testpid" && retry_quiet 10 check_pid $testpid || ret=1
-test -n "$testpid" && $KILL -15 $testpid > kill$n.out 2>&1 && ret=1
+test -n "$testpid" && kill -15 $testpid > kill$n.out 2>&1 && ret=1
 test -n "$testpid" && retry_quiet 10 check_pid $testpid || ret=1
 if [ $ret -ne 0 ]; then echo_i "failed"; fi
 status=$((status+ret))
@@ -93,7 +95,7 @@ echo_i "verifying that 'lock-file none' disables process check ($n)"
 ret=0
 testpid=$(run_named ns2 named$n.run -c named-alt3.conf -D runtime-ns2-extra-3)
 test -n "$testpid" || ret=1
-retry_quiet 10 check_named_log "running$" ns2/named$n.run || ret=1
+retry_quiet 60 check_named_log "running$" ns2/named$n.run || ret=1
 grep "another named process" ns2/named$n.run > /dev/null && ret=1
 kill_named ns2/named-alt3.pid || ret=1
 test -n "$testpid" && retry_quiet 10 check_pid $testpid || ret=1
@@ -185,7 +187,7 @@ ret=0
 INSTANCE_NAME="runtime-ns2-extra-7-$(cat ctrl-chars)"
 testpid=$(run_named ns2 named$n.run -c named-alt7.conf -D "${INSTANCE_NAME}")
 test -n "$testpid" || ret=1
-retry_quiet 10 check_named_log "running$" ns2/named$n.run || ret=1
+retry_quiet 60 check_named_log "running$" ns2/named$n.run || ret=1
 grep 'running as.*\\177\\033' ns2/named$n.run > /dev/null || ret=1
 kill_named ns2/named.pid || ret=1
 test -n "$testpid" && retry_quiet 10 check_pid $testpid || ret=1
@@ -198,7 +200,7 @@ ret=0
 INSTANCE_NAME="runtime-ns2-extra-8-$;"
 testpid=$(run_named ns2 named$n.run -c named-alt7.conf -D "${INSTANCE_NAME}")
 test -n "$testpid" || ret=1
-retry_quiet 10 check_named_log "running$" ns2/named$n.run || ret=1
+retry_quiet 60 check_named_log "running$" ns2/named$n.run || ret=1
 grep 'running as.*\\$\\;' ns2/named$n.run > /dev/null || ret=1
 kill_named ns2/named.pid || ret=1
 test -n "$testpid" && retry_quiet 10 check_pid $testpid || ret=1
@@ -212,7 +214,7 @@ LONG_CMD_LINE=$(cat long-cmd-line)
 # shellcheck disable=SC2086
 testpid=$(run_named ns2 named$n.run $LONG_CMD_LINE -c "named-alt7.conf")
 test -n "$testpid" || ret=1
-retry_quiet 10 check_named_log "running$" ns2/named$n.run || ret=1
+retry_quiet 60 check_named_log "running$" ns2/named$n.run || ret=1
 grep "running as.*\.\.\.$" ns2/named$n.run > /dev/null || ret=1
 kill_named ns2/named.pid || ret=1
 test -n "$testpid" && retry_quiet 10 check_pid $testpid || ret=1
@@ -221,18 +223,16 @@ status=$((status+ret))
 
 n=$((n+1))
 echo_i "verifying that named switches UID ($n)"
-if [ "$(id -u)" -eq 0 ] && [ -z "$CYGWIN" ]; then
+if [ "$(id -u)" -eq 0 ]; then
     ret=0
-    TEMP_NAMED_DIR=$(mktemp -d "$(pwd)/ns2/tmp.XXXXXXXX")
-    if [ "$?" -eq 0 ]; then
+    { TEMP_NAMED_DIR=$(mktemp -d "$(pwd)/ns2/tmp.XXXXXXXX"); rc=$?; } || true
+    if [ "$rc" -eq 0 ]; then
 	copy_setports ns2/named-alt9.conf.in "${TEMP_NAMED_DIR}/named-alt9.conf"
-	export SOFTHSM2_CONF="${TEMP_NAMED_DIR}/softhsm2.conf"
-	sh "$TOP_SRCDIR/bin/tests/prepare-softhsm2.sh"
 	chown -R nobody: "${TEMP_NAMED_DIR}"
 	chmod 0700 "${TEMP_NAMED_DIR}"
 	testpid=$(run_named "${TEMP_NAMED_DIR}" "${TEMP_NAMED_DIR}/named$n.run" -u nobody -c named-alt9.conf)
 	test -n "$testpid" || ret=1
-	retry_quiet 10 check_named_log "running$" "${TEMP_NAMED_DIR}/named$n.run" || ret=1
+	retry_quiet 60 check_named_log "running$" "${TEMP_NAMED_DIR}/named$n.run" || ret=1
 	[ -s "${TEMP_NAMED_DIR}/named9.pid" ] || ret=1
 	grep "loading configuration: permission denied" "${TEMP_NAMED_DIR}/named$n.run" > /dev/null && ret=1
 	kill_named "${TEMP_NAMED_DIR}/named9.pid" || ret=1
@@ -245,7 +245,7 @@ if [ "$(id -u)" -eq 0 ] && [ -z "$CYGWIN" ]; then
     if [ $ret -ne 0 ]; then echo_i "failed"; fi
     status=$((status+ret))
 else
-    echo_i "skipped, not running as root or running on Windows"
+    echo_i "skipped, not running as root"
 fi
 
 echo_i "exit status: $status"

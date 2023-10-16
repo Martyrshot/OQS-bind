@@ -1,6 +1,8 @@
 /*
  * Copyright (C) Internet Systems Consortium, Inc. ("ISC")
  *
+ * SPDX-License-Identifier: MPL-2.0
+ *
  * This Source Code Form is subject to the terms of the Mozilla Public
  * License, v. 2.0. If a copy of the MPL was not distributed with this
  * file, you can obtain one at https://mozilla.org/MPL/2.0/.
@@ -50,7 +52,6 @@ static cfg_clausedef_t dnsconf_clauses[] = {
 
 static cfg_clausedef_t *dnsconf_clausesets[] = { dnsconf_clauses, NULL };
 
-LIBISCCFG_EXTERNAL_DATA cfg_type_t cfg_type_dnsconf = {
-	"dnsconf",	 cfg_parse_mapbody, cfg_print_mapbody,
-	cfg_doc_mapbody, &cfg_rep_map,	    dnsconf_clausesets
-};
+cfg_type_t cfg_type_dnsconf = { "dnsconf",	   cfg_parse_mapbody,
+				cfg_print_mapbody, cfg_doc_mapbody,
+				&cfg_rep_map,	   dnsconf_clausesets };

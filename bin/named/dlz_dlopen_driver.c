@@ -1,6 +1,8 @@
 /*
  * Copyright (C) Internet Systems Consortium, Inc. ("ISC")
  *
+ * SPDX-License-Identifier: MPL-2.0
+ *
  * This Source Code Form is subject to the terms of the Mozilla Public
  * License, v. 2.0. If a copy of the MPL was not distributed with this
  * file, you can obtain one at https://mozilla.org/MPL/2.0/.
@@ -14,16 +16,14 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
-#include <uv.h>
 
 #include <isc/mem.h>
-#include <isc/print.h>
 #include <isc/result.h>
 #include <isc/util.h>
+#include <isc/uv.h>
 
 #include <dns/dlz_dlopen.h>
 #include <dns/log.h>
-#include <dns/result.h>
 
 #include <dlz/dlz_dlopen_driver.h>
 #include <named/globals.h>
@@ -224,12 +224,11 @@ dlopen_dlz_create(const char *dlzname, unsigned int argc, char *argv[],
 
 	isc_mem_create(&mctx);
 	cd = isc_mem_get(mctx, sizeof(*cd));
-	memset(cd, 0, sizeof(*cd));
-
-	cd->mctx = mctx;
-
-	cd->dl_path = isc_mem_strdup(cd->mctx, argv[1]);
-	cd->dlzname = isc_mem_strdup(cd->mctx, dlzname);
+	*cd = (dlopen_data_t){
+		.mctx = mctx,
+		.dl_path = isc_mem_strdup(mctx, argv[1]),
+		.dlzname = isc_mem_strdup(mctx, dlzname),
+	};
 
 	/* Initialize the lock */
 	isc_mutex_init(&cd->lock);
@@ -531,8 +530,7 @@ dlz_dlopen_init(isc_mem_t *mctx) {
 				  mctx, &dlz_dlopen);
 
 	if (result != ISC_R_SUCCESS) {
-		UNEXPECTED_ERROR(__FILE__, __LINE__,
-				 "dns_sdlzregister() failed: %s",
+		UNEXPECTED_ERROR("dns_sdlzregister() failed: %s",
 				 isc_result_totext(result));
 		result = ISC_R_UNEXPECTED;
 	}

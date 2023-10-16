@@ -1,6 +1,8 @@
 /*
  * Copyright (C) Internet Systems Consortium, Inc. ("ISC")
  *
+ * SPDX-License-Identifier: MPL-2.0
+ *
  * This Source Code Form is subject to the terms of the Mozilla Public
  * License, v. 2.0. If a copy of the MPL was not distributed with this
  * file, you can obtain one at https://mozilla.org/MPL/2.0/.
@@ -9,8 +11,7 @@
  * information regarding copyright ownership.
  */
 
-#ifndef DNS_DNSSEC_H
-#define DNS_DNSSEC_H 1
+#pragma once
 
 /*! \file dns/dnssec.h */
 
@@ -27,7 +28,7 @@
 
 ISC_LANG_BEGINDECLS
 
-LIBDNS_EXTERNAL_DATA extern isc_stats_t *dns_dnssec_stats;
+extern isc_stats_t *dns_dnssec_stats;
 
 /*%< Maximum number of keys supported in a zone. */
 #define DNS_MAXZONEKEYS 32
@@ -92,6 +93,23 @@ dns_dnssec_keyfromrdata(const dns_name_t *name, const dns_rdata_t *rdata,
  *\li		#ISC_R_NOMEMORY
  *\li		DST_R_INVALIDPUBLICKEY
  *\li		various errors from dns_name_totext
+ */
+
+isc_result_t
+dns_dnssec_make_dnskey(dst_key_t *key, unsigned char *buf, int bufsize,
+		       dns_rdata_t *target);
+/*%<
+ *	Convert a DST key into a DNS record.
+ *
+ *	Requires:
+ *\li		'key' is not NULL
+ *\li		'buf' is not NULL
+ *\li		'bufsize' equals DST_KEY_MAXSIZE
+ *\li		'target' is not NULL
+ *
+ *	Returns:
+ *\li		#ISC_R_SUCCESS
+ *\li		various errors from dst_key_todns
  */
 
 isc_result_t
@@ -244,7 +262,7 @@ dns_dnssec_signs(dns_rdata_t *rdata, const dns_name_t *name,
  * rrset.  dns_dnssec_signs() works on any rrset.
  */
 
-isc_result_t
+void
 dns_dnsseckey_create(isc_mem_t *mctx, dst_key_t **dstkey,
 		     dns_dnsseckey_t **dkp);
 /*%<
@@ -252,10 +270,6 @@ dns_dnsseckey_create(isc_mem_t *mctx, dst_key_t **dstkey,
  *
  *	Requires:
  *\li		'dkp' is not NULL and '*dkp' is NULL.
- *
- *	Returns:
- *\li		#ISC_R_SUCCESS
- *\li		#ISC_R_NOMEMORY
  */
 
 void
@@ -325,7 +339,8 @@ isc_result_t
 dns_dnssec_updatekeys(dns_dnsseckeylist_t *keys, dns_dnsseckeylist_t *newkeys,
 		      dns_dnsseckeylist_t *removed, const dns_name_t *origin,
 		      dns_ttl_t hint_ttl, dns_diff_t *diff, isc_mem_t *mctx,
-		      void (*report)(const char *, ...));
+		      void (*report)(const char *, ...)
+			      ISC_FORMAT_PRINTF(1, 2));
 /*%<
  * Update the list of keys in 'keys' with new key information in 'newkeys'.
  *
@@ -354,10 +369,29 @@ dns_dnssec_updatekeys(dns_dnsseckeylist_t *keys, dns_dnsseckeylist_t *newkeys,
 isc_result_t
 dns_dnssec_syncupdate(dns_dnsseckeylist_t *keys, dns_dnsseckeylist_t *rmkeys,
 		      dns_rdataset_t *cds, dns_rdataset_t *cdnskey,
-		      isc_stdtime_t now, dns_ttl_t hint_ttl, dns_diff_t *diff,
+		      isc_stdtime_t now, dns_kasp_digestlist_t *digests,
+		      bool gencdnskey, dns_ttl_t hint_ttl, dns_diff_t *diff,
 		      isc_mem_t *mctx);
 /*%<
  * Update the CDS and CDNSKEY RRsets, adding and removing keys as needed.
+ *
+ * For each key in 'keys', check if corresponding CDS and CDNSKEY records
+ * need to be published. If needed and 'gencdnskey' is true, there will be one
+ * CDNSKEY record added to the 'cdnskey' RRset. Also one CDS record will be
+ * added to the 'cds' RRset for each digest type in 'digests'.
+ *
+ * For each key in 'rmkeys', remove any associated CDS and CDNSKEY records from
+ * the RRsets 'cds' and 'cdnskey'.
+ *
+ * 'hint_ttl' is the TTL to use for the CDS and CDNSKEY RRsets if there is no
+ * existing RRset.
+ *
+ * Any changes made also cause a dns_difftuple to be added to 'diff'.
+ *
+ * Requires:
+ *\li	'keys' is not NULL.
+ *\li	'rmkeys' is not NULL.
+ *\li	'digests' is not NULL.
  *
  * Returns:
  *\li   ISC_R_SUCCESS
@@ -368,11 +402,14 @@ isc_result_t
 dns_dnssec_syncdelete(dns_rdataset_t *cds, dns_rdataset_t *cdnskey,
 		      dns_name_t *origin, dns_rdataclass_t zclass,
 		      dns_ttl_t ttl, dns_diff_t *diff, isc_mem_t *mctx,
-		      bool dnssec_insecure);
+		      bool expect_cds_delete, bool expect_cdnskey_delete);
 /*%<
  * Add or remove the CDS DELETE record and the CDNSKEY DELETE record.
- * If 'dnssec_insecure' is true, the DELETE records should be present.
- * Otherwise, the DELETE records must be removed from the RRsets (if present).
+ * If 'expect_cds_delete' is true, the CDS DELETE record should be present.
+ * Otherwise, the CDS DELETE record must be removed from the RRsets (if
+ * present). If 'expect_cdnskey_delete' is true, the CDNSKEY DELETE record
+ * should be present. Otherwise, the CDNSKEY DELETE record must be removed
+ * from the RRsets (if present).
  *
  * Returns:
  *\li   ISC_R_SUCCESS
@@ -392,5 +429,3 @@ dns_dnssec_matchdskey(dns_name_t *name, dns_rdata_t *dsrdata,
  *\li	Other values indicate error
  */
 ISC_LANG_ENDDECLS
-
-#endif /* DNS_DNSSEC_H */

@@ -1,6 +1,8 @@
 /*
  * Copyright (C) Internet Systems Consortium, Inc. ("ISC")
  *
+ * SPDX-License-Identifier: MPL-2.0
+ *
  * This Source Code Form is subject to the terms of the Mozilla Public
  * License, v. 2.0. If a copy of the MPL was not distributed with this
  * file, you can obtain one at https://mozilla.org/MPL/2.0/.
@@ -16,7 +18,7 @@
 
 #define RRTYPE_NSAP_PTR_ATTRIBUTES (0)
 
-static inline isc_result_t
+static isc_result_t
 fromtext_in_nsap_ptr(ARGS_FROMTEXT) {
 	isc_token_t token;
 	dns_name_t name;
@@ -41,12 +43,12 @@ fromtext_in_nsap_ptr(ARGS_FROMTEXT) {
 	return (ISC_R_SUCCESS);
 }
 
-static inline isc_result_t
+static isc_result_t
 totext_in_nsap_ptr(ARGS_TOTEXT) {
 	isc_region_t region;
 	dns_name_t name;
 	dns_name_t prefix;
-	bool sub;
+	unsigned int opts;
 
 	REQUIRE(rdata->type == dns_rdatatype_nsap_ptr);
 	REQUIRE(rdata->rdclass == dns_rdataclass_in);
@@ -58,12 +60,12 @@ totext_in_nsap_ptr(ARGS_TOTEXT) {
 	dns_rdata_toregion(rdata, &region);
 	dns_name_fromregion(&name, &region);
 
-	sub = name_prefix(&name, tctx->origin, &prefix);
-
-	return (dns_name_totext(&prefix, sub, target));
+	opts = name_prefix(&name, tctx->origin, &prefix) ? DNS_NAME_OMITFINALDOT
+							 : 0;
+	return (dns_name_totext(&prefix, opts, target));
 }
 
-static inline isc_result_t
+static isc_result_t
 fromwire_in_nsap_ptr(ARGS_FROMWIRE) {
 	dns_name_t name;
 
@@ -73,13 +75,13 @@ fromwire_in_nsap_ptr(ARGS_FROMWIRE) {
 	UNUSED(type);
 	UNUSED(rdclass);
 
-	dns_decompress_setmethods(dctx, DNS_COMPRESS_NONE);
+	dctx = dns_decompress_setpermitted(dctx, false);
 
 	dns_name_init(&name, NULL);
-	return (dns_name_fromwire(&name, source, dctx, options, target));
+	return (dns_name_fromwire(&name, source, dctx, target));
 }
 
-static inline isc_result_t
+static isc_result_t
 towire_in_nsap_ptr(ARGS_TOWIRE) {
 	dns_name_t name;
 	dns_offsets_t offsets;
@@ -89,15 +91,15 @@ towire_in_nsap_ptr(ARGS_TOWIRE) {
 	REQUIRE(rdata->rdclass == dns_rdataclass_in);
 	REQUIRE(rdata->length != 0);
 
-	dns_compress_setmethods(cctx, DNS_COMPRESS_NONE);
+	dns_compress_setpermitted(cctx, false);
 	dns_name_init(&name, offsets);
 	dns_rdata_toregion(rdata, &region);
 	dns_name_fromregion(&name, &region);
 
-	return (dns_name_towire(&name, cctx, target));
+	return (dns_name_towire(&name, cctx, target, NULL));
 }
 
-static inline int
+static int
 compare_in_nsap_ptr(ARGS_COMPARE) {
 	dns_name_t name1;
 	dns_name_t name2;
@@ -123,7 +125,7 @@ compare_in_nsap_ptr(ARGS_COMPARE) {
 	return (dns_name_rdatacompare(&name1, &name2));
 }
 
-static inline isc_result_t
+static isc_result_t
 fromstruct_in_nsap_ptr(ARGS_FROMSTRUCT) {
 	dns_rdata_in_nsap_ptr_t *nsap_ptr = source;
 	isc_region_t region;
@@ -141,7 +143,7 @@ fromstruct_in_nsap_ptr(ARGS_FROMSTRUCT) {
 	return (isc_buffer_copyregion(target, &region));
 }
 
-static inline isc_result_t
+static isc_result_t
 tostruct_in_nsap_ptr(ARGS_TOSTRUCT) {
 	isc_region_t region;
 	dns_rdata_in_nsap_ptr_t *nsap_ptr = target;
@@ -160,12 +162,12 @@ tostruct_in_nsap_ptr(ARGS_TOSTRUCT) {
 	dns_rdata_toregion(rdata, &region);
 	dns_name_fromregion(&name, &region);
 	dns_name_init(&nsap_ptr->owner, NULL);
-	RETERR(name_duporclone(&name, mctx, &nsap_ptr->owner));
+	name_duporclone(&name, mctx, &nsap_ptr->owner);
 	nsap_ptr->mctx = mctx;
 	return (ISC_R_SUCCESS);
 }
 
-static inline void
+static void
 freestruct_in_nsap_ptr(ARGS_FREESTRUCT) {
 	dns_rdata_in_nsap_ptr_t *nsap_ptr = source;
 
@@ -181,19 +183,20 @@ freestruct_in_nsap_ptr(ARGS_FREESTRUCT) {
 	nsap_ptr->mctx = NULL;
 }
 
-static inline isc_result_t
+static isc_result_t
 additionaldata_in_nsap_ptr(ARGS_ADDLDATA) {
 	REQUIRE(rdata->type == dns_rdatatype_nsap_ptr);
 	REQUIRE(rdata->rdclass == dns_rdataclass_in);
 
 	UNUSED(rdata);
+	UNUSED(owner);
 	UNUSED(add);
 	UNUSED(arg);
 
 	return (ISC_R_SUCCESS);
 }
 
-static inline isc_result_t
+static isc_result_t
 digest_in_nsap_ptr(ARGS_DIGEST) {
 	isc_region_t r;
 	dns_name_t name;
@@ -208,7 +211,7 @@ digest_in_nsap_ptr(ARGS_DIGEST) {
 	return (dns_name_digest(&name, digest, arg));
 }
 
-static inline bool
+static bool
 checkowner_in_nsap_ptr(ARGS_CHECKOWNER) {
 	REQUIRE(type == dns_rdatatype_nsap_ptr);
 	REQUIRE(rdclass == dns_rdataclass_in);
@@ -221,7 +224,7 @@ checkowner_in_nsap_ptr(ARGS_CHECKOWNER) {
 	return (true);
 }
 
-static inline bool
+static bool
 checknames_in_nsap_ptr(ARGS_CHECKNAMES) {
 	REQUIRE(rdata->type == dns_rdatatype_nsap_ptr);
 	REQUIRE(rdata->rdclass == dns_rdataclass_in);
@@ -233,7 +236,7 @@ checknames_in_nsap_ptr(ARGS_CHECKNAMES) {
 	return (true);
 }
 
-static inline int
+static int
 casecompare_in_nsap_ptr(ARGS_COMPARE) {
 	return (compare_in_nsap_ptr(rdata1, rdata2));
 }

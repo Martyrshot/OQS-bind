@@ -1,6 +1,8 @@
 /*
  * Copyright (C) Internet Systems Consortium, Inc. ("ISC")
  *
+ * SPDX-License-Identifier: MPL-2.0
+ *
  * This Source Code Form is subject to the terms of the Mozilla Public
  * License, v. 2.0. If a copy of the MPL was not distributed with this
  * file, you can obtain one at https://mozilla.org/MPL/2.0/.
@@ -16,14 +18,13 @@
 #include <stdio.h>
 #include <time.h>
 
-#include <isc/print.h>
 #include <isc/region.h>
+#include <isc/result.h>
 #include <isc/serial.h>
 #include <isc/stdtime.h>
-#include <isc/string.h> /* Required for HP/UX (and others?) */
+#include <isc/string.h>
 #include <isc/util.h>
 
-#include <dns/result.h>
 #include <dns/time.h>
 
 static const int days[12] = { 31, 28, 31, 30, 31, 30, 31, 31, 30, 31, 30, 31 };
@@ -100,17 +101,17 @@ dns_time64_totext(int64_t t, isc_buffer_t *target) {
 
 int64_t
 dns_time64_from32(uint32_t value) {
-	isc_stdtime_t now;
+	isc_stdtime_t now = isc_stdtime_now();
 	int64_t start;
 	int64_t t;
 
 	/*
 	 * Adjust the time to the closest epoch.  This should be changed
-	 * to use a 64-bit counterpart to isc_stdtime_get() if one ever
+	 * to use a 64-bit counterpart to isc_stdtime_now() if one ever
 	 * is defined, but even the current code is good until the year
 	 * 2106.
 	 */
-	isc_stdtime_get(&now);
+
 	start = (int64_t)now;
 	if (isc_serial_gt(value, now)) {
 		t = start + (value - now);

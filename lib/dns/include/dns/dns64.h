@@ -1,6 +1,8 @@
 /*
  * Copyright (C) Internet Systems Consortium, Inc. ("ISC")
  *
+ * SPDX-License-Identifier: MPL-2.0
+ *
  * This Source Code Form is subject to the terms of the Mozilla Public
  * License, v. 2.0. If a copy of the MPL was not distributed with this
  * file, you can obtain one at https://mozilla.org/MPL/2.0/.
@@ -9,8 +11,7 @@
  * information regarding copyright ownership.
  */
 
-#ifndef DNS_DNS64_H
-#define DNS_DNS64_H 1
+#pragma once
 
 #include <stdbool.h>
 
@@ -98,7 +99,7 @@ dns_dns64_destroy(dns_dns64_t **dns64p);
 
 isc_result_t
 dns_dns64_aaaafroma(const dns_dns64_t *dns64, const isc_netaddr_t *reqaddr,
-		    const dns_name_t *reqsigner, const dns_aclenv_t *env,
+		    const dns_name_t *reqsigner, dns_aclenv_t *env,
 		    unsigned int flags, unsigned char *a, unsigned char *aaaa);
 /*
  * dns_dns64_aaaafroma() determines whether to perform a DNS64 address
@@ -146,7 +147,7 @@ dns_dns64_unlink(dns_dns64list_t *list, dns_dns64_t *dns64);
 
 bool
 dns_dns64_aaaaok(const dns_dns64_t *dns64, const isc_netaddr_t *reqaddr,
-		 const dns_name_t *reqsigner, const dns_aclenv_t *env,
+		 const dns_name_t *reqsigner, dns_aclenv_t *env,
 		 unsigned int flags, dns_rdataset_t *rdataset, bool *aaaaok,
 		 size_t aaaaoklen);
 /*
@@ -189,5 +190,3 @@ dns_dns64_findprefix(dns_rdataset_t *rdataset, isc_netprefix_t *prefix,
  */
 
 ISC_LANG_ENDDECLS
-
-#endif /* DNS_DNS64_H */

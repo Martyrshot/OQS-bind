@@ -1,6 +1,8 @@
 /*
  * Copyright (C) Internet Systems Consortium, Inc. ("ISC")
  *
+ * SPDX-License-Identifier: MPL-2.0
+ *
  * This Source Code Form is subject to the terms of the Mozilla Public
  * License, v. 2.0. If a copy of the MPL was not distributed with this
  * file, you can obtain one at https://mozilla.org/MPL/2.0/.
@@ -20,7 +22,7 @@
  */
 #define RRTYPE_NXT_ATTRIBUTES (0)
 
-static inline isc_result_t
+static isc_result_t
 fromtext_nxt(ARGS_FROMTEXT) {
 	isc_token_t token;
 	dns_name_t name;
@@ -86,13 +88,12 @@ fromtext_nxt(ARGS_FROMTEXT) {
 	return (mem_tobuffer(target, bm, n));
 }
 
-static inline isc_result_t
+static isc_result_t
 totext_nxt(ARGS_TOTEXT) {
 	isc_region_t sr;
-	unsigned int i, j;
+	unsigned int i, j, opts;
 	dns_name_t name;
 	dns_name_t prefix;
-	bool sub;
 
 	REQUIRE(rdata->type == dns_rdatatype_nxt);
 	REQUIRE(rdata->length != 0);
@@ -102,8 +103,9 @@ totext_nxt(ARGS_TOTEXT) {
 	dns_rdata_toregion(rdata, &sr);
 	dns_name_fromregion(&name, &sr);
 	isc_region_consume(&sr, name_length(&name));
-	sub = name_prefix(&name, tctx->origin, &prefix);
-	RETERR(dns_name_totext(&prefix, sub, target));
+	opts = name_prefix(&name, tctx->origin, &prefix) ? DNS_NAME_OMITFINALDOT
+							 : 0;
+	RETERR(dns_name_totext(&prefix, opts, target));
 
 	for (i = 0; i < sr.length; i++) {
 		if (sr.base[i] != 0) {
@@ -132,7 +134,7 @@ totext_nxt(ARGS_TOTEXT) {
 	return (ISC_R_SUCCESS);
 }
 
-static inline isc_result_t
+static isc_result_t
 fromwire_nxt(ARGS_FROMWIRE) {
 	isc_region_t sr;
 	dns_name_t name;
@@ -142,10 +144,10 @@ fromwire_nxt(ARGS_FROMWIRE) {
 	UNUSED(type);
 	UNUSED(rdclass);
 
-	dns_decompress_setmethods(dctx, DNS_COMPRESS_NONE);
+	dctx = dns_decompress_setpermitted(dctx, false);
 
 	dns_name_init(&name, NULL);
-	RETERR(dns_name_fromwire(&name, source, dctx, options, target));
+	RETERR(dns_name_fromwire(&name, source, dctx, target));
 
 	isc_buffer_activeregion(source, &sr);
 	if (sr.length > 0 && ((sr.base[0] & 0x80) != 0 || sr.length > 16 ||
@@ -158,7 +160,7 @@ fromwire_nxt(ARGS_FROMWIRE) {
 	return (ISC_R_SUCCESS);
 }
 
-static inline isc_result_t
+static isc_result_t
 towire_nxt(ARGS_TOWIRE) {
 	isc_region_t sr;
 	dns_name_t name;
@@ -167,17 +169,17 @@ towire_nxt(ARGS_TOWIRE) {
 	REQUIRE(rdata->type == dns_rdatatype_nxt);
 	REQUIRE(rdata->length != 0);
 
-	dns_compress_setmethods(cctx, DNS_COMPRESS_NONE);
+	dns_compress_setpermitted(cctx, false);
 	dns_name_init(&name, offsets);
 	dns_rdata_toregion(rdata, &sr);
 	dns_name_fromregion(&name, &sr);
 	isc_region_consume(&sr, name_length(&name));
-	RETERR(dns_name_towire(&name, cctx, target));
+	RETERR(dns_name_towire(&name, cctx, target, NULL));
 
 	return (mem_tobuffer(target, sr.base, sr.length));
 }
 
-static inline int
+static int
 compare_nxt(ARGS_COMPARE) {
 	isc_region_t r1;
 	isc_region_t r2;
@@ -208,7 +210,7 @@ compare_nxt(ARGS_COMPARE) {
 	return (isc_region_compare(&r1, &r2));
 }
 
-static inline isc_result_t
+static isc_result_t
 fromstruct_nxt(ARGS_FROMSTRUCT) {
 	dns_rdata_nxt_t *nxt = source;
 	isc_region_t region;
@@ -232,7 +234,7 @@ fromstruct_nxt(ARGS_FROMSTRUCT) {
 	return (mem_tobuffer(target, nxt->typebits, nxt->len));
 }
 
-static inline isc_result_t
+static isc_result_t
 tostruct_nxt(ARGS_TOSTRUCT) {
 	isc_region_t region;
 	dns_rdata_nxt_t *nxt = target;
@@ -251,25 +253,15 @@ tostruct_nxt(ARGS_TOSTRUCT) {
 	dns_name_fromregion(&name, &region);
 	isc_region_consume(&region, name_length(&name));
 	dns_name_init(&nxt->next, NULL);
-	RETERR(name_duporclone(&name, mctx, &nxt->next));
+	name_duporclone(&name, mctx, &nxt->next);
 
 	nxt->len = region.length;
 	nxt->typebits = mem_maybedup(mctx, region.base, region.length);
-	if (nxt->typebits == NULL) {
-		goto cleanup;
-	}
-
 	nxt->mctx = mctx;
 	return (ISC_R_SUCCESS);
-
-cleanup:
-	if (mctx != NULL) {
-		dns_name_free(&nxt->next, mctx);
-	}
-	return (ISC_R_NOMEMORY);
 }
 
-static inline void
+static void
 freestruct_nxt(ARGS_FREESTRUCT) {
 	dns_rdata_nxt_t *nxt = source;
 
@@ -287,18 +279,19 @@ freestruct_nxt(ARGS_FREESTRUCT) {
 	nxt->mctx = NULL;
 }
 
-static inline isc_result_t
+static isc_result_t
 additionaldata_nxt(ARGS_ADDLDATA) {
 	REQUIRE(rdata->type == dns_rdatatype_nxt);
 
 	UNUSED(rdata);
+	UNUSED(owner);
 	UNUSED(add);
 	UNUSED(arg);
 
 	return (ISC_R_SUCCESS);
 }
 
-static inline isc_result_t
+static isc_result_t
 digest_nxt(ARGS_DIGEST) {
 	isc_region_t r;
 	dns_name_t name;
@@ -318,7 +311,7 @@ digest_nxt(ARGS_DIGEST) {
 	return ((digest)(arg, &r));
 }
 
-static inline bool
+static bool
 checkowner_nxt(ARGS_CHECKOWNER) {
 	REQUIRE(type == dns_rdatatype_nxt);
 
@@ -330,7 +323,7 @@ checkowner_nxt(ARGS_CHECKOWNER) {
 	return (true);
 }
 
-static inline bool
+static bool
 checknames_nxt(ARGS_CHECKNAMES) {
 	REQUIRE(rdata->type == dns_rdatatype_nxt);
 
@@ -341,7 +334,7 @@ checknames_nxt(ARGS_CHECKNAMES) {
 	return (true);
 }
 
-static inline int
+static int
 casecompare_nxt(ARGS_COMPARE) {
 	return (compare_nxt(rdata1, rdata2));
 }

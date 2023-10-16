@@ -1,6 +1,8 @@
 /*
  * Copyright (C) Internet Systems Consortium, Inc. ("ISC")
  *
+ * SPDX-License-Identifier: MPL-2.0
+ *
  * This Source Code Form is subject to the terms of the Mozilla Public
  * License, v. 2.0. If a copy of the MPL was not distributed with this
  * file, you can obtain one at https://mozilla.org/MPL/2.0/.
@@ -9,8 +11,7 @@
  * information regarding copyright ownership.
  */
 
-#ifndef GENERIC_HIP_5_H
-#define GENERIC_HIP_5_H 1
+#pragma once
 
 /* RFC 5205 */
 
@@ -36,5 +37,3 @@ dns_rdata_hip_next(dns_rdata_hip_t *);
 
 void
 dns_rdata_hip_current(dns_rdata_hip_t *, dns_name_t *);
-
-#endif /* GENERIC_HIP_5_H */

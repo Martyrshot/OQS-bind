@@ -32,16 +32,14 @@ MANPAGES_RST =				\
 	nsec3hash.rst			\
 	nslookup.rst			\
 	nsupdate.rst			\
-	pkcs11-destroy.rst		\
-	pkcs11-keygen.rst		\
-	pkcs11-list.rst			\
-	pkcs11-tokens.rst		\
 	rndc-confgen.rst		\
 	rndc.conf.rst			\
 	rndc.rst			\
 	tsig-keygen.rst			\
 	../../bin/check/named-checkconf.rst \
 	../../bin/check/named-checkzone.rst \
+	../../bin/check/named-compilezone.rst \
+	../../bin/confgen/ddns-confgen.rst \
 	../../bin/confgen/rndc-confgen.rst \
 	../../bin/confgen/tsig-keygen.rst \
 	../../bin/delv/delv.rst \
@@ -57,12 +55,9 @@ MANPAGES_RST =				\
 	../../bin/dnssec/dnssec-settime.rst \
 	../../bin/dnssec/dnssec-signzone.rst \
 	../../bin/dnssec/dnssec-verify.rst \
+	../../bin/named/named.conf.rst \
 	../../bin/named/named.rst \
 	../../bin/nsupdate/nsupdate.rst \
-	../../bin/pkcs11/pkcs11-destroy.rst \
-	../../bin/pkcs11/pkcs11-keygen.rst \
-	../../bin/pkcs11/pkcs11-list.rst \
-	../../bin/pkcs11/pkcs11-tokens.rst \
 	../../bin/plugins/filter-aaaa.rst \
 	../../bin/plugins/filter-a.rst \
 	../../bin/rndc/rndc.conf.rst \
@@ -74,7 +69,6 @@ MANPAGES_RST =				\
 	../../bin/tools/named-nzd2nzf.rst \
 	../../bin/tools/named-rrchecker.rst \
 	../../bin/tools/nsec3hash.rst
-
 
 man_MANS =				\
 	arpaname.1			\
@@ -110,7 +104,7 @@ man_MANS =				\
 	tsig-keygen.8
 
 if HAVE_DNSTAP
-man_MANS += 				\
+man_MANS +=				\
 	dnstap-read.1
 endif HAVE_DNSTAP
 
@@ -119,29 +113,17 @@ man_MANS +=				\
 	named-nzd2nzf.1
 endif HAVE_LMDB
 
-if HAVE_PKCS11
-man_MANS +=				\
-	pkcs11-destroy.1		\
-	pkcs11-keygen.1			\
-	pkcs11-list.1			\
-	pkcs11-tokens.1
-endif HAVE_PKCS11
-
 MANPAGES_IN =				\
 	$(man_MANS:=in)			\
 	dnstap-read.1in			\
-	named-nzd2nzf.1in		\
-	pkcs11-destroy.1in		\
-	pkcs11-keygen.1in		\
-	pkcs11-list.1in			\
-	pkcs11-tokens.1in
+	named-nzd2nzf.1in
 
 EXTRA_DIST =				\
 	conf.py				\
 	$(MANPAGES_RST)			\
 	$(MANPAGES_IN)
 
-CLEANFILES =				\
+CLEANFILES +=				\
 	$(man_MANS)
 
 #
@@ -152,6 +134,9 @@ man_SUBST =							\
 	$(AM_V_SED)$(SED)					\
 	  -e 's,[@]PACKAGE_VERSION@,$(PACKAGE_VERSION),'	\
 	  -e 's,[@]RELEASE_DATE@,$(RELEASE_DATE),'		\
+	  -e 's,[@]libdir[@],$(libdir),g'			\
+	  -e 's,[@]runstatedir[@],$(runstatedir),g'		\
+	  -e 's,[@]sysconfdir[@],$(sysconfdir),g'		\
 	  $(srcdir)/$@in >$@
 
 .1in.1:
@@ -171,13 +156,16 @@ doc-local: man
 clean-local::
 	-rm -rf $(SPHINXBUILDDIR)
 
-if MAINTAINER_MODE
 
 CLEANFILES +=				\
 	manpages.stamp
 
+if MAINTAINER_MODE
+
 MAINTAINERCLEANFILES =			\
 	$(MANPAGES_IN)
+
+endif MAINTAINER_MODE
 
 #
 # Build rules for generating pre-generated manpages
@@ -190,6 +178,7 @@ if HAVE_SPHINX_BUILD
 manpages.stamp: $(MANPAGES_RST)
 	@rm -f manpages.tmp
 	@touch manpages.tmp
+	echo "${man_RST_EPILOG}"
 	$(AM_V_SPHINX)$(SPHINX_BUILD) -b man -d $(SPHINXBUILDDIR)/.doctrees/man $(man_SPHINXOPTS) $(SPHINXBUILDDIR)/man
 	for f in $(SPHINXBUILDDIR)/man/*; do \
 	  cp -a "$$f" "$(srcdir)/$$(basename $$f)in"; \
@@ -221,6 +210,5 @@ $(MANPAGES_IN): manpages.stamp
             $$dry test -f manpages.stamp; exit $$?; \
           fi; \
         fi
-endif HAVE_SPHINX_BUILD
 
-endif MAINTAINER_MODE
+endif HAVE_SPHINX_BUILD

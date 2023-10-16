@@ -1,6 +1,8 @@
 /*
  * Copyright (C) Internet Systems Consortium, Inc. ("ISC")
  *
+ * SPDX-License-Identifier: MPL-2.0
+ *
  * This Source Code Form is subject to the terms of the Mozilla Public
  * License, v. 2.0. If a copy of the MPL was not distributed with this
  * file, you can obtain one at https://mozilla.org/MPL/2.0/.
@@ -255,10 +257,9 @@ dlz_create(const char *dlzname, unsigned int argc, char *argv[], void **dbdata,
 	struct dlz_example_data *state;
 	const char *helper_name;
 	va_list ap;
-	char soa_data[1024];
-	const char *extra;
+	char soa_data[sizeof("@ hostmaster.root 123 900 600 86400 3600")];
 	isc_result_t result;
-	int n;
+	size_t n;
 
 	UNUSED(dlzname);
 
@@ -292,19 +293,19 @@ dlz_create(const char *dlzname, unsigned int argc, char *argv[], void **dbdata,
 		sprintf(state->zone_name, "%s.", argv[1]);
 	}
 
+	/*
+	 * Use relative names to trigger ISC_R_NOSPACE in dns_sdlz_putrr.
+	 */
 	if (strcmp(state->zone_name, ".") == 0) {
-		extra = ".root";
+		n = strlcpy(soa_data,
+			    "@ hostmaster.root 123 900 600 86400 3600",
+			    sizeof(soa_data));
 	} else {
-		extra = ".";
+		n = strlcpy(soa_data, "@ hostmaster 123 900 600 86400 3600",
+			    sizeof(soa_data));
 	}
 
-	n = sprintf(soa_data, "%s hostmaster%s%s 123 900 600 86400 3600",
-		    state->zone_name, extra, state->zone_name);
-
-	if (n < 0) {
-		CHECK(ISC_R_FAILURE);
-	}
-	if ((unsigned)n >= sizeof(soa_data)) {
+	if (n >= sizeof(soa_data)) {
 		CHECK(ISC_R_NOSPACE);
 	}
 
@@ -479,8 +480,7 @@ dlz_lookup(const char *zone, const char *name, void *dbdata,
 	 * If the DLZ only operates on 'live' data, then version
 	 * wouldn't necessarily be needed.
 	 */
-	if (clientinfo != NULL && clientinfo->version >= DNS_CLIENTINFO_VERSION)
-	{
+	if (clientinfo != NULL && clientinfo->version >= 2) {
 		dbversion = clientinfo->dbversion;
 		if (dbversion != NULL && *(bool *)dbversion) {
 			loginfo("dlz_example: lookup against live transaction");
@@ -488,6 +488,7 @@ dlz_lookup(const char *zone, const char *name, void *dbdata,
 	}
 
 	if (strcmp(name, "source-addr") == 0) {
+		char ecsbuf[DNS_ECS_FORMATSIZE] = "not supported";
 		strncpy(buf, "unknown", sizeof(buf));
 		if (methods != NULL && methods->sourceip != NULL &&
 		    (methods->version - methods->age <=
@@ -497,6 +498,17 @@ dlz_lookup(const char *zone, const char *name, void *dbdata,
 			methods->sourceip(clientinfo, &src);
 			fmt_address(src, buf, sizeof(buf));
 		}
+		if (clientinfo != NULL && clientinfo->version >= 3) {
+			if (clientinfo->ecs.addr.family != AF_UNSPEC) {
+				dns_ecs_format(&clientinfo->ecs, ecsbuf,
+					       sizeof(ecsbuf));
+			} else {
+				snprintf(ecsbuf, sizeof(ecsbuf), "%s",
+					 "not present");
+			}
+		}
+		i = strlen(buf);
+		snprintf(buf + i, sizeof(buf) - i - 1, " ECS %s", ecsbuf);
 
 		loginfo("dlz_example: lookup connection from %s", buf);
 
@@ -508,7 +520,8 @@ dlz_lookup(const char *zone, const char *name, void *dbdata,
 	}
 
 	if (strcmp(name, "too-long") == 0 ||
-	    strcmp(zone, "bigcname.domain") == 0) {
+	    strcmp(zone, "bigcname.domain") == 0)
+	{
 		for (i = 0; i < 511; i++) {
 			buf[i] = 'x';
 		}
@@ -530,7 +543,8 @@ dlz_lookup(const char *zone, const char *name, void *dbdata,
 	}
 
 	if (strcmp(name, "long.name.is.not.there") == 0 &&
-	    strcmp(zone, ".") == 0) {
+	    strcmp(zone, ".") == 0)
+	{
 		result = state->putrr(lookup, "A", 0, "100.100.100.3");
 		found = true;
 		if (result != ISC_R_SUCCESS) {

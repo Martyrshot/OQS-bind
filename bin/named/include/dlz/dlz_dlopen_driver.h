@@ -1,6 +1,8 @@
 /*
  * Copyright (C) Internet Systems Consortium, Inc. ("ISC")
  *
+ * SPDX-License-Identifier: MPL-2.0
+ *
  * This Source Code Form is subject to the terms of the Mozilla Public
  * License, v. 2.0. If a copy of the MPL was not distributed with this
  * file, you can obtain one at https://mozilla.org/MPL/2.0/.
@@ -9,12 +11,10 @@
  * information regarding copyright ownership.
  */
 
-#ifndef DLZ_DLOPEN_DRIVER_H
-#define DLZ_DLOPEN_DRIVER_H
+#pragma once
 
 isc_result_t
 dlz_dlopen_init(isc_mem_t *mctx);
 
 void
 dlz_dlopen_clear(void);
-#endif /* ifndef DLZ_DLOPEN_DRIVER_H */

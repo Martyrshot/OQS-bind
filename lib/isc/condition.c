@@ -1,6 +1,8 @@
 /*
  * Copyright (C) Internet Systems Consortium, Inc. ("ISC")
  *
+ * SPDX-License-Identifier: MPL-2.0
+ *
  * This Source Code Form is subject to the terms of the Mozilla Public
  * License, v. 2.0. If a copy of the MPL was not distributed with this
  * file, you can obtain one at https://mozilla.org/MPL/2.0/.
@@ -20,11 +22,10 @@
 #include <isc/util.h>
 
 isc_result_t
-isc_condition_waituntil(isc_condition_t *c, isc_mutex_t *m, isc_time_t *t) {
+isc__condition_waituntil(pthread_cond_t *c, pthread_mutex_t *m, isc_time_t *t) {
 	int presult;
 	isc_result_t result;
 	struct timespec ts;
-	char strbuf[ISC_STRERRORSIZE];
 
 	REQUIRE(c != NULL && m != NULL && t != NULL);
 
@@ -50,11 +51,7 @@ isc_condition_waituntil(isc_condition_t *c, isc_mutex_t *m, isc_time_t *t) {
 	ts.tv_nsec = (long)isc_time_nanoseconds(t);
 
 	do {
-#if ISC_MUTEX_PROFILE
-		presult = pthread_cond_timedwait(c, &m->mutex, &ts);
-#else  /* if ISC_MUTEX_PROFILE */
 		presult = pthread_cond_timedwait(c, m, &ts);
-#endif /* if ISC_MUTEX_PROFILE */
 		if (presult == 0) {
 			return (ISC_R_SUCCESS);
 		}
@@ -63,8 +60,6 @@ isc_condition_waituntil(isc_condition_t *c, isc_mutex_t *m, isc_time_t *t) {
 		}
 	} while (presult == EINTR);
 
-	strerror_r(presult, strbuf, sizeof(strbuf));
-	UNEXPECTED_ERROR(__FILE__, __LINE__,
-			 "pthread_cond_timedwait() returned %s", strbuf);
+	UNEXPECTED_SYSERROR(presult, "pthread_cond_timedwait()");
 	return (ISC_R_UNEXPECTED);
 }

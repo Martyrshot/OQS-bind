@@ -1,6 +1,8 @@
 /*
  * Copyright (C) Internet Systems Consortium, Inc. ("ISC")
  *
+ * SPDX-License-Identifier: MPL-2.0
+ *
  * This Source Code Form is subject to the terms of the Mozilla Public
  * License, v. 2.0. If a copy of the MPL was not distributed with this
  * file, you can obtain one at https://mozilla.org/MPL/2.0/.
@@ -9,8 +11,7 @@
  * information regarding copyright ownership.
  */
 
-#ifndef GENERIC_OPT_41_H
-#define GENERIC_OPT_41_H 1
+#pragma once
 
 /*!
  *  \brief Per RFC2671 */
@@ -43,5 +44,3 @@ dns_rdata_opt_next(dns_rdata_opt_t *);
 
 isc_result_t
 dns_rdata_opt_current(dns_rdata_opt_t *, dns_rdata_opt_opcode_t *);
-
-#endif /* GENERIC_OPT_41_H */

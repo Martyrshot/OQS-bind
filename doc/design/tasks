@@ -1,32 +1,20 @@
+<!--
 Copyright (C) Internet Systems Consortium, Inc. ("ISC")
 
-See COPYRIGHT in the source root or https://isc.org/copyright.html for terms.
+SPDX-License-Identifier: MPL-2.0
+
+This Source Code Form is subject to the terms of the Mozilla Public
+License, v. 2.0.  If a copy of the MPL was not distributed with this
+file, you can obtain one at https://mozilla.org/MPL/2.0/.
+
+See the COPYRIGHT file distributed with this work for additional
+information regarding copyright ownership.
+-->
 
 Changes I made last week to the task code simplified the task shutdown
 and termination model.  Here's how things now work:
 
-When a task is shutdown:
-
-	Any "on shutdown" events for the task are posted
-
-	The "shutting down" attribute of the task is set
-
-	Any attempts to add shutdown events with isc_task_onshutdown()
-	will fail, since the task is already shutting down
-
-Task shutdown can be initiated explicitly, via a call to isc_task_shutdown(),
-or implicitly, when the following conditions occur:
-
-	The "shutting down" attribute of the task is not set
-
-	The task has no references
-
-	The task has an empty event queue
-
-
 Task termination occurs when:
-
-	The "shutting down" attribute of the task is set
 
 	The task has no references
 

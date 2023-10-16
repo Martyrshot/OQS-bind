@@ -1,11 +1,17 @@
+#!/bin/sh
+
 # Copyright (C) Internet Systems Consortium, Inc. ("ISC")
 #
+# SPDX-License-Identifier: MPL-2.0
+#
 # This Source Code Form is subject to the terms of the Mozilla Public
-# License, v. 2.0. If a copy of the MPL was not distributed with this
+# License, v. 2.0.  If a copy of the MPL was not distributed with this
 # file, you can obtain one at https://mozilla.org/MPL/2.0/.
 #
 # See the COPYRIGHT file distributed with this work for additional
 # information regarding copyright ownership.
+
+set -e
 
 . ../conf.sh
 
@@ -30,8 +36,7 @@ status=$((status+ret))
 
 n=$((n+1))
 echo_i "adding a new zone into default NZD using rndc addzone ($n)"
-rndccmd 10.53.0.1 addzone "added.example { type master; file \"added.db\";
-};" 2>&1 | sed 's/^/I:ns1 /' | cat_i
+rndccmd 10.53.0.1 addzone 'added.example { type primary; file "added.db"; };' 2>&1 | sed 's/^/I:ns1 /' | cat_i
 sleep 2
 
 n=$((n+1))
@@ -43,7 +48,7 @@ if [ $ret != 0 ]; then echo_i "failed"; fi
 status=$((status+ret))
 
 echo_i "stopping ns1"
-$PERL ../stop.pl nzd2nzf ns1
+stop_server ns1
 
 n=$((n+1))
 echo_i "dumping _default.nzd to _default.nzf ($n)"
@@ -53,7 +58,7 @@ status=$((status+ret))
 
 n=$((n+1))
 echo_i "checking that _default.nzf contains the expected content ($n)"
-grep 'zone "added.example" { type master; file "added.db"; };' ns1/_default.nzf > /dev/null || ret=1
+grep 'zone "added.example" { type primary; file "added.db"; };' ns1/_default.nzf > /dev/null || ret=1
 if [ $ret != 0 ]; then echo_i "failed"; fi
 status=$((status+ret))
 
@@ -61,7 +66,7 @@ echo_i "deleting _default.nzd database"
 rm -f ns1/_default.nzd
 
 echo_i "starting ns1 which should migrate the .nzf to .nzd"
-start_server --noclean --restart --port ${PORT} nzd2nzf ns1
+start_server --noclean --restart --port ${PORT} ns1
 
 n=$((n+1))
 echo_i "querying for zone data from migrated zone config ($n)"

@@ -1,6 +1,8 @@
 /*
  * Copyright (C) Internet Systems Consortium, Inc. ("ISC")
  *
+ * SPDX-License-Identifier: MPL-2.0
+ *
  * This Source Code Form is subject to the terms of the Mozilla Public
  * License, v. 2.0. If a copy of the MPL was not distributed with this
  * file, you can obtain one at https://mozilla.org/MPL/2.0/.
@@ -9,8 +11,7 @@
  * information regarding copyright ownership.
  */
 
-#ifndef NAMED_OS_H
-#define NAMED_OS_H 1
+#pragma once
 
 /*! \file */
 
@@ -61,9 +62,6 @@ named_os_issingleton(const char *filename);
 void
 named_os_shutdown(void);
 
-isc_result_t
-named_os_gethostname(char *buf, size_t len);
-
 void
 named_os_shutdownmsg(char *command, isc_buffer_t *text);
 
@@ -75,5 +73,3 @@ named_os_started(void);
 
 const char *
 named_os_uname(void);
-
-#endif /* NAMED_OS_H */

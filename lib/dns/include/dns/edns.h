@@ -1,6 +1,8 @@
 /*
  * Copyright (C) Internet Systems Consortium, Inc. ("ISC")
  *
+ * SPDX-License-Identifier: MPL-2.0
+ *
  * This Source Code Form is subject to the terms of the Mozilla Public
  * License, v. 2.0. If a copy of the MPL was not distributed with this
  * file, you can obtain one at https://mozilla.org/MPL/2.0/.
@@ -9,8 +11,7 @@
  * information regarding copyright ownership.
  */
 
-#ifndef DNS_EDNS_H
-#define DNS_EDNS_H 1
+#pragma once
 
 /*%
  * The maximum version on EDNS supported by this build.
@@ -23,5 +24,3 @@
  */
 #define DNS_EDNS_VERSION 1 /* draft-andrews-edns1 */
 #endif			   /* ifdef DRAFT_ANDREWS_EDNS1 */
-
-#endif /* ifndef DNS_EDNS_H */

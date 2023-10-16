@@ -1,6 +1,8 @@
 /*
  * Copyright (C) Internet Systems Consortium, Inc. ("ISC")
  *
+ * SPDX-License-Identifier: MPL-2.0
+ *
  * This Source Code Form is subject to the terms of the Mozilla Public
  * License, v. 2.0. If a copy of the MPL was not distributed with this
  * file, you can obtain one at https://mozilla.org/MPL/2.0/.
@@ -14,17 +16,15 @@
 #include <stdbool.h>
 #include <stdlib.h>
 
+#include <isc/ascii.h>
 #include <isc/buffer.h>
 #include <isc/parseint.h>
-#include <isc/print.h>
 #include <isc/region.h>
 #include <isc/result.h>
 #include <isc/stdio.h>
 #include <isc/string.h>
 #include <isc/types.h>
 #include <isc/util.h>
-
-#include <pk11/site.h>
 
 #include <dns/cert.h>
 #include <dns/ds.h>
@@ -33,7 +33,6 @@
 #include <dns/keyvalues.h>
 #include <dns/rcode.h>
 #include <dns/rdataclass.h>
-#include <dns/result.h>
 #include <dns/secalg.h>
 #include <dns/secproto.h>
 
@@ -223,7 +222,8 @@ maybe_numeric(unsigned int *valuep, isc_textregion_t *source, unsigned int max,
 	int v;
 
 	if (!isdigit((unsigned char)source->base[0]) ||
-	    source->length > NUMBERSIZE - 1) {
+	    source->length > NUMBERSIZE - 1)
+	{
 		return (ISC_R_BADNUMBER);
 	}
 
@@ -234,7 +234,7 @@ maybe_numeric(unsigned int *valuep, isc_textregion_t *source, unsigned int max,
 	 */
 	v = snprintf(buffer, sizeof(buffer), "%.*s", (int)source->length,
 		     source->base);
-	if (v < 0 || (unsigned)v != source->length) {
+	if (v < 0 || (unsigned int)v != source->length) {
 		return (ISC_R_BADNUMBER);
 	}
 	INSIST(buffer[source->length] == '\0');
@@ -478,7 +478,7 @@ dns_rdataclass_fromtext(dns_rdataclass_t *classp, isc_textregion_t *source) {
 		return (ISC_R_SUCCESS);                               \
 	}
 
-	switch (tolower((unsigned char)source->base[0])) {
+	switch (isc_ascii_tolower(source->base[0])) {
 	case 'a':
 		COMPARE("any", dns_rdataclass_any);
 		break;

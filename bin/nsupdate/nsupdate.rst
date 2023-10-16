@@ -1,26 +1,16 @@
-.. 
-   Copyright (C) Internet Systems Consortium, Inc. ("ISC")
-   
-   This Source Code Form is subject to the terms of the Mozilla Public
-   License, v. 2.0. If a copy of the MPL was not distributed with this
-   file, you can obtain one at https://mozilla.org/MPL/2.0/.
-   
-   See the COPYRIGHT file distributed with this work for additional
-   information regarding copyright ownership.
-
+.. Copyright (C) Internet Systems Consortium, Inc. ("ISC")
 ..
-   Copyright (C) Internet Systems Consortium, Inc. ("ISC")
+.. SPDX-License-Identifier: MPL-2.0
+..
+.. This Source Code Form is subject to the terms of the Mozilla Public
+.. License, v. 2.0.  If a copy of the MPL was not distributed with this
+.. file, you can obtain one at https://mozilla.org/MPL/2.0/.
+..
+.. See the COPYRIGHT file distributed with this work for additional
+.. information regarding copyright ownership.
 
-   This Source Code Form is subject to the terms of the Mozilla Public
-   License, v. 2.0. If a copy of the MPL was not distributed with this
-   file, You can obtain one at http://mozilla.org/MPL/2.0/.
-
-   See the COPYRIGHT file distributed with this work for additional
-   information regarding copyright ownership.
-
-
-.. highlight: console
-
+.. iscman:: nsupdate
+.. program:: nsupdate
 .. _man_nsupdate:
 
 nsupdate - dynamic DNS update utility
@@ -29,23 +19,23 @@ nsupdate - dynamic DNS update utility
 Synopsis
 ~~~~~~~~
 
-:program:`nsupdate` [**-d**] [**-D**] [**-i**] [**-L** level] [ [**-g**] | [**-o**] | [**-l**] | [**-y** [hmac:]keyname:secret] | [**-k** keyfile] ] [**-t** timeout] [**-u** udptimeout] [**-r** udpretries] [**-v**] [**-T**] [**-P**] [**-V**] [ [**-4**] | [**-6**] ] [filename]
+:program:`nsupdate` [**-d**] [**-D**] [**-i**] [**-L** level] [ [**-g**] | [**-o**] | [**-l**] | [**-y** [hmac:]keyname:secret] | [**-k** keyfile] ] [ [**-S**] [**-K** tlskeyfile] [**-E** tlscertfile] [**-A** tlscafile] [**-H** tlshostname] [-O] ] [**-t** timeout] [**-u** udptimeout] [**-r** udpretries] [**-v**] [**-T**] [**-P**] [**-V**] [ [**-4**] | [**-6**] ] [filename]
 
 Description
 ~~~~~~~~~~~
 
-``nsupdate`` is used to submit Dynamic DNS Update requests, as defined in
+:program:`nsupdate` is used to submit Dynamic DNS Update requests, as defined in
 :rfc:`2136`, to a name server. This allows resource records to be added or
 removed from a zone without manually editing the zone file. A single
 update request can contain requests to add or remove more than one
 resource record.
 
-Zones that are under dynamic control via ``nsupdate`` or a DHCP server
+Zones that are under dynamic control via :program:`nsupdate` or a DHCP server
 should not be edited by hand. Manual edits could conflict with dynamic
 updates and cause data to be lost.
 
 The resource records that are dynamically added or removed with
-``nsupdate`` must be in the same zone. Requests are sent to the
+:program:`nsupdate` must be in the same zone. Requests are sent to the
 zone's primary server, which is identified by the MNAME field of the
 zone's SOA record.
 
@@ -54,84 +44,162 @@ updates. These use the TSIG resource record type described in :rfc:`2845`,
 the SIG(0) record described in :rfc:`2535` and :rfc:`2931`, or GSS-TSIG as
 described in :rfc:`3645`.
 
-TSIG relies on a shared secret that should only be known to ``nsupdate``
+TSIG relies on a shared secret that should only be known to :program:`nsupdate`
 and the name server. For instance, suitable ``key`` and ``server``
-statements are added to ``/etc/named.conf`` so that the name server
+statements are added to |named_conf| so that the name server
 can associate the appropriate secret key and algorithm with the IP
 address of the client application that is using TSIG
-authentication. ``ddns-confgen`` can generate suitable
-configuration fragments. ``nsupdate`` uses the ``-y`` or ``-k`` options
+authentication. :iscman:`ddns-confgen` can generate suitable
+configuration fragments. :program:`nsupdate` uses the :option:`-y` or :option:`-k` options
 to provide the TSIG shared secret; these options are mutually exclusive.
 
 SIG(0) uses public key cryptography. To use a SIG(0) key, the public key
 must be stored in a KEY record in a zone served by the name server.
 
 GSS-TSIG uses Kerberos credentials. Standard GSS-TSIG mode is switched
-on with the ``-g`` flag. A non-standards-compliant variant of GSS-TSIG
-used by Windows 2000 can be switched on with the ``-o`` flag.
+on with the :option:`-g` flag. A non-standards-compliant variant of GSS-TSIG
+used by Windows 2000 can be switched on with the :option:`-o` flag.
 
 Options
 ~~~~~~~
 
-``-4``
+.. option:: -4
+
    This option sets use of IPv4 only.
 
-``-6``
+.. option:: -6
+
    This option sets use of IPv6 only.
 
-``-d``
+.. option:: -A tlscafile
+
+   This option specifies the file of the certificate authorities (CA) certificates
+   (in PEM format) in order to verify the remote server TLS certificate when
+   using DNS-over-TLS (DoT), to achieve Strict or Mutual TLS. When used, it will
+   override the certificates from the global certificates store, which are
+   otherwise used by default when :option:`-S` is enabled. This option can not
+   be used in conjuction with :option:`-O`, and it implies :option:`-S`.
+
+.. option:: -C
+
+   Overrides the default `resolv.conf` file. This is only intended for testing.
+
+.. option:: -d
+
    This option sets debug mode, which provides tracing information about the update
    requests that are made and the replies received from the name server.
 
-``-D``
+.. option:: -D
+
    This option sets extra debug mode.
 
-``-i``
+.. option:: -E tlscertfile
+
+   This option sets the certificate(s) file for authentication for the
+   DNS-over-TLS (DoT) transport to the remote server. The certificate
+   chain file is expected to be in PEM format. This option implies :option:`-S`,
+   and can only be used with :option:`-K`.
+
+.. option:: -g
+
+   This option enables standard GSS-TSIG mode.
+
+.. option:: -H tlshostname
+
+   This option makes :program:`nsupdate` use the provided hostname during remote
+   server TLS certificate verification. Otherwise, the DNS server name
+   is used. This option implies :option:`-S`.
+
+.. option:: -i
+
    This option forces interactive mode, even when standard input is not a terminal.
 
-``-k keyfile``
+.. option:: -k keyfile
+
    This option indicates the file containing the TSIG authentication key. Keyfiles may be in
-   two formats: a single file containing a ``named.conf``-format ``key``
-   statement, which may be generated automatically by ``ddns-confgen``;
+   two formats: a single file containing a :iscman:`named.conf`-format ``key``
+   statement, which may be generated automatically by :iscman:`ddns-confgen`;
    or a pair of files whose names are of the format
    ``K{name}.+157.+{random}.key`` and
    ``K{name}.+157.+{random}.private``, which can be generated by
-   ``dnssec-keygen``. The ``-k`` option can also be used to specify a SIG(0)
+   :iscman:`dnssec-keygen`. The :option:`-k` option can also be used to specify a SIG(0)
    key used to authenticate Dynamic DNS update requests. In this case,
    the key specified is not an HMAC-MD5 key.
 
-``-l``
+.. option:: -K tlskeyfile
+
+   This option sets the key file for authenticated encryption for the
+   DNS-over-TLS (DoT) transport with the remote server. The private key file is
+   expected to be in PEM format. This option implies :option:`-S`, and can only
+   be used with :option:`-E`.
+
+.. option:: -l
+
    This option sets local-host only mode, which sets the server address to localhost
    (disabling the ``server`` so that the server address cannot be
    overridden). Connections to the local server use a TSIG key
-   found in ``/var/run/named/session.key``, which is automatically
-   generated by ``named`` if any local ``primary`` zone has set
+   found in |session_key|, which is automatically
+   generated by :iscman:`named` if any local ``primary`` zone has set
    ``update-policy`` to ``local``. The location of this key file can be
-   overridden with the ``-k`` option.
+   overridden with the :option:`-k` option.
 
-``-L level``
+.. option:: -L level
+
    This option sets the logging debug level. If zero, logging is disabled.
 
-``-p port``
+.. option:: -o
+
+   This option is deprecated. Previously, it enabled a
+   non-standards-compliant variant of GSS-TSIG that was used by Windows
+   2000. Since that OS is now long past its end of life, this option is
+   now treated as a synonym for :option:`-g`.
+
+.. option:: -O
+
+   This option enables Opportunistic TLS. When used, the remote peer's TLS
+   certificate will not be verified. This option should be used for debugging
+   purposes only, and it is not recommended to use it in production. This
+   option can not be used in conjuction with :option:`-A`, and it implies
+   :option:`-S`.
+
+.. option:: -p port
+
    This option sets the port to use for connections to a name server. The default is
    53.
 
-``-P``
-   This option prints the list of private BIND-specific resource record types whose
-   format is understood by ``nsupdate``. See also the ``-T`` option.
+.. option:: -P
 
-``-r udpretries``
+   This option prints the list of private BIND-specific resource record types whose
+   format is understood by :program:`nsupdate`. See also the :option:`-T` option.
+
+.. option:: -r udpretries
+
    This option sets the number of UDP retries. The default is 3. If zero, only one update
    request is made.
 
-``-t timeout``
-   This option sets the maximum time an update request can take before it is aborted. The
-   default is 300 seconds. If zero, the timeout is disabled.
+.. option:: -S
 
-``-T``
+   This option indicates whether to use DNS-over-TLS (DoT) when querying
+   name servers specified by ``server servername port`` syntax in the input
+   file, and the primary server discovered through a SOA request. When the
+   :option:`-K` and :option:`-E` options are used, then the specified TLS
+   client certificate and private key pair are used for authentication
+   (Mutual TLS). This option implies :option:`-v`.
+
+.. option:: -t timeout
+
+   This option sets the maximum time an update request can take before it is aborted. The
+   default is 300 seconds. If zero, the timeout is disabled for TCP mode. For UDP mode,
+   the option :option:`-u` takes precedence over this option, unless the option :option:`-u`
+   is set to zero, in which case the interval is computed from the :option:`-t` timeout interval
+   and the number of UDP retries. For UDP mode, the timeout can not be disabled, and will
+   be rounded up to 1 second in case if both :option:`-t` and :option:`-u` are set to zero.
+
+.. option:: -T
+
    This option prints the list of IANA standard resource record types whose format is
-   understood by ``nsupdate``. ``nsupdate`` exits after the lists
-   are printed. The ``-T`` option can be combined with the ``-P``
+   understood by :program:`nsupdate`. :program:`nsupdate` exits after the lists
+   are printed. The :option:`-T` option can be combined with the :option:`-P`
    option.
 
    Other types can be entered using ``TYPEXXXXX`` where ``XXXXX`` is the
@@ -139,21 +207,25 @@ Options
    present, is parsed using the UNKNOWN rdata format, (<backslash>
    <hash> <space> <length> <space> <hexstring>).
 
-``-u udptimeout``
+.. option:: -u udptimeout
+
    This option sets the UDP retry interval. The default is 3 seconds. If zero, the
    interval is computed from the timeout interval and number of UDP
    retries.
 
-``-v``
-   This option specifies that TCP should be used even for small update requests. By default, ``nsupdate`` uses
+.. option:: -v
+
+   This option specifies that TCP should be used even for small update requests. By default, :program:`nsupdate` uses
    UDP to send update requests to the name server unless they are too
    large to fit in a UDP request, in which case TCP is used. TCP may
    be preferable when a batch of update requests is made.
 
-``-V``
+.. option:: -V
+
    This option prints the version number and exits.
 
-``-y [hmac:]keyname:secret``
+.. option:: -y [hmac:]keyname:secret
+
    This option sets the literal TSIG authentication key. ``keyname`` is the name of the key,
    and ``secret`` is the base64 encoded shared secret. ``hmac`` is the
    name of the key algorithm; valid choices are ``hmac-md5``,
@@ -161,7 +233,7 @@ Options
    ``hmac-sha512``. If ``hmac`` is not specified, the default is
    ``hmac-md5``, or if MD5 was disabled, ``hmac-sha256``.
 
-   NOTE: Use of the ``-y`` option is discouraged because the shared
+   NOTE: Use of the :option:`-y` option is discouraged because the shared
    secret is supplied as a command-line argument in clear text. This may
    be visible in the output from ps1 or in a history file maintained by
    the user's shell.
@@ -169,7 +241,7 @@ Options
 Input Format
 ~~~~~~~~~~~~
 
-``nsupdate`` reads input from ``filename`` or standard input. Each
+:program:`nsupdate` reads input from ``filename`` or standard input. Each
 command is supplied on exactly one line of input. Some commands are for
 administrative purposes; others are either update instructions or
 prerequisite checks on the contents of the zone. These checks set
@@ -189,23 +261,25 @@ The command formats and their meanings are as follows:
 
 ``server servername port``
    This command sends all dynamic update requests to the name server ``servername``.
-   When no server statement is provided, ``nsupdate`` sends updates
+   When no server statement is provided, :program:`nsupdate` sends updates
    to the primary server of the correct zone. The MNAME field of that
    zone's SOA record identify the primary server for that zone.
    ``port`` is the port number on ``servername`` where the dynamic
    update requests are sent. If no port number is specified, the default
    DNS port number of 53 is used.
 
+   .. note:: This command has no effect when GSS-TSIG is in use.
+
 ``local address port``
    This command sends all dynamic update requests using the local ``address``. When
-   no local statement is provided, ``nsupdate`` sends updates using
+   no local statement is provided, :program:`nsupdate` sends updates using
    an address and port chosen by the system. ``port`` can also
    be used to force requests to come from a specific port. If no port number
    is specified, the system assigns one.
 
 ``zone zonename``
    This command specifies that all updates are to be made to the zone ``zonename``.
-   If no ``zone`` statement is provided, ``nsupdate`` attempts to
+   If no ``zone`` statement is provided, :program:`nsupdate` attempts to
    determine the correct zone to update based on the rest of the input.
 
 ``class classname``
@@ -221,25 +295,32 @@ The command formats and their meanings are as follows:
    ``keyname``-``secret`` pair. If ``hmac`` is specified, it sets
    the signing algorithm in use. The default is ``hmac-md5``; if MD5
    was disabled, the default is ``hmac-sha256``. The ``key`` command overrides any key
-   specified on the command line via ``-y`` or ``-k``.
+   specified on the command line via :option:`-y` or :option:`-k`.
 
 ``gsstsig``
    This command uses GSS-TSIG to sign the updates. This is equivalent to specifying
-   ``-g`` on the command line.
+   :option:`-g` on the command line.
 
 ``oldgsstsig``
-   This command uses the Windows 2000 version of GSS-TSIG to sign the updates. This is
-   equivalent to specifying ``-o`` on the command line.
+   This command is deprecated and will be removed in a future release.
+   Previously, it caused ``nsupdate`` to use the Windows 2000 version of
+   GSS-TSIG to sign updates. It is now treated as a synonym for ``gsstsig``.
 
 ``realm [realm_name]``
    When using GSS-TSIG, this command specifies the use of ``realm_name`` rather than the default realm
    in ``krb5.conf``. If no realm is specified, the saved realm is
    cleared.
 
-``check-names [yes_or_no]``
+``check-names [boolean]``
    This command turns on or off check-names processing on records to be added.
    Check-names has no effect on prerequisites or records to be deleted.
    By default check-names processing is on. If check-names processing
+   fails, the record is not added to the UPDATE message.
+
+``check-svbc [boolean]``
+   This command turns on or off check-svcb processing on records to be added.
+   Check-svcb has no effect on prerequisites or records to be deleted.
+   By default check-svcb processing is on. If check-svcb processing
    fails, the record is not added to the UPDATE message.
 
 ``prereq nxdomain domain-name``
@@ -303,7 +384,7 @@ Lines beginning with a semicolon (;) are comments and are ignored.
 Examples
 ~~~~~~~~
 
-The examples below show how ``nsupdate`` can be used to insert and
+The examples below show how :program:`nsupdate` can be used to insert and
 delete resource records from the ``example.com`` zone. Notice that the
 input in each example contains a trailing blank line, so that a group of
 commands is sent as one dynamic update request to the primary name
@@ -342,24 +423,24 @@ Files
 ``/etc/resolv.conf``
    Used to identify the default name server
 
-``/var/run/named/session.key``
+|session_key|
    Sets the default TSIG key for use in local-only mode
 
 ``K{name}.+157.+{random}.key``
-   Base-64 encoding of the HMAC-MD5 key created by ``dnssec-keygen``.
+   Base-64 encoding of the HMAC-MD5 key created by :iscman:`dnssec-keygen`.
 
 ``K{name}.+157.+{random}.private``
-   Base-64 encoding of the HMAC-MD5 key created by ``dnssec-keygen``.
+   Base-64 encoding of the HMAC-MD5 key created by :iscman:`dnssec-keygen`.
 
 See Also
 ~~~~~~~~
 
 :rfc:`2136`, :rfc:`3007`, :rfc:`2104`, :rfc:`2845`, :rfc:`1034`, :rfc:`2535`, :rfc:`2931`,
-:manpage:`named(8)`, :manpage:`dnssec-keygen(8)`, :manpage:`tsig-keygen(8)`.
+:iscman:`named(8) <named>`, :iscman:`dnssec-keygen(8) <dnssec-keygen>`, :iscman:`tsig-keygen(8) <tsig-keygen>`.
 
 Bugs
 ~~~~
 
 The TSIG key is redundantly stored in two separate files. This is a
-consequence of ``nsupdate`` using the DST library for its cryptographic
+consequence of :program:`nsupdate` using the DST library for its cryptographic
 operations, and may change in future releases.

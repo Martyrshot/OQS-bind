@@ -49,6 +49,10 @@
 	       (expand-file-name
 		(concat directory-of-current-dir-locals-file "lib/bind9/include"))
 
+	       ;; libtest
+	       (expand-file-name
+		(concat directory-of-current-dir-locals-file "tests/include"))
+
 	       ;; bin
 	       (expand-file-name
 		(concat directory-of-current-dir-locals-file "bin/check"))
@@ -57,7 +61,7 @@
 	       (expand-file-name
 		(concat directory-of-current-dir-locals-file "bin/confgen"))
 	       (expand-file-name
-		(concat directory-of-current-dir-locals-file "bin/confgen/include"))	       
+		(concat directory-of-current-dir-locals-file "bin/confgen/include"))
 	       (expand-file-name
 		(concat directory-of-current-dir-locals-file "bin/dig/include"))
 	       (expand-file-name
@@ -72,6 +76,9 @@
 		(concat directory-of-current-dir-locals-file "bin/named/include"))
 	       (expand-file-name
 		(concat directory-of-current-dir-locals-file "bin/rndc/include"))
+
+	       (expand-file-name "/usr/include/libxml2")
+	       (expand-file-name "/usr/include/json-c")
 
 	       (expand-file-name "/usr/local/opt/openssl@1.1/include")
 	       (expand-file-name "/usr/local/opt/libxml2/include/libxml2")
@@ -103,8 +110,9 @@
 	  "--enable=all"
 	  "--suppress=missingIncludeSystem"
 	  "--suppress=nullPointerRedundantCheck"
-	  (concat "--suppressions-list=" (expand-file-name
-			       (concat directory-of-current-dir-locals-file "util/suppressions.txt")))
+	  "--suppress=preprocessorErrorDirective"
+	  "--suppress=unknownMacro"
+	  "--suppress=unmatchedSuppression"
 	  (concat "-include=" (expand-file-name
 			       (concat directory-of-current-dir-locals-file "config.h")))
 	  )

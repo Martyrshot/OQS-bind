@@ -1,6 +1,8 @@
 /*
  * Copyright (C) Internet Systems Consortium, Inc. ("ISC")
  *
+ * SPDX-License-Identifier: MPL-2.0
+ *
  * This Source Code Form is subject to the terms of the Mozilla Public
  * License, v. 2.0. If a copy of the MPL was not distributed with this
  * file, you can obtain one at https://mozilla.org/MPL/2.0/.
@@ -22,9 +24,9 @@
 /*
  * Commandline arguments for named;
  */
-#define NAMED_MAIN_ARGS "46A:c:d:D:E:fFgL:M:m:n:N:p:sS:t:T:U:u:vVx:X:"
+#define NAMED_MAIN_ARGS "46A:c:Cd:D:E:fFgL:M:m:n:N:p:sS:t:T:U:u:vVx:X:"
 
-ISC_NORETURN void
+noreturn void
 named_main_earlyfatal(const char *format, ...) ISC_FORMAT_PRINTF(1, 2);
 
 void
@@ -32,3 +34,6 @@ named_main_earlywarning(const char *format, ...) ISC_FORMAT_PRINTF(1, 2);
 
 void
 named_main_setmemstats(const char *);
+
+void
+named_main_shutdown(void *arg, int signum);

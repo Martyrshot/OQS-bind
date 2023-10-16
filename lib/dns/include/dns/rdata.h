@@ -1,6 +1,8 @@
 /*
  * Copyright (C) Internet Systems Consortium, Inc. ("ISC")
  *
+ * SPDX-License-Identifier: MPL-2.0
+ *
  * This Source Code Form is subject to the terms of the Mozilla Public
  * License, v. 2.0. If a copy of the MPL was not distributed with this
  * file, you can obtain one at https://mozilla.org/MPL/2.0/.
@@ -9,8 +11,7 @@
  * information regarding copyright ownership.
  */
 
-#ifndef DNS_RDATA_H
-#define DNS_RDATA_H 1
+#pragma once
 
 /*****
 ***** Module Info
@@ -108,7 +109,7 @@ ISC_LANG_BEGINDECLS
  * purpose the client desires.
  */
 struct dns_rdata {
-	unsigned char *	 data;
+	unsigned char	*data;
 	unsigned int	 length;
 	dns_rdataclass_t rdclass;
 	dns_rdatatype_t	 type;
@@ -280,17 +281,12 @@ dns_rdata_toregion(const dns_rdata_t *rdata, isc_region_t *r);
 isc_result_t
 dns_rdata_fromwire(dns_rdata_t *rdata, dns_rdataclass_t rdclass,
 		   dns_rdatatype_t type, isc_buffer_t *source,
-		   dns_decompress_t *dctx, unsigned int options,
-		   isc_buffer_t *target);
+		   dns_decompress_t dctx, isc_buffer_t *target);
 /*%<
  * Copy the possibly-compressed rdata at source into the target region.
  *
  * Notes:
  *\li	Name decompression policy is controlled by 'dctx'.
- *
- *	'options'
- *\li	DNS_RDATA_DOWNCASE	downcase domain names when they are copied
- *				into target.
  *
  * Requires:
  *
@@ -327,16 +323,14 @@ dns_rdata_towire(dns_rdata_t *rdata, dns_compress_t *cctx,
  * compression context 'cctx', and storing the result in 'target'.
  *
  * Notes:
- *\li	If the compression context allows global compression, then the
- *	global compression table may be updated.
+ *\li	If compression is permitted, then the cctx table may be updated.
  *
  * Requires:
  *\li	'rdata' is a valid, non-empty rdata
  *
  *\li	target is a valid buffer
  *
- *\li	Any offsets specified in a global compression table are valid
- *	for target.
+ *\li	Any offsets in the compression table are valid for target.
  *
  * Ensures,
  *	if the result is success:
@@ -516,13 +510,13 @@ dns_rdata_tostruct(const dns_rdata_t *rdata, void *target, isc_mem_t *mctx);
  *
  * Requires:
  *
- *\li	'rdata' is a valid, non-empty rdata.
+ *\li	'rdata' is a valid, non-empty, non-pseudo rdata.
  *
  *\li	'target' to point to a valid pointer for the type and class.
  *
  * Result:
  *\li	Success
- *\li	Resource Limit: Not enough memory
+ *\li	Not Implemented
  */
 
 void
@@ -572,6 +566,13 @@ dns_rdatatype_isdnssec(dns_rdatatype_t type);
  */
 
 bool
+dns_rdatatype_iskeymaterial(dns_rdatatype_t type);
+/*%<
+ * Return true iff the rdata type 'type' is a DNSSEC key
+ * related type, like DNSKEY, CDNSKEY, or CDS.
+ */
+
+bool
 dns_rdatatype_iszonecutauth(dns_rdatatype_t type);
 /*%<
  * Return true iff rdata of type 'type' is considered authoritative
@@ -594,8 +595,8 @@ dns_rdatatype_isknown(dns_rdatatype_t type);
  */
 
 isc_result_t
-dns_rdata_additionaldata(dns_rdata_t *rdata, dns_additionaldatafunc_t add,
-			 void *arg);
+dns_rdata_additionaldata(dns_rdata_t *rdata, const dns_name_t *owner,
+			 dns_additionaldatafunc_t add, void *arg);
 /*%<
  * Call 'add' for each name and type from 'rdata' which is subject to
  * additional section processing.
@@ -695,6 +696,21 @@ dns_rdatatype_atcname(dns_rdatatype_t type);
  *
  */
 
+bool
+dns_rdatatype_followadditional(dns_rdatatype_t type);
+/*%<
+ * Return true if adding a record of type 'type' to the ADDITIONAL section
+ * of a message can itself trigger the addition of still more data to the
+ * additional section.
+ *
+ * (For example: adding SRV to the ADDITIONAL section may trigger
+ * the addition of address records associated with that SRV.)
+ *
+ * Requires:
+ * \li	'type' is a valid rdata type.
+ *
+ */
+
 unsigned int
 dns_rdatatype_attributes(dns_rdatatype_t rdtype);
 /*%<
@@ -729,6 +745,8 @@ dns_rdatatype_attributes(dns_rdatatype_t rdtype);
 #define DNS_RDATATYPEATTR_ATPARENT 0x00000200U
 /*% Can exist along side a CNAME */
 #define DNS_RDATATYPEATTR_ATCNAME 0x00000400U
+/*% Follow additional */
+#define DNS_RDATATYPEATTR_FOLLOWADDITIONAL 0x00000800U
 
 dns_rdatatype_t
 dns_rdata_covers(dns_rdata_t *rdata);
@@ -788,6 +806,20 @@ dns_rdata_makedelete(dns_rdata_t *rdata);
 const char *
 dns_rdata_updateop(dns_rdata_t *rdata, dns_section_t section);
 
-ISC_LANG_ENDDECLS
+isc_result_t
+dns_rdata_checksvcb(const dns_name_t *owner, const dns_rdata_t *rdata);
+/*%<
+ * Checks that 'rdata' contains a valid SVCB record.
+ *
+ * Requires:
+ *\li	'owner' is a valid name.
+ *\li	'rdata' is a valid, non-empty SVCB rdata.
+ *
+ * Returns:
+ *\li	#ISC_R_SUCCESS		-- success, the data is valid
+ *\li	#DNS_R_HAVEPARMKEYS	-- alias mode record, but SvcParamKeys is found
+ *\li	#DNS_R_NOALPN		-- ALPN required for 'owner', but not found
+ *\li	#DNS_R_NODOHPATH	-- DOHPATH required for 'owner', but not found
+ */
 
-#endif /* DNS_RDATA_H */
+ISC_LANG_ENDDECLS

@@ -1,5 +1,7 @@
 /*
- * Portions Copyright (C) Internet Systems Consortium, Inc. ("ISC")
+ * Copyright (C) Internet Systems Consortium, Inc. ("ISC")
+ *
+ * SPDX-License-Identifier: MPL-2.0 AND ISC
  *
  * This Source Code Form is subject to the terms of the Mozilla Public
  * License, v. 2.0. If a copy of the MPL was not distributed with this
@@ -7,7 +9,9 @@
  *
  * See the COPYRIGHT file distributed with this work for additional
  * information regarding copyright ownership.
- *
+ */
+
+/*
  * Portions Copyright (C) Network Associates, Inc.
  *
  * Permission to use, copy, modify, and/or distribute this software for any
@@ -28,6 +32,11 @@
 #include <inttypes.h>
 #include <stdbool.h>
 
+#include <openssl/err.h>
+#include <openssl/evp.h>
+#include <openssl/objects.h>
+#include <openssl/rsa.h>
+
 #include <isc/buffer.h>
 #include <isc/hmac.h>
 #include <isc/lang.h>
@@ -37,17 +46,6 @@
 #include <isc/region.h>
 #include <isc/stdtime.h>
 #include <isc/types.h>
-
-#if USE_PKCS11
-#include <pk11/pk11.h>
-#include <pk11/site.h>
-#endif /* USE_PKCS11 */
-
-#include <openssl/dh.h>
-#include <openssl/err.h>
-#include <openssl/evp.h>
-#include <openssl/objects.h>
-#include <openssl/rsa.h>
 
 #include <dns/time.h>
 
@@ -79,6 +77,7 @@ typedef enum { DO_SIGN, DO_VERIFY } dst_use_t;
 struct dst_key {
 	unsigned int magic;
 	isc_refcount_t refs;
+	isc_mutex_t mdlock;	    /*%< lock for read/write metadata */
 	dns_name_t *key_name;	    /*%< name of the key */
 	unsigned int key_size;	    /*%< size of the key in bits */
 	unsigned int key_proto;	    /*%< protocols this key is used for
@@ -97,14 +96,11 @@ struct dst_key {
 	union {
 		void *generic;
 		dns_gss_ctx_id_t gssctx;
-		DH *dh;
-#if USE_OPENSSL
-		EVP_PKEY *pkey;
-#endif /* if USE_OPENSSL */
-#if USE_PKCS11
-		pk11_object_t *pkey;
-#endif /* if USE_PKCS11 */
 		dst_hmac_key_t *hmac_key;
+		struct {
+			EVP_PKEY *pub;
+			EVP_PKEY *priv;
+		} pkeypair;
 	} keydata; /*%< pointer to key in crypto pkg fmt */
 
 	isc_stdtime_t times[DST_MAX_TIMES + 1]; /*%< timing metadata */
@@ -127,6 +123,7 @@ struct dst_key {
 	bool inactive; /*%< private key not present as it is
 			* inactive */
 	bool external; /*%< external key */
+	bool modified; /*%< set to true if key file metadata has changed */
 
 	int fmt_major; /*%< private key format, major version
 			* */
@@ -148,9 +145,6 @@ struct dst_context {
 		dst_gssapi_signverifyctx_t *gssctx;
 		isc_hmac_t *hmac_ctx;
 		EVP_MD_CTX *evp_md_ctx;
-#if USE_PKCS11
-		pk11_context_t *pk11_ctx;
-#endif /* if USE_PKCS11 */
 	} ctxdata;
 };
 
@@ -202,7 +196,6 @@ struct dst_func {
  */
 isc_result_t
 dst__openssl_init(const char *engine);
-#define dst__pkcs11_init pk11_initialize
 
 isc_result_t
 dst__hmacmd5_init(struct dst_func **funcp);
@@ -217,27 +210,13 @@ dst__hmacsha384_init(struct dst_func **funcp);
 isc_result_t
 dst__hmacsha512_init(struct dst_func **funcp);
 isc_result_t
-dst__openssldh_init(struct dst_func **funcp);
-#if USE_OPENSSL
-isc_result_t
 dst__opensslrsa_init(struct dst_func **funcp, unsigned char algorithm);
 isc_result_t
 dst__opensslecdsa_init(struct dst_func **funcp);
 #if HAVE_OPENSSL_ED25519 || HAVE_OPENSSL_ED448
 isc_result_t
-dst__openssleddsa_init(struct dst_func **funcp);
+dst__openssleddsa_init(struct dst_func **funcp, unsigned char algorithm);
 #endif /* HAVE_OPENSSL_ED25519 || HAVE_OPENSSL_ED448 */
-#endif /* USE_OPENSSL */
-#if USE_PKCS11
-isc_result_t
-dst__pkcs11rsa_init(struct dst_func **funcp);
-isc_result_t
-dst__pkcs11dsa_init(struct dst_func **funcp);
-isc_result_t
-dst__pkcs11ecdsa_init(struct dst_func **funcp);
-isc_result_t
-dst__pkcs11eddsa_init(struct dst_func **funcp);
-#endif /* USE_PKCS11 */
 #if HAVE_GSSAPI
 isc_result_t
 dst__gssapi_init(struct dst_func **funcp);
@@ -254,7 +233,6 @@ dst__opensslsphincssha256128s_init(struct dst_func **funcp);
  */
 void
 dst__openssl_destroy(void);
-#define dst__pkcs11_destroy pk11_finalize
 
 /*%
  * Memory allocators using the DST memory pool.
@@ -265,6 +243,16 @@ void
 dst__mem_free(void *ptr);
 void *
 dst__mem_realloc(void *ptr, size_t size);
+
+/*%
+ * Secure private file handling
+ */
+FILE *
+dst_key_open(char *tmpname, mode_t mode);
+isc_result_t
+dst_key_close(char *tmpname, FILE *fp, char *filename);
+isc_result_t
+dst_key_cleanup(char *tmpname, FILE *fp);
 
 ISC_LANG_ENDDECLS
 

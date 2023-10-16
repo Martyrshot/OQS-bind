@@ -1,6 +1,8 @@
 /*
  * Copyright (C) Internet Systems Consortium, Inc. ("ISC")
  *
+ * SPDX-License-Identifier: MPL-2.0
+ *
  * This Source Code Form is subject to the terms of the Mozilla Public
  * License, v. 2.0. If a copy of the MPL was not distributed with this
  * file, you can obtain one at https://mozilla.org/MPL/2.0/.
@@ -10,9 +12,9 @@
  */
 
 #include <errno.h>
+#include <sys/stat.h>
 #include <unistd.h>
 
-#include <isc/stat.h>
 #include <isc/stdio.h>
 #include <isc/util.h>
 
@@ -83,9 +85,7 @@ isc_stdio_read(void *ptr, size_t size, size_t nmemb, FILE *f, size_t *nret) {
 			result = isc__errno2result(errno);
 		}
 	}
-	if (nret != NULL) {
-		*nret = r;
-	}
+	SET_IF_NOT_NULL(nret, r);
 	return (result);
 }
 
@@ -100,9 +100,7 @@ isc_stdio_write(const void *ptr, size_t size, size_t nmemb, FILE *f,
 	if (r != nmemb) {
 		result = isc__errno2result(errno);
 	}
-	if (nret != NULL) {
-		*nret = r;
-	}
+	SET_IF_NOT_NULL(nret, r);
 	return (result);
 }
 

@@ -1,6 +1,8 @@
 /*
  * Copyright (C) Internet Systems Consortium, Inc. ("ISC")
  *
+ * SPDX-License-Identifier: MPL-2.0
+ *
  * This Source Code Form is subject to the terms of the Mozilla Public
  * License, v. 2.0. If a copy of the MPL was not distributed with this
  * file, you can obtain one at https://mozilla.org/MPL/2.0/.
@@ -9,8 +11,7 @@
  * information regarding copyright ownership.
  */
 
-#ifndef ISCCFG_CFG_H
-#define ISCCFG_CFG_H 1
+#pragma once
 
 /*****
 ***** Module Info
@@ -70,7 +71,7 @@ typedef struct cfg_listelt cfg_listelt_t;
  * that needs to be interpreted at parsing time, like
  * "directory".
  */
-typedef isc_result_t (*cfg_parsecallback_t)(const char *     clausename,
+typedef isc_result_t (*cfg_parsecallback_t)(const char	    *clausename,
 					    const cfg_obj_t *obj, void *arg);
 
 /***
@@ -391,6 +392,12 @@ cfg_obj_issockaddr(const cfg_obj_t *obj);
  * Return true iff 'obj' is a socket address.
  */
 
+bool
+cfg_obj_issockaddrtls(const cfg_obj_t *obj);
+/*%<
+ * Return true iff 'obj' is a socket address with an optional tls configuration.
+ */
+
 const isc_sockaddr_t *
 cfg_obj_assockaddr(const cfg_obj_t *obj);
 /*%<
@@ -398,17 +405,17 @@ cfg_obj_assockaddr(const cfg_obj_t *obj);
  *
  * Requires:
  * \li     'obj' points to a valid configuration object of a socket address
- * type.
+ * type, or of a socket address type with an optional tls configuration.
  *
  * Returns:
  * \li     A pointer to a sockaddr.  The sockaddr must be copied by the caller
  *      if necessary.
  */
 
-isc_dscp_t
-cfg_obj_getdscp(const cfg_obj_t *obj);
+const char *
+cfg_obj_getsockaddrtls(const cfg_obj_t *obj);
 /*%<
- * Returns the DSCP value of a configuration object representing a
+ * Returns the TLS value of a configuration object representing a
  * socket address.
  *
  * Requires:
@@ -416,7 +423,7 @@ cfg_obj_getdscp(const cfg_obj_t *obj);
  *         socket address type.
  *
  * Returns:
- * \li     DSCP value associated with a sockaddr, or -1.
+ * \li     TLS value associated with a sockaddr, or NULL.
  */
 
 bool
@@ -579,9 +586,9 @@ cfg_map_nextclause(const cfg_type_t *map, const void **clauses,
 
 typedef isc_result_t(pluginlist_cb_t)(const cfg_obj_t *config,
 				      const cfg_obj_t *obj,
-				      const char *     plugin_path,
-				      const char *     parameters,
-				      void *	       callback_data);
+				      const char      *plugin_path,
+				      const char      *parameters,
+				      void	      *callback_data);
 /*%<
  * Function prototype for the callback used with cfg_pluginlist_foreach().
  * Called once for each element of the list passed to cfg_pluginlist_foreach().
@@ -620,5 +627,3 @@ cfg_pluginlist_foreach(const cfg_obj_t *config, const cfg_obj_t *list,
  */
 
 ISC_LANG_ENDDECLS
-
-#endif /* ISCCFG_CFG_H */

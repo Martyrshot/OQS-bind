@@ -1,13 +1,16 @@
 <!--
- - Copyright (C) Internet Systems Consortium, Inc. ("ISC")
- -
- - This Source Code Form is subject to the terms of the Mozilla Public
- - License, v. 2.0. If a copy of the MPL was not distributed with this
- - file, you can obtain one at https://mozilla.org/MPL/2.0/.
- -
- - See the COPYRIGHT file distributed with this work for additional
- - information regarding copyright ownership.
+Copyright (C) Internet Systems Consortium, Inc. ("ISC")
+
+SPDX-License-Identifier: MPL-2.0
+
+This Source Code Form is subject to the terms of the Mozilla Public
+License, v. 2.0.  If a copy of the MPL was not distributed with this
+file, you can obtain one at https://mozilla.org/MPL/2.0/.
+
+See the COPYRIGHT file distributed with this work for additional
+information regarding copyright ownership.
 -->
+
 ## RDATA Types
 
 ### Overview
@@ -108,6 +111,12 @@ Initial rdata hierarchy:
                 any_255/
                         tsig_250.h
 
+#### CLASSNUMBER and TYPENUMBER
+
+Class and type numbers must be unsigned integers. Permissable alphabet: 0 to 9,
+if no match than the file is silently ignored. The number can be at most 65535,
+any number higher is a build error.
+
 #### CLASSNAME and TYPENAME
 
 Class and type names must be from the following alphabet and less that 11
@@ -187,7 +196,7 @@ security area and must be paranoid about its input.
         fromwire_typename(dns_rdataclass_t class,
                            dns_rdatatype_t type,
                            isc_buffer_t *source,
-                           dns_decompress_t *dctx,
+                           dns_decompress_t dctx,
                            bool downcase,
                            isc_buffer_t *target);
 
@@ -195,17 +204,14 @@ security area and must be paranoid about its input.
         fromwire_classname_typename(dns_rdataclass_t class,
                                     dns_rdatatype_t type,
                                     isc_buffer_t *source,
-                                    dns_decompress_t *dctx,
+                                    dns_decompress_t dctx,
                                     bool downcase,
                                     isc_buffer_t *target);
 
-`fromwire_classname_typename()` is required to set the valid
-decompression methods if there is a domain name in the rdata.
+`fromwire_classname_typename()` is required to set whether
+name compression is allowed, according to RFC 3597.
 
-        if (dns_decompress_edns(dctx) >= # || !dns_decompress_strict(dctx))
-                dns_decompress_setmethods(dctx, DNS_COMPRESS_ALL);
-        else
-                dns_decompress_setmethods(dctx, DNS_COMPRESS_GLOBAL14);
+        dctx = dns_decompress_setpermitted(dctx, true); /* or false */
 
 |Parameter|Description |
 |---------|-----------------------|
@@ -236,14 +242,10 @@ will return `DNS_R_EXTRADATA`.
                                   dns_compress_t *cctx,
                                   isc_buffer_t *target);
 
-`towire_classname_typename()` is required to set the
-allowed name compression methods based on the EDNS version, if there
-is a domain name in the rdata.
+`towire_classname_typename()` is required to set whether
+name compression is allowed, according to RFC 3597.
 
-        if (dns_compress_getedns(cctx) >= #)
-                dns_compress_setmethods(cctx, DNS_COMPRESS_ALL);
-        else
-                dns_compress_setmethods(cctx, DNS_COMPRESS_GLOBAL14);
+        dns_compress_setpermitted(cctx, true); /* or false */
 
 |Parameter|Description |
 |---------|-----------------------|

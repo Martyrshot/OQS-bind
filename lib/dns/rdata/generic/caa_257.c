@@ -1,6 +1,8 @@
 /*
  * Copyright (C) Internet Systems Consortium, Inc. ("ISC")
  *
+ * SPDX-License-Identifier: MPL-2.0
+ *
  * This Source Code Form is subject to the terms of the Mozilla Public
  * License, v. 2.0. If a copy of the MPL was not distributed with this
  * file, you can obtain one at https://mozilla.org/MPL/2.0/.
@@ -273,7 +275,7 @@ static unsigned char const alphanumeric[256] = {
 	0,
 };
 
-static inline isc_result_t
+static isc_result_t
 fromtext_caa(ARGS_FROMTEXT) {
 	isc_token_t token;
 	isc_textregion_t tr;
@@ -317,14 +319,15 @@ fromtext_caa(ARGS_FROMTEXT) {
 	RETERR(isc_lex_getmastertoken(lexer, &token, isc_tokentype_qstring,
 				      false));
 	if (token.type != isc_tokentype_qstring &&
-	    token.type != isc_tokentype_string) {
+	    token.type != isc_tokentype_string)
+	{
 		RETERR(DNS_R_SYNTAX);
 	}
 	RETERR(multitxt_fromtext(&token.value.as_textregion, target));
 	return (ISC_R_SUCCESS);
 }
 
-static inline isc_result_t
+static isc_result_t
 totext_caa(ARGS_TOTEXT) {
 	isc_region_t region;
 	uint8_t flags;
@@ -358,7 +361,7 @@ totext_caa(ARGS_TOTEXT) {
 	return (ISC_R_SUCCESS);
 }
 
-static inline isc_result_t
+static isc_result_t
 fromwire_caa(ARGS_FROMWIRE) {
 	isc_region_t sr;
 	unsigned int len, i;
@@ -368,7 +371,6 @@ fromwire_caa(ARGS_FROMWIRE) {
 	UNUSED(type);
 	UNUSED(rdclass);
 	UNUSED(dctx);
-	UNUSED(options);
 
 	/*
 	 * Flags
@@ -409,7 +411,7 @@ fromwire_caa(ARGS_FROMWIRE) {
 	return (mem_tobuffer(target, sr.base, sr.length));
 }
 
-static inline isc_result_t
+static isc_result_t
 towire_caa(ARGS_TOWIRE) {
 	isc_region_t region;
 
@@ -423,7 +425,7 @@ towire_caa(ARGS_TOWIRE) {
 	return (mem_tobuffer(target, region.base, region.length));
 }
 
-static inline int
+static int
 compare_caa(ARGS_COMPARE) {
 	isc_region_t r1, r2;
 
@@ -440,7 +442,7 @@ compare_caa(ARGS_COMPARE) {
 	return (isc_region_compare(&r1, &r2));
 }
 
-static inline isc_result_t
+static isc_result_t
 fromstruct_caa(ARGS_FROMSTRUCT) {
 	dns_rdata_caa_t *caa = source;
 	isc_region_t region;
@@ -486,7 +488,7 @@ fromstruct_caa(ARGS_FROMSTRUCT) {
 	return (isc_buffer_copyregion(target, &region));
 }
 
-static inline isc_result_t
+static isc_result_t
 tostruct_caa(ARGS_TOSTRUCT) {
 	dns_rdata_caa_t *caa = target;
 	isc_region_t sr;
@@ -505,31 +507,20 @@ tostruct_caa(ARGS_TOSTRUCT) {
 	/*
 	 * Flags
 	 */
-	if (sr.length < 1) {
-		return (ISC_R_UNEXPECTEDEND);
-	}
 	caa->flags = uint8_fromregion(&sr);
 	isc_region_consume(&sr, 1);
 
 	/*
 	 * Tag length
 	 */
-	if (sr.length < 1) {
-		return (ISC_R_UNEXPECTEDEND);
-	}
 	caa->tag_len = uint8_fromregion(&sr);
 	isc_region_consume(&sr, 1);
 
 	/*
 	 * Tag
 	 */
-	if (sr.length < caa->tag_len) {
-		return (ISC_R_UNEXPECTEDEND);
-	}
+	INSIST(sr.length >= caa->tag_len);
 	caa->tag = mem_maybedup(mctx, sr.base, caa->tag_len);
-	if (caa->tag == NULL) {
-		return (ISC_R_NOMEMORY);
-	}
 	isc_region_consume(&sr, caa->tag_len);
 
 	/*
@@ -537,15 +528,12 @@ tostruct_caa(ARGS_TOSTRUCT) {
 	 */
 	caa->value_len = sr.length;
 	caa->value = mem_maybedup(mctx, sr.base, sr.length);
-	if (caa->value == NULL) {
-		return (ISC_R_NOMEMORY);
-	}
 
 	caa->mctx = mctx;
 	return (ISC_R_SUCCESS);
 }
 
-static inline void
+static void
 freestruct_caa(ARGS_FREESTRUCT) {
 	dns_rdata_caa_t *caa = (dns_rdata_caa_t *)source;
 
@@ -565,20 +553,21 @@ freestruct_caa(ARGS_FREESTRUCT) {
 	caa->mctx = NULL;
 }
 
-static inline isc_result_t
+static isc_result_t
 additionaldata_caa(ARGS_ADDLDATA) {
 	REQUIRE(rdata->type == dns_rdatatype_caa);
 	REQUIRE(rdata->data != NULL);
 	REQUIRE(rdata->length >= 3U);
 
 	UNUSED(rdata);
+	UNUSED(owner);
 	UNUSED(add);
 	UNUSED(arg);
 
 	return (ISC_R_SUCCESS);
 }
 
-static inline isc_result_t
+static isc_result_t
 digest_caa(ARGS_DIGEST) {
 	isc_region_t r;
 
@@ -591,7 +580,7 @@ digest_caa(ARGS_DIGEST) {
 	return ((digest)(arg, &r));
 }
 
-static inline bool
+static bool
 checkowner_caa(ARGS_CHECKOWNER) {
 	REQUIRE(type == dns_rdatatype_caa);
 
@@ -603,7 +592,7 @@ checkowner_caa(ARGS_CHECKOWNER) {
 	return (true);
 }
 
-static inline bool
+static bool
 checknames_caa(ARGS_CHECKNAMES) {
 	REQUIRE(rdata->type == dns_rdatatype_caa);
 	REQUIRE(rdata->data != NULL);
@@ -616,7 +605,7 @@ checknames_caa(ARGS_CHECKNAMES) {
 	return (true);
 }
 
-static inline int
+static int
 casecompare_caa(ARGS_COMPARE) {
 	return (compare_caa(rdata1, rdata2));
 }

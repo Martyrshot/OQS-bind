@@ -1,6 +1,8 @@
 /*
  * Copyright (C) Internet Systems Consortium, Inc. ("ISC")
  *
+ * SPDX-License-Identifier: MPL-2.0
+ *
  * This Source Code Form is subject to the terms of the Mozilla Public
  * License, v. 2.0. If a copy of the MPL was not distributed with this
  * file, you can obtain one at https://mozilla.org/MPL/2.0/.
@@ -9,8 +11,7 @@
  * information regarding copyright ownership.
  */
 
-#ifndef DNS_KEYVALUES_H
-#define DNS_KEYVALUES_H 1
+#pragma once
 
 /*! \file dns/keyvalues.h */
 
@@ -51,28 +52,29 @@
 #define DNS_KEYFLAG_RESERVEDMASK2 0xFFFF /*%< no bits defined here */
 
 /* The Algorithm field of the KEY and SIG RR's is an integer, {1..254} */
-#define DNS_KEYALG_RSAMD5	1 /*%< RSA with MD5 */
-#define DNS_KEYALG_RSA		1 /*%< Used just for tagging */
-#define DNS_KEYALG_DH		2 /*%< Diffie Hellman KEY */
-#define DNS_KEYALG_DSA		3 /*%< DSA KEY */
-#define DNS_KEYALG_NSEC3DSA	6
-#define DNS_KEYALG_DSS		DNS_ALG_DSA
-#define DNS_KEYALG_ECC		4
-#define DNS_KEYALG_RSASHA1	5
-#define DNS_KEYALG_NSEC3RSASHA1 7
-#define DNS_KEYALG_RSASHA256	8
-#define DNS_KEYALG_RSASHA512	10
-#define DNS_KEYALG_ECCGOST	12
-#define DNS_KEYALG_ECDSA256	13
-#define DNS_KEYALG_ECDSA384	14
-#define DNS_KEYALG_ED25519	15
-#define DNS_KEYALG_ED448	16
-#define DNS_KEYALG_FALCON512	249
-#define DNS_KEYALG_DILITHIUM2	250
+#define DNS_KEYALG_RSAMD5	 	1 /*%< RSA with MD5 */
+#define DNS_KEYALG_RSA		 	1 /*%< Used just for tagging */
+#define DNS_KEYALG_DH_DEPRECATED 	2 /*%< deprecated */
+#define DNS_KEYALG_DSA		 	3 /*%< DSA KEY */
+#define DNS_KEYALG_NSEC3DSA	 	6
+#define DNS_KEYALG_DSS		 	DNS_ALG_DSA
+#define DNS_KEYALG_ECC		 	4
+#define DNS_KEYALG_RSASHA1	 	5
+#define DNS_KEYALG_NSEC3RSASHA1	 	7
+#define DNS_KEYALG_RSASHA256	 	8
+#define DNS_KEYALG_RSASHA512	 	10
+#define DNS_KEYALG_ECCGOST	 	12
+#define DNS_KEYALG_ECDSA256	 	13
+#define DNS_KEYALG_ECDSA384	 	14
+#define DNS_KEYALG_ED25519	 	15
+#define DNS_KEYALG_ED448	 	16
+#define DNS_KEYALG_FALCON512		249
+#define DNS_KEYALG_DILITHIUM2		250
 #define DNS_KEYALG_SPHINCSSHA256128S	251
-#define DNS_KEYALG_INDIRECT	252
-#define DNS_KEYALG_PRIVATEDNS	253
-#define DNS_KEYALG_PRIVATEOID	254 /*%< Key begins with OID giving alg */
+#define DNS_KEYALG_INDIRECT	 	252
+#define DNS_KEYALG_PRIVATEDNS	 	253
+#define DNS_KEYALG_PRIVATEOID	 	254 /*%< Key begins with OID giving alg */
+#define DNS_KEYALG_MAX		 	255
 
 /* Protocol values  */
 #define DNS_KEYPROTO_RESERVED 0
@@ -112,4 +114,3 @@
 
 #define DNS_SIG_SPHINCSSHA256128SSIZE 7856
 #define DNS_KEY_SPHINCSSHA256128SSIZE 32 
-#endif /* DNS_KEYVALUES_H */

@@ -1,6 +1,8 @@
 /*
  * Copyright (C) Internet Systems Consortium, Inc. ("ISC")
  *
+ * SPDX-License-Identifier: MPL-2.0
+ *
  * This Source Code Form is subject to the terms of the Mozilla Public
  * License, v. 2.0. If a copy of the MPL was not distributed with this
  * file, you can obtain one at https://mozilla.org/MPL/2.0/.
@@ -13,6 +15,7 @@
 #include <string.h>
 #include <unistd.h>
 
+#include <isc/ascii.h>
 #include <isc/endian.h>
 #include <isc/siphash.h>
 #include <isc/util.h>
@@ -64,34 +67,21 @@
 
 #define HALFSIPROUND FULL_ROUND32
 
-#define U32TO8_LE(p, v)                \
-	(p)[0] = (uint8_t)((v));       \
-	(p)[1] = (uint8_t)((v) >> 8);  \
-	(p)[2] = (uint8_t)((v) >> 16); \
-	(p)[3] = (uint8_t)((v) >> 24);
+#define U8TO32_ONE(case_sensitive, byte) \
+	(uint32_t)(case_sensitive ? byte : isc__ascii_tolower1(byte))
 
-#define U8TO32_LE(p)                                        \
-	(((uint32_t)((p)[0])) | ((uint32_t)((p)[1]) << 8) | \
-	 ((uint32_t)((p)[2]) << 16) | ((uint32_t)((p)[3]) << 24))
-
-#define U64TO8_LE(p, v)                  \
-	U32TO8_LE((p), (uint32_t)((v))); \
-	U32TO8_LE((p) + 4, (uint32_t)((v) >> 32));
-
-#define U8TO64_LE(p)                                               \
-	(((uint64_t)((p)[0])) | ((uint64_t)((p)[1]) << 8) |        \
-	 ((uint64_t)((p)[2]) << 16) | ((uint64_t)((p)[3]) << 24) | \
-	 ((uint64_t)((p)[4]) << 32) | ((uint64_t)((p)[5]) << 40) | \
-	 ((uint64_t)((p)[6]) << 48) | ((uint64_t)((p)[7]) << 56))
+#define U8TO64_ONE(case_sensitive, byte) \
+	(uint64_t)(case_sensitive ? byte : isc__ascii_tolower1(byte))
 
 void
 isc_siphash24(const uint8_t *k, const uint8_t *in, const size_t inlen,
-	      uint8_t *out) {
+	      bool case_sensitive, uint8_t *out) {
 	REQUIRE(k != NULL);
 	REQUIRE(out != NULL);
+	REQUIRE(inlen == 0 || in != NULL);
 
-	uint64_t k0 = U8TO64_LE(k);
-	uint64_t k1 = U8TO64_LE(k + 8);
+	uint64_t k0 = ISC_U8TO64_LE(k);
+	uint64_t k1 = ISC_U8TO64_LE(k + 8);
 
 	uint64_t v0 = UINT64_C(0x736f6d6570736575) ^ k0;
 	uint64_t v1 = UINT64_C(0x646f72616e646f6d) ^ k1;
@@ -100,48 +90,52 @@ isc_siphash24(const uint8_t *k, const uint8_t *in, const size_t inlen,
 
 	uint64_t b = ((uint64_t)inlen) << 56;
 
-	const uint8_t *end = in + inlen - (inlen % sizeof(uint64_t));
-	const size_t left = inlen & 7;
+	if (in != NULL && inlen != 0) {
+		const uint8_t *end = in + inlen - (inlen % sizeof(uint64_t));
+		const size_t left = inlen & 7;
 
-	for (; in != end; in += 8) {
-		uint64_t m = U8TO64_LE(in);
+		for (; in != end; in += 8) {
+			uint64_t m =
+				case_sensitive
+					? ISC_U8TO64_LE(in)
+					: isc_ascii_tolower8(ISC_U8TO64_LE(in));
 
-		v3 ^= m;
+			v3 ^= m;
 
-		for (size_t i = 0; i < cROUNDS; ++i) {
-			SIPROUND(v0, v1, v2, v3);
+			for (size_t i = 0; i < cROUNDS; ++i) {
+				SIPROUND(v0, v1, v2, v3);
+			}
+
+			v0 ^= m;
 		}
 
-		v0 ^= m;
-	}
-
-	switch (left) {
-	case 7:
-		b |= ((uint64_t)in[6]) << 48;
-	/* FALLTHROUGH */
-	case 6:
-		b |= ((uint64_t)in[5]) << 40;
-	/* FALLTHROUGH */
-	case 5:
-		b |= ((uint64_t)in[4]) << 32;
-	/* FALLTHROUGH */
-	case 4:
-		b |= ((uint64_t)in[3]) << 24;
-	/* FALLTHROUGH */
-	case 3:
-		b |= ((uint64_t)in[2]) << 16;
-	/* FALLTHROUGH */
-	case 2:
-		b |= ((uint64_t)in[1]) << 8;
-	/* FALLTHROUGH */
-	case 1:
-		b |= ((uint64_t)in[0]);
-	/* FALLTHROUGH */
-	case 0:
-		break;
-	default:
-		INSIST(0);
-		ISC_UNREACHABLE();
+		switch (left) {
+		case 7:
+			b |= U8TO64_ONE(case_sensitive, in[6]) << 48;
+			FALLTHROUGH;
+		case 6:
+			b |= U8TO64_ONE(case_sensitive, in[5]) << 40;
+			FALLTHROUGH;
+		case 5:
+			b |= U8TO64_ONE(case_sensitive, in[4]) << 32;
+			FALLTHROUGH;
+		case 4:
+			b |= U8TO64_ONE(case_sensitive, in[3]) << 24;
+			FALLTHROUGH;
+		case 3:
+			b |= U8TO64_ONE(case_sensitive, in[2]) << 16;
+			FALLTHROUGH;
+		case 2:
+			b |= U8TO64_ONE(case_sensitive, in[1]) << 8;
+			FALLTHROUGH;
+		case 1:
+			b |= U8TO64_ONE(case_sensitive, in[0]);
+			FALLTHROUGH;
+		case 0:
+			break;
+		default:
+			UNREACHABLE();
+		}
 	}
 
 	v3 ^= b;
@@ -160,17 +154,18 @@ isc_siphash24(const uint8_t *k, const uint8_t *in, const size_t inlen,
 
 	b = v0 ^ v1 ^ v2 ^ v3;
 
-	U64TO8_LE(out, b);
+	ISC_U64TO8_LE(out, b);
 }
 
 void
 isc_halfsiphash24(const uint8_t *k, const uint8_t *in, const size_t inlen,
-		  uint8_t *out) {
+		  bool case_sensitive, uint8_t *out) {
 	REQUIRE(k != NULL);
 	REQUIRE(out != NULL);
+	REQUIRE(inlen == 0 || in != NULL);
 
-	uint32_t k0 = U8TO32_LE(k);
-	uint32_t k1 = U8TO32_LE(k + 4);
+	uint32_t k0 = ISC_U8TO32_LE(k);
+	uint32_t k1 = ISC_U8TO32_LE(k + 4);
 
 	uint32_t v0 = UINT32_C(0x00000000) ^ k0;
 	uint32_t v1 = UINT32_C(0x00000000) ^ k1;
@@ -179,35 +174,40 @@ isc_halfsiphash24(const uint8_t *k, const uint8_t *in, const size_t inlen,
 
 	uint32_t b = ((uint32_t)inlen) << 24;
 
-	const uint8_t *end = in + inlen - (inlen % sizeof(uint32_t));
-	const int left = inlen & 3;
+	if (in != NULL && inlen != 0) {
+		const uint8_t *end = in + inlen - (inlen % sizeof(uint32_t));
+		const int left = inlen & 3;
 
-	for (; in != end; in += 4) {
-		uint32_t m = U8TO32_LE(in);
-		v3 ^= m;
+		for (; in != end; in += 4) {
+			uint32_t m =
+				case_sensitive
+					? ISC_U8TO32_LE(in)
+					: isc_ascii_tolower4(ISC_U8TO32_LE(in));
 
-		for (size_t i = 0; i < cROUNDS; ++i) {
-			HALFSIPROUND(v0, v1, v2, v3);
+			v3 ^= m;
+
+			for (size_t i = 0; i < cROUNDS; ++i) {
+				HALFSIPROUND(v0, v1, v2, v3);
+			}
+
+			v0 ^= m;
 		}
 
-		v0 ^= m;
-	}
-
-	switch (left) {
-	case 3:
-		b |= ((uint32_t)in[2]) << 16;
-	/* FALLTHROUGH */
-	case 2:
-		b |= ((uint32_t)in[1]) << 8;
-	/* FALLTHROUGH */
-	case 1:
-		b |= ((uint32_t)in[0]);
-	/* FALLTHROUGH */
-	case 0:
-		break;
-	default:
-		INSIST(0);
-		ISC_UNREACHABLE();
+		switch (left) {
+		case 3:
+			b |= U8TO32_ONE(case_sensitive, in[2]) << 16;
+			FALLTHROUGH;
+		case 2:
+			b |= U8TO32_ONE(case_sensitive, in[1]) << 8;
+			FALLTHROUGH;
+		case 1:
+			b |= U8TO32_ONE(case_sensitive, in[0]);
+			FALLTHROUGH;
+		case 0:
+			break;
+		default:
+			UNREACHABLE();
+		}
 	}
 
 	v3 ^= b;
@@ -225,5 +225,5 @@ isc_halfsiphash24(const uint8_t *k, const uint8_t *in, const size_t inlen,
 	}
 
 	b = v1 ^ v3;
-	U32TO8_LE(out, b);
+	ISC_U32TO8_LE(out, b);
 }

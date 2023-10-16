@@ -1,6 +1,8 @@
 /*
  * Copyright (C) Internet Systems Consortium, Inc. ("ISC")
  *
+ * SPDX-License-Identifier: MPL-2.0
+ *
  * This Source Code Form is subject to the terms of the Mozilla Public
  * License, v. 2.0. If a copy of the MPL was not distributed with this
  * file, you can obtain one at https://mozilla.org/MPL/2.0/.
@@ -11,9 +13,9 @@
 
 /*! \file */
 
-#include <ctype.h>
 #include <stdbool.h>
 
+#include <isc/ascii.h>
 #include <isc/magic.h>
 #include <isc/mem.h>
 #include <isc/string.h>
@@ -60,7 +62,7 @@ isc_symtab_create(isc_mem_t *mctx, unsigned int size,
 
 	symtab->mctx = NULL;
 	isc_mem_attach(mctx, &symtab->mctx);
-	symtab->table = isc_mem_get(mctx, size * sizeof(eltlist_t));
+	symtab->table = isc_mem_cget(mctx, size, sizeof(eltlist_t));
 	for (i = 0; i < size; i++) {
 		INIT_LIST(symtab->table[i]);
 	}
@@ -99,17 +101,16 @@ isc_symtab_destroy(isc_symtab_t **symtabp) {
 			isc_mem_put(symtab->mctx, elt, sizeof(*elt));
 		}
 	}
-	isc_mem_put(symtab->mctx, symtab->table,
-		    symtab->size * sizeof(eltlist_t));
+	isc_mem_cput(symtab->mctx, symtab->table, symtab->size,
+		     sizeof(eltlist_t));
 	symtab->magic = 0;
 	isc_mem_putanddetach(&symtab->mctx, symtab, sizeof(*symtab));
 }
 
-static inline unsigned int
+static unsigned int
 hash(const char *key, bool case_sensitive) {
 	const char *s;
 	unsigned int h = 0;
-	int c;
 
 	/*
 	 * This hash function is similar to the one Ousterhout
@@ -122,9 +123,7 @@ hash(const char *key, bool case_sensitive) {
 		}
 	} else {
 		for (s = key; *s != '\0'; s++) {
-			c = *s;
-			c = tolower((unsigned char)c);
-			h += (h << 3) + c;
+			h += (h << 3) + isc_ascii_tolower(*s);
 		}
 	}
 
@@ -162,9 +161,7 @@ isc_symtab_lookup(isc_symtab_t *symtab, const char *key, unsigned int type,
 		return (ISC_R_NOTFOUND);
 	}
 
-	if (value != NULL) {
-		*value = elt->value;
-	}
+	SET_IF_NOT_NULL(value, elt->value);
 
 	return (ISC_R_SUCCESS);
 }
@@ -180,7 +177,7 @@ grow_table(isc_symtab_t *symtab) {
 	newmax = newsize * 3 / 4;
 	INSIST(newsize > 0U && newmax > 0U);
 
-	newtable = isc_mem_get(symtab->mctx, newsize * sizeof(eltlist_t));
+	newtable = isc_mem_cget(symtab->mctx, newsize, sizeof(eltlist_t));
 
 	for (i = 0; i < newsize; i++) {
 		INIT_LIST(newtable[i]);
@@ -200,8 +197,8 @@ grow_table(isc_symtab_t *symtab) {
 		}
 	}
 
-	isc_mem_put(symtab->mctx, symtab->table,
-		    symtab->size * sizeof(eltlist_t));
+	isc_mem_cput(symtab->mctx, symtab->table, symtab->size,
+		     sizeof(eltlist_t));
 
 	symtab->table = newtable;
 	symtab->size = newsize;
@@ -244,7 +241,7 @@ isc_symtab_define(isc_symtab_t *symtab, const char *key, unsigned int type,
 	 * truly const coming in and then the caller modified it anyway ...
 	 * well, don't do that!
 	 */
-	DE_CONST(key, elt->key);
+	elt->key = UNCONST(key);
 	elt->type = type;
 	elt->value = value;
 

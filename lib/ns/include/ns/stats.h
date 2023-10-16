@@ -1,6 +1,8 @@
 /*
  * Copyright (C) Internet Systems Consortium, Inc. ("ISC")
  *
+ * SPDX-License-Identifier: MPL-2.0
+ *
  * This Source Code Form is subject to the terms of the Mozilla Public
  * License, v. 2.0. If a copy of the MPL was not distributed with this
  * file, you can obtain one at https://mozilla.org/MPL/2.0/.
@@ -9,10 +11,12 @@
  * information regarding copyright ownership.
  */
 
-#ifndef NS_STATS_H
-#define NS_STATS_H 1
+#pragma once
 
 /*! \file include/ns/stats.h */
+
+#include <isc/mem.h>
+#include <isc/stats.h>
 
 #include <ns/types.h>
 
@@ -106,7 +110,9 @@ enum {
 
 	ns_statscounter_reclimitdropped = 66,
 
-	ns_statscounter_max = 67,
+	ns_statscounter_updatequota = 67,
+
+	ns_statscounter_max = 68,
 };
 
 void
@@ -115,7 +121,7 @@ ns_stats_attach(ns_stats_t *stats, ns_stats_t **statsp);
 void
 ns_stats_detach(ns_stats_t **statsp);
 
-isc_result_t
+void
 ns_stats_create(isc_mem_t *mctx, int ncounters, ns_stats_t **statsp);
 
 void
@@ -133,5 +139,3 @@ ns_stats_update_if_greater(ns_stats_t *stats, isc_statscounter_t counter,
 
 isc_statscounter_t
 ns_stats_get_counter(ns_stats_t *stats, isc_statscounter_t counter);
-
-#endif /* NS_STATS_H */

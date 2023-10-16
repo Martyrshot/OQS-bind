@@ -1,9 +1,11 @@
 #!/bin/sh
-#
+
 # Copyright (C) Internet Systems Consortium, Inc. ("ISC")
 #
+# SPDX-License-Identifier: MPL-2.0
+#
 # This Source Code Form is subject to the terms of the Mozilla Public
-# License, v. 2.0. If a copy of the MPL was not distributed with this
+# License, v. 2.0.  If a copy of the MPL was not distributed with this
 # file, you can obtain one at https://mozilla.org/MPL/2.0/.
 #
 # See the COPYRIGHT file distributed with this work for additional
@@ -11,7 +13,12 @@
 
 # tests for TSIG-GSS updates
 
+set -e
+
 . ../conf.sh
+
+# Uncomment to regenerate credential caches after running krb5/setup.sh
+# KRB5_CONFIG=$(pwd)/krb/krb5.conf
 
 status=0
 n=1
@@ -39,7 +46,7 @@ EOF
     }
 
     # Verify that TKEY response is signed.
-    tkeyout=`awk '/recvmsg reply from GSS-TSIG query/,/Sending update to/' nsupdate.out${num}`
+    tkeyout=$(awk '/recvmsg reply from GSS-TSIG query/,/Sending update to/' nsupdate.out${num})
     pattern="recvmsg reply from GSS-TSIG query .* opcode: QUERY, status: NOERROR, id: .* flags: qr; QUESTION: 1, ANSWER: 1, AUTHORITY: 0, ADDITIONAL: 1 ;; QUESTION SECTION: ;.* ANY TKEY ;; ANSWER SECTION: .* 0 ANY TKEY gss-tsig\. .* ;; TSIG PSEUDOSECTION: .* 0 ANY TSIG gss-tsig\. .* NOERROR 0"
     echo $tkeyout | grep "$pattern" > /dev/null || {
 	echo_i "bad tkey response (not tsig signed)"
@@ -52,8 +59,8 @@ EOF
 	return 1
     }
 
-    out=`$DIG $DIGOPTS -t $type -q $host | egrep "^${host}"`
-    lines=`echo "$out" | grep "$digout" | wc -l`
+    out=$($DIG $DIGOPTS -t $type -q $host | grep -E "^${host}")
+    lines=$(echo "$out" | grep "$digout" | wc -l)
     [ $lines -eq 1 ] || {
 	echo_i "dig output incorrect for $host $type $cmd: $out"
 	return 1
@@ -63,7 +70,7 @@ EOF
 
 
 # Testing updates with good credentials.
-KRB5CCNAME="FILE:"`pwd`/ns1/administrator.ccache
+KRB5CCNAME="FILE:"$(pwd)/ns1/administrator.ccache
 export KRB5CCNAME
 
 echo_i "testing updates to testdc1 as administrator ($n)"
@@ -89,7 +96,7 @@ status=$((status+ret))
 
 
 # Testing denied updates.
-KRB5CCNAME="FILE:"`pwd`/ns1/testdenied.ccache
+KRB5CCNAME="FILE:"$(pwd)/ns1/testdenied.ccache
 export KRB5CCNAME
 
 echo_i "testing updates to denied (A) as a user ($n)"
@@ -137,7 +144,7 @@ zone example.nil
 update add fred.example.nil 120 cname foo.bar.
 send
 END
-output=`$DIG $DIGOPTS +short cname fred.example.nil.`
+output=$($DIG $DIGOPTS +short cname fred.example.nil.)
 [ -n "$output" ] || ret=1
 [ $ret -eq 0 ] || echo_i "failed"
 n=$((n+1))
@@ -166,9 +173,21 @@ n=$((n+1))
 if [ "$ret" -ne 0 ]; then echo_i "failed"; fi
 status=$((status+ret))
 
+echo_i "stop and start server to check key restoration ($n)"
+ret=0
+gss_keys=$(grep 'tsig key.*generated' ns1/named.run | wc -l)
+stop_server --use-rndc --port "${CONTROLPORT}" ns1
+start_server --noclean --restart --port "${PORT}" ns1
+restored_keys=$(grep 'tsig key.*restored from file' ns1/named.run | wc -l)
+[ "$gss_keys" -ne 0 ] || ret=1
+[ "$restored_keys" -ne 0 ] || ret=1
+[ "$gss_keys" -eq "$restored_keys" ] || ret=1
+if [ "$ret" -ne 0 ]; then echo_i "failed"; fi
+status=$((status+ret))
+
 [ $status -eq 0 ] && echo_i "tsiggss tests all OK"
 
-kill `cat authsock.pid`
+kill $(cat authsock.pid)
 
 echo_i "exit status: $status"
 [ $status -eq 0 ] || exit 1

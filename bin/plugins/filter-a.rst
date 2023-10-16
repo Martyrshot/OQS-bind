@@ -1,26 +1,17 @@
-.. 
-   Copyright (C) Internet Systems Consortium, Inc. ("ISC")
-   
-   This Source Code Form is subject to the terms of the Mozilla Public
-   License, v. 2.0. If a copy of the MPL was not distributed with this
-   file, you can obtain one at https://mozilla.org/MPL/2.0/.
-   
-   See the COPYRIGHT file distributed with this work for additional
-   information regarding copyright ownership.
-
+.. Copyright (C) Internet Systems Consortium, Inc. ("ISC")
 ..
-   Copyright (C) Internet Systems Consortium, Inc. ("ISC")
-
-   This Source Code Form is subject to the terms of the Mozilla Public
-   License, v. 2.0. If a copy of the MPL was not distributed with this
-   file, You can obtain one at http://mozilla.org/MPL/2.0/.
-
-   See the COPYRIGHT file distributed with this work for additional
-   information regarding copyright ownership.
-
+.. SPDX-License-Identifier: MPL-2.0
+..
+.. This Source Code Form is subject to the terms of the Mozilla Public
+.. License, v. 2.0.  If a copy of the MPL was not distributed with this
+.. file, you can obtain one at https://mozilla.org/MPL/2.0/.
+..
+.. See the COPYRIGHT file distributed with this work for additional
+.. information regarding copyright ownership.
 
 .. highlight: console
 
+.. iscman:: filter-a
 .. _man_filter-a:
 
 filter-a.so - filter A in DNS responses when AAAA is present
@@ -34,14 +25,14 @@ Synopsis
 Description
 ~~~~~~~~~~~
 
-``filter-a.so`` is a query plugin module for ``named``, enabling
-``named`` to omit some IPv4 addresses when responding to clients.
+:program:`filter-a.so` is a query plugin module for :iscman:`named`, enabling
+:iscman:`named` to omit some IPv4 addresses when responding to clients.
 
 For example:
 
 ::
 
-   plugin query "/usr/local/lib/filter-a.so" {
+   plugin query "filter-a.so" {
            filter-a-on-v6 yes;
            filter-a-on-v4 yes;
            filter-a { 192.0.2.1; 2001:db8:2::1; };

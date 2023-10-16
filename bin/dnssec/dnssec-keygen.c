@@ -1,6 +1,8 @@
 /*
  * Portions Copyright (C) Internet Systems Consortium, Inc. ("ISC")
  *
+ * SPDX-License-Identifier: MPL-2.0
+ *
  * This Source Code Form is subject to the terms of the Mozilla Public
  * License, v. 2.0. If a copy of the MPL was not distributed with this
  * file, you can obtain one at https://mozilla.org/MPL/2.0/.
@@ -31,16 +33,17 @@
 #include <stdlib.h>
 #include <unistd.h>
 
+#include <openssl/opensslv.h>
+
 #include <isc/attributes.h>
 #include <isc/buffer.h>
 #include <isc/commandline.h>
+#include <isc/fips.h>
 #include <isc/mem.h>
-#include <isc/print.h>
 #include <isc/region.h>
+#include <isc/result.h>
 #include <isc/string.h>
 #include <isc/util.h>
-
-#include <pk11/site.h>
 
 #include <dns/dnssec.h>
 #include <dns/fixedname.h>
@@ -49,7 +52,6 @@
 #include <dns/log.h>
 #include <dns/name.h>
 #include <dns/rdataclass.h>
-#include <dns/result.h>
 #include <dns/secalg.h>
 
 #include <dst/dst.h>
@@ -58,20 +60,28 @@
 #include <isccfg/grammar.h>
 #include <isccfg/kaspconf.h>
 #include <isccfg/namedconf.h>
-
-#if USE_PKCS11
-#include <pk11/result.h>
-#endif /* if USE_PKCS11 */
+#if OPENSSL_VERSION_NUMBER >= 0x30000000L && OPENSSL_API_LEVEL >= 30000
+#include <openssl/err.h>
+#include <openssl/provider.h>
+#endif
 
 #include "dnssectool.h"
 
 #define MAX_RSA 4096 /* should be long enough... */
+#define MAX_DH	4096 /* should be long enough... */
 
 const char *program = "dnssec-keygen";
 
+/*
+ * These are are set here for backwards compatibility.  They are
+ * raised to 2048 in FIPS mode.
+ */
+static int min_rsa = 1024;
+static int min_dh = 128;
+
 isc_log_t *lctx = NULL;
 
-ISC_NORETURN static void
+noreturn static void
 usage(void);
 
 static void
@@ -85,7 +95,6 @@ struct keygen_ctx {
 	char *algname;
 	char *nametype;
 	char *type;
-	int generator;
 	int protocol;
 	int size;
 	int signatory;
@@ -145,19 +154,25 @@ usage(void) {
 	fprintf(stderr, "    -l <file>: configuration file with dnssec-policy "
 			"statement\n");
 	fprintf(stderr, "    -a <algorithm>:\n");
-	fprintf(stderr, "        RSASHA1 | NSEC3RSASHA1 |\n");
+	if (!isc_fips_mode()) {
+		fprintf(stderr, "        RSASHA1 | NSEC3RSASHA1 |\n");
+	}
 	fprintf(stderr, "        RSASHA256 | RSASHA512 |\n");
 	fprintf(stderr, "        ECDSAP256SHA256 | ECDSAP384SHA384 |\n");
+	fprintf(stderr, "        ED25519 | ED448\n");
 	fprintf(stderr, "        ED25519 | ED448 | DH\n");
 	fprintf(stderr, "        FALCON512 | DILITHIUM2 |\n");
 	fprintf(stderr, "        SPHINCS+-SHA256-128S\n");
 	fprintf(stderr, "    -3: use NSEC3-capable algorithm\n");
 	fprintf(stderr, "    -b <key size in bits>:\n");
-	fprintf(stderr, "        RSASHA1:\t[1024..%d]\n", MAX_RSA);
-	fprintf(stderr, "        NSEC3RSASHA1:\t[1024..%d]\n", MAX_RSA);
-	fprintf(stderr, "        RSASHA256:\t[1024..%d]\n", MAX_RSA);
-	fprintf(stderr, "        RSASHA512:\t[1024..%d]\n", MAX_RSA);
-	fprintf(stderr, "        DH:\t\t[128..4096]\n");
+	if (!isc_fips_mode()) {
+		fprintf(stderr, "        RSASHA1:\t[%d..%d]\n", min_rsa,
+			MAX_RSA);
+		fprintf(stderr, "        NSEC3RSASHA1:\t[%d..%d]\n", min_rsa,
+			MAX_RSA);
+	}
+	fprintf(stderr, "        RSASHA256:\t[%d..%d]\n", min_rsa, MAX_RSA);
+	fprintf(stderr, "        RSASHA512:\t[%d..%d]\n", min_rsa, MAX_RSA);
 	fprintf(stderr, "        ECDSAP256SHA256:\tignored\n");
 	fprintf(stderr, "        ECDSAP384SHA384:\tignored\n");
 	fprintf(stderr, "        ED25519:\tignored\n");
@@ -173,17 +188,9 @@ usage(void) {
 	fprintf(stderr, "    -c <class>: (default: IN)\n");
 	fprintf(stderr, "    -d <digest bits> (0 => max, default)\n");
 	fprintf(stderr, "    -E <engine>:\n");
-#if USE_PKCS11
-	fprintf(stderr,
-		"        path to PKCS#11 provider library "
-		"(default is %s)\n",
-		PK11_LIB_LOCATION);
-#else  /* if USE_PKCS11 */
 	fprintf(stderr, "        name of an OpenSSL engine to use\n");
-#endif /* if USE_PKCS11 */
 	fprintf(stderr, "    -f <keyflag>: KSK | REVOKE\n");
-	fprintf(stderr, "    -g <generator>: use specified generator "
-			"(DH only)\n");
+	fprintf(stderr, "    -F: FIPS mode\n");
 	fprintf(stderr, "    -L <ttl>: default key TTL\n");
 	fprintf(stderr, "    -p <protocol>: (default: 3 [dnssec])\n");
 	fprintf(stderr, "    -s <strength>: strength value this key signs DNS "
@@ -270,11 +277,12 @@ kasp_from_conf(cfg_obj_t *config, isc_mem_t *mctx, const char *name,
 		cfg_obj_t *kconfig = cfg_listelt_value(element);
 		kasp = NULL;
 		if (strcmp(cfg_obj_asstring(cfg_tuple_get(kconfig, "name")),
-			   name) != 0) {
+			   name) != 0)
+		{
 			continue;
 		}
 
-		result = cfg_kasp_fromconfig(kconfig, NULL, mctx, lctx,
+		result = cfg_kasp_fromconfig(kconfig, NULL, true, mctx, lctx,
 					     &kasplist, &kasp);
 		if (result != ISC_R_SUCCESS) {
 			fatal("failed to configure dnssec-policy '%s': %s",
@@ -336,8 +344,15 @@ keygen(keygen_ctx_t *ctx, isc_mem_t *mctx, int argc, char **argv) {
 			fatal("unsupported algorithm: %s", algstr);
 		}
 
-		if (ctx->alg == DST_ALG_DH) {
-			ctx->options |= DST_TYPE_KEY;
+		if (isc_fips_mode()) {
+			/* verify only in FIPS mode */
+			switch (ctx->alg) {
+			case DST_ALG_RSASHA1:
+			case DST_ALG_NSEC3RSASHA1:
+				fatal("unsupported algorithm: %s", algstr);
+			default:
+				break;
+			}
 		}
 
 		if (ctx->use_nsec3) {
@@ -382,6 +397,11 @@ keygen(keygen_ctx_t *ctx, isc_mem_t *mctx, int argc, char **argv) {
 			switch (ctx->alg) {
 			case DST_ALG_RSASHA1:
 			case DST_ALG_NSEC3RSASHA1:
+				if (isc_fips_mode()) {
+					fatal("key size not specified (-b "
+					      "option)");
+				}
+				FALLTHROUGH;
 			case DST_ALG_RSASHA256:
 			case DST_ALG_RSASHA512:
 				ctx->size = 2048;
@@ -408,7 +428,8 @@ keygen(keygen_ctx_t *ctx, isc_mem_t *mctx, int argc, char **argv) {
 
 		if (!ctx->oldstyle && ctx->prepub > 0) {
 			if (ctx->setpub && ctx->setact &&
-			    (ctx->activate - ctx->prepub) < ctx->publish) {
+			    (ctx->activate - ctx->prepub) < ctx->publish)
+			{
 				fatal("Activation and publication dates "
 				      "are closer together than the\n\t"
 				      "prepublication interval.");
@@ -539,21 +560,16 @@ keygen(keygen_ctx_t *ctx, isc_mem_t *mctx, int argc, char **argv) {
 	switch (ctx->alg) {
 	case DNS_KEYALG_RSASHA1:
 	case DNS_KEYALG_NSEC3RSASHA1:
+		if (isc_fips_mode()) {
+			fatal("SHA1 based keys not supported in FIPS mode");
+		}
+		FALLTHROUGH;
 	case DNS_KEYALG_RSASHA256:
-		if (ctx->size != 0 && (ctx->size < 1024 || ctx->size > MAX_RSA))
-		{
-			fatal("RSA key size %d out of range", ctx->size);
-		}
-		break;
 	case DNS_KEYALG_RSASHA512:
-		if (ctx->size != 0 && (ctx->size < 1024 || ctx->size > MAX_RSA))
+		if (ctx->size != 0 &&
+		    (ctx->size < min_rsa || ctx->size > MAX_RSA))
 		{
 			fatal("RSA key size %d out of range", ctx->size);
-		}
-		break;
-	case DNS_KEYALG_DH:
-		if (ctx->size != 0 && (ctx->size < 128 || ctx->size > 4096)) {
-			fatal("DH key size %d out of range", ctx->size);
 		}
 		break;
 	case DST_ALG_ECDSA256:
@@ -577,10 +593,6 @@ keygen(keygen_ctx_t *ctx, isc_mem_t *mctx, int argc, char **argv) {
 	case DST_ALG_SPHINCSSHA256128S:
 		ctx->size = 64;
 		break;
-	}
-
-	if (ctx->alg != DNS_KEYALG_DH && ctx->generator != 0) {
-		fatal("specified DH generator for a non-DH key");
 	}
 
 	if (ctx->nametype == NULL) {
@@ -632,22 +644,12 @@ keygen(keygen_ctx_t *ctx, isc_mem_t *mctx, int argc, char **argv) {
 		}
 	}
 
-	if ((flags & DNS_KEYFLAG_OWNERMASK) == DNS_KEYOWNER_ZONE &&
-	    ctx->alg == DNS_KEYALG_DH)
-	{
-		fatal("a key with algorithm %s cannot be a zone key", algstr);
-	}
-
 	switch (ctx->alg) {
 	case DNS_KEYALG_RSASHA1:
 	case DNS_KEYALG_NSEC3RSASHA1:
 	case DNS_KEYALG_RSASHA256:
 	case DNS_KEYALG_RSASHA512:
 		show_progress = true;
-		break;
-
-	case DNS_KEYALG_DH:
-		param = ctx->generator;
 		break;
 
 	case DST_ALG_ECDSA256:
@@ -750,7 +752,8 @@ keygen(keygen_ctx_t *ctx, isc_mem_t *mctx, int argc, char **argv) {
 
 			if (ctx->setdel) {
 				if (ctx->setinact &&
-				    ctx->deltime < ctx->inactive) {
+				    ctx->deltime < ctx->inactive)
+				{
 					fprintf(stderr,
 						"%s: warning: Key is "
 						"scheduled to be deleted "
@@ -880,30 +883,30 @@ main(int argc, char **argv) {
 	const char *engine = NULL;
 	unsigned char c;
 	int ch;
+	bool set_fips_mode = false;
+#if OPENSSL_VERSION_NUMBER >= 0x30000000L && OPENSSL_API_LEVEL >= 30000
+	OSSL_PROVIDER *fips = NULL, *base = NULL;
+#endif
 
 	keygen_ctx_t ctx = {
 		.options = DST_TYPE_PRIVATE | DST_TYPE_PUBLIC,
 		.prepub = -1,
 		.protocol = -1,
 		.size = -1,
+		.now = isc_stdtime_now(),
 	};
 
 	if (argc == 1) {
 		usage();
 	}
 
-#if USE_PKCS11
-	pk11_result_register();
-#endif /* if USE_PKCS11 */
-	dns_result_register();
-
 	isc_commandline_errprint = false;
 
 	/*
 	 * Process memory debugging argument first.
 	 */
-#define CMDLINE_FLAGS                                           \
-	"3A:a:b:Cc:D:d:E:eFf:Gg:hI:i:K:k:L:l:m:n:P:p:qR:r:S:s:" \
+#define CMDLINE_FLAGS                                        \
+	"3A:a:b:Cc:D:d:E:Ff:GhI:i:K:k:L:l:m:n:P:p:qR:r:S:s:" \
 	"T:t:v:V"
 	while ((ch = isc_commandline_parse(argc, argv, CMDLINE_FLAGS)) != -1) {
 		switch (ch) {
@@ -920,12 +923,6 @@ main(int argc, char **argv) {
 			{
 				isc_mem_debugging |= ISC_MEM_DEBUGUSAGE;
 			}
-			if (strcasecmp(isc_commandline_argument, "size") == 0) {
-				isc_mem_debugging |= ISC_MEM_DEBUGSIZE;
-			}
-			if (strcasecmp(isc_commandline_argument, "mctx") == 0) {
-				isc_mem_debugging |= ISC_MEM_DEBUGCTX;
-			}
 			break;
 		default:
 			break;
@@ -934,7 +931,6 @@ main(int argc, char **argv) {
 	isc_commandline_reset = true;
 
 	isc_mem_create(&mctx);
-	isc_stdtime_get(&ctx.now);
 
 	while ((ch = isc_commandline_parse(argc, argv, CMDLINE_FLAGS)) != -1) {
 		switch (ch) {
@@ -965,10 +961,6 @@ main(int argc, char **argv) {
 		case 'E':
 			engine = isc_commandline_argument;
 			break;
-		case 'e':
-			fprintf(stderr, "phased-out option -e "
-					"(was 'use (RSA) large exponent')\n");
-			break;
 		case 'f':
 			c = (unsigned char)(isc_commandline_argument[0]);
 			if (toupper(c) == 'K') {
@@ -978,13 +970,6 @@ main(int argc, char **argv) {
 			} else {
 				fatal("unknown flag '%s'",
 				      isc_commandline_argument);
-			}
-			break;
-		case 'g':
-			ctx.generator = strtol(isc_commandline_argument, &endp,
-					       10);
-			if (*endp != '\0' || ctx.generator <= 0) {
-				fatal("-g requires a positive number");
 			}
 			break;
 		case 'K':
@@ -1014,7 +999,8 @@ main(int argc, char **argv) {
 			ctx.protocol = strtol(isc_commandline_argument, &endp,
 					      10);
 			if (*endp != '\0' || ctx.protocol < 0 ||
-			    ctx.protocol > 255) {
+			    ctx.protocol > 255)
+			{
 				fatal("-p must be followed by a number "
 				      "[0..255]");
 			}
@@ -1030,7 +1016,8 @@ main(int argc, char **argv) {
 			ctx.signatory = strtol(isc_commandline_argument, &endp,
 					       10);
 			if (*endp != '\0' || ctx.signatory < 0 ||
-			    ctx.signatory > 15) {
+			    ctx.signatory > 15)
+			{
 				fatal("-s must be followed by a number "
 				      "[0..15]");
 			}
@@ -1141,14 +1128,14 @@ main(int argc, char **argv) {
 			ctx.prepub = strtottl(isc_commandline_argument);
 			break;
 		case 'F':
-		/* Reserved for FIPS mode */
-		/* FALLTHROUGH */
+			set_fips_mode = true;
+			break;
 		case '?':
 			if (isc_commandline_option != '?') {
 				fprintf(stderr, "%s: invalid argument -%c\n",
 					program, isc_commandline_option);
 			}
-		/* FALLTHROUGH */
+			FALLTHROUGH;
 		case 'h':
 			/* Does not return. */
 			usage();
@@ -1168,9 +1155,38 @@ main(int argc, char **argv) {
 		ctx.quiet = true;
 	}
 
+	if (set_fips_mode) {
+#if OPENSSL_VERSION_NUMBER >= 0x30000000L && OPENSSL_API_LEVEL >= 30000
+		fips = OSSL_PROVIDER_load(NULL, "fips");
+		if (fips == NULL) {
+			ERR_clear_error();
+			fatal("Failed to load FIPS provider");
+		}
+		base = OSSL_PROVIDER_load(NULL, "base");
+		if (base == NULL) {
+			OSSL_PROVIDER_unload(fips);
+			ERR_clear_error();
+			fatal("Failed to load base provider");
+		}
+#endif
+		if (!isc_fips_mode()) {
+			if (isc_fips_set_mode(1) != ISC_R_SUCCESS) {
+				fatal("setting FIPS mode failed");
+			}
+		}
+	}
+
 	ret = dst_lib_init(mctx, engine);
 	if (ret != ISC_R_SUCCESS) {
 		fatal("could not initialize dst: %s", isc_result_totext(ret));
+	}
+
+	/*
+	 * After dst_lib_init which will set FIPS mode if requested
+	 * at build time.  The minumums are both raised to 2048.
+	 */
+	if (isc_fips_mode()) {
+		min_rsa = min_dh = 2048;
 	}
 
 	setup_logging(mctx, &lctx);
@@ -1312,6 +1328,14 @@ main(int argc, char **argv) {
 	}
 	isc_mem_destroy(&mctx);
 
+#if OPENSSL_VERSION_NUMBER >= 0x30000000L && OPENSSL_API_LEVEL >= 30000
+	if (base != NULL) {
+		OSSL_PROVIDER_unload(base);
+	}
+	if (fips != NULL) {
+		OSSL_PROVIDER_unload(fips);
+	}
+#endif
 	if (freeit != NULL) {
 		free(freeit);
 	}

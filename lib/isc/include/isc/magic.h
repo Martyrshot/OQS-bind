@@ -1,6 +1,8 @@
 /*
  * Copyright (C) Internet Systems Consortium, Inc. ("ISC")
  *
+ * SPDX-License-Identifier: MPL-2.0
+ *
  * This Source Code Form is subject to the terms of the Mozilla Public
  * License, v. 2.0. If a copy of the MPL was not distributed with this
  * file, you can obtain one at https://mozilla.org/MPL/2.0/.
@@ -9,10 +11,7 @@
  * information regarding copyright ownership.
  */
 
-#ifndef ISC_MAGIC_H
-#define ISC_MAGIC_H 1
-
-#include <isc/likely.h>
+#pragma once
 
 /*! \file isc/magic.h */
 
@@ -26,10 +25,7 @@ typedef struct {
  * The intent of this is to allow magic numbers to be checked even though
  * the object is otherwise opaque.
  */
-#define ISC_MAGIC_VALID(a, b)       \
-	(ISC_LIKELY((a) != NULL) && \
-	 ISC_LIKELY(((const isc__magic_t *)(a))->magic == (b)))
+#define ISC_MAGIC_VALID(a, b) \
+	((a) != NULL && ((const isc__magic_t *)(a))->magic == (b))
 
 #define ISC_MAGIC(a, b, c, d) ((a) << 24 | (b) << 16 | (c) << 8 | (d))
-
-#endif /* ISC_MAGIC_H */

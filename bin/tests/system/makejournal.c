@@ -1,6 +1,8 @@
 /*
  * Copyright (C) Internet Systems Consortium, Inc. ("ISC")
  *
+ * SPDX-License-Identifier: MPL-2.0
+ *
  * This Source Code Form is subject to the terms of the Mozilla Public
  * License, v. 2.0. If a copy of the MPL was not distributed with this
  * file, you can obtain one at https://mozilla.org/MPL/2.0/.
@@ -17,7 +19,7 @@
 #include <isc/hash.h>
 #include <isc/log.h>
 #include <isc/mem.h>
-#include <isc/print.h>
+#include <isc/result.h>
 #include <isc/util.h>
 
 #include <dns/db.h>
@@ -25,7 +27,6 @@
 #include <dns/journal.h>
 #include <dns/log.h>
 #include <dns/name.h>
-#include <dns/result.h>
 #include <dns/types.h>
 
 #define CHECK(r)                             \
@@ -61,7 +62,7 @@ loadzone(dns_db_t **db, const char *origin, const char *filename) {
 
 	name = dns_fixedname_initname(&fixed);
 
-	result = dns_name_fromstring(name, origin, 0, NULL);
+	result = dns_name_fromstring(name, origin, dns_rootname, 0, NULL);
 	if (result != ISC_R_SUCCESS) {
 		return (result);
 	}
@@ -73,6 +74,9 @@ loadzone(dns_db_t **db, const char *origin, const char *filename) {
 	}
 
 	result = dns_db_load(*db, filename, dns_masterformat_text, 0);
+	if (result == DNS_R_SEENINCLUDE) {
+		result = ISC_R_SUCCESS;
+	}
 	return (result);
 }
 
@@ -114,8 +118,6 @@ main(int argc, char **argv) {
 			      ISC_LOG_DYNAMIC, &destination, 0);
 
 	CHECK(isc_log_usechannel(logconfig, "stderr", NULL, NULL));
-
-	dns_result_register();
 
 	result = loadzone(&olddb, origin, file1);
 	if (result != ISC_R_SUCCESS) {

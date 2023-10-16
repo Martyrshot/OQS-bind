@@ -1,6 +1,8 @@
 /*
  * Copyright (C) Internet Systems Consortium, Inc. ("ISC")
  *
+ * SPDX-License-Identifier: MPL-2.0
+ *
  * This Source Code Form is subject to the terms of the Mozilla Public
  * License, v. 2.0. If a copy of the MPL was not distributed with this
  * file, you can obtain one at https://mozilla.org/MPL/2.0/.
@@ -9,8 +11,7 @@
  * information regarding copyright ownership.
  */
 
-#ifndef RNDC_KEYGEN_H
-#define RNDC_KEYGEN_H 1
+#pragma once
 
 /*! \file */
 
@@ -38,5 +39,3 @@ int
 alg_bits(dns_secalg_t alg);
 
 ISC_LANG_ENDDECLS
-
-#endif /* RNDC_KEYGEN_H */

@@ -1,6 +1,8 @@
 /*
  * Copyright (C) Internet Systems Consortium, Inc. ("ISC")
  *
+ * SPDX-License-Identifier: MPL-2.0
+ *
  * This Source Code Form is subject to the terms of the Mozilla Public
  * License, v. 2.0. If a copy of the MPL was not distributed with this
  * file, you can obtain one at https://mozilla.org/MPL/2.0/.
@@ -40,9 +42,8 @@
 #include <isc/lex.h>
 #include <isc/mem.h>
 #include <isc/once.h>
-#include <isc/platform.h>
-#include <isc/print.h>
 #include <isc/random.h>
+#include <isc/result.h>
 #include <isc/string.h>
 #include <isc/time.h>
 #include <isc/util.h>
@@ -53,11 +54,9 @@
 #include <dns/name.h>
 #include <dns/rdata.h>
 #include <dns/rdataclass.h>
-#include <dns/result.h>
 #include <dns/types.h>
 
 #include <dst/gssapi.h>
-#include <dst/result.h>
 
 #include "dst_internal.h"
 
@@ -100,7 +99,7 @@ static gss_OID_desc __gss_spnego_mechanism_oid_desc = {
 			goto out;            \
 	} while (0)
 
-static inline void
+static void
 name_to_gbuffer(const dns_name_t *name, isc_buffer_t *buffer,
 		gss_buffer_desc *gbuffer) {
 	dns_name_t tname;
@@ -118,7 +117,8 @@ name_to_gbuffer(const dns_name_t *name, isc_buffer_t *buffer,
 		namep = &tname;
 	}
 
-	result = dns_name_toprincipal(namep, buffer);
+	result = dns_name_totext(
+		namep, DNS_NAME_OMITFINALDOT | DNS_NAME_PRINCIPAL, buffer);
 	RUNTIME_CHECK(result == ISC_R_SUCCESS);
 	isc_buffer_putuint8(buffer, 0);
 	isc_buffer_usedregion(buffer, &r);
@@ -384,7 +384,8 @@ dst_gssapi_identitymatchesrealmkrb5(const dns_name_t *signer,
 	 * a string, and do string operations on them.
 	 */
 	isc_buffer_init(&buffer, sbuf, sizeof(sbuf));
-	result = dns_name_toprincipal(signer, &buffer);
+	result = dns_name_totext(
+		signer, DNS_NAME_OMITFINALDOT | DNS_NAME_PRINCIPAL, &buffer);
 	RUNTIME_CHECK(result == ISC_R_SUCCESS);
 	isc_buffer_putuint8(&buffer, 0);
 	dns_name_format(realm, rbuf, sizeof(rbuf));
@@ -432,7 +433,8 @@ dst_gssapi_identitymatchesrealmkrb5(const dns_name_t *signer,
 		dns_name_t *machine;
 
 		machine = dns_fixedname_initname(&fixed);
-		result = dns_name_fromstring(machine, sname, 0, NULL);
+		result = dns_name_fromstring(machine, sname, dns_rootname, 0,
+					     NULL);
 		if (result != ISC_R_SUCCESS) {
 			return (false);
 		}
@@ -461,7 +463,8 @@ dst_gssapi_identitymatchesrealmms(const dns_name_t *signer,
 	 * a string, and do string operations on them.
 	 */
 	isc_buffer_init(&buffer, sbuf, sizeof(sbuf));
-	result = dns_name_toprincipal(signer, &buffer);
+	result = dns_name_totext(
+		signer, DNS_NAME_OMITFINALDOT | DNS_NAME_PRINCIPAL, &buffer);
 	RUNTIME_CHECK(result == ISC_R_SUCCESS);
 	isc_buffer_putuint8(&buffer, 0);
 	dns_name_format(realm, rbuf, sizeof(rbuf));
@@ -512,7 +515,7 @@ dst_gssapi_identitymatchesrealmms(const dns_name_t *signer,
 		dns_name_t *machine;
 
 		machine = dns_fixedname_initname(&fixed);
-		result = dns_name_fromstring2(machine, sbuf, realm, 0, NULL);
+		result = dns_name_fromstring(machine, sbuf, realm, 0, NULL);
 		if (result != ISC_R_SUCCESS) {
 			return (false);
 		}

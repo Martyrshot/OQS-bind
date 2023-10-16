@@ -1,6 +1,8 @@
 /*
  * Copyright (C) Internet Systems Consortium, Inc. ("ISC")
  *
+ * SPDX-License-Identifier: MPL-2.0
+ *
  * This Source Code Form is subject to the terms of the Mozilla Public
  * License, v. 2.0. If a copy of the MPL was not distributed with this
  * file, you can obtain one at https://mozilla.org/MPL/2.0/.
@@ -13,19 +15,15 @@
 
 #include <stdbool.h>
 
-#include <isc/app.h>
-#include <isc/event.h>
 #include <isc/lex.h>
 #include <isc/mem.h>
+#include <isc/result.h>
 #include <isc/string.h>
 #include <isc/timer.h>
 #include <isc/util.h>
 
-#include <dns/result.h>
-
 #include <isccc/alist.h>
 #include <isccc/cc.h>
-#include <isccc/result.h>
 
 #include <named/control.h>
 #include <named/globals.h>
@@ -59,7 +57,7 @@ getcommand(isc_lex_t *lex, char **cmdp) {
 	return (ISC_R_SUCCESS);
 }
 
-static inline bool
+static bool
 command_compare(const char *str, const char *command) {
 	return (strcasecmp(str, command) == 0);
 }
@@ -98,10 +96,7 @@ named_control_docommand(isccc_sexpr_t *message, bool readonly,
 		return (result);
 	}
 
-	result = isc_lex_create(named_g_mctx, strlen(cmdline), &lex);
-	if (result != ISC_R_SUCCESS) {
-		return (result);
-	}
+	isc_lex_create(named_g_mctx, strlen(cmdline), &lex);
 
 	isc_buffer_init(&src, cmdline, strlen(cmdline));
 	isc_buffer_add(&src, strlen(cmdline));
@@ -175,9 +170,8 @@ named_control_docommand(isccc_sexpr_t *message, bool readonly,
 			named_smf_want_disable = 1;
 		}
 		/*
-		 * If named_smf_got_instance = 0, named_smf_chroot
-		 * is not relevant and we fall through to
-		 * isc_app_shutdown below.
+		 * If named_smf_got_instance = 0, named_smf_chroot is
+		 * not relevant and we fall through to shutdown below.
 		 */
 #endif /* ifdef HAVE_LIBSCF */
 		/* Do not flush master files */
@@ -218,6 +212,8 @@ named_control_docommand(isccc_sexpr_t *message, bool readonly,
 		result = ISC_R_SUCCESS;
 	} else if (command_compare(command, NAMED_COMMAND_DUMPSTATS)) {
 		result = named_server_dumpstats(named_g_server);
+	} else if (command_compare(command, NAMED_COMMAND_FETCHLIMIT)) {
+		result = named_server_fetchlimit(named_g_server, lex, text);
 	} else if (command_compare(command, NAMED_COMMAND_FLUSH)) {
 		result = named_server_flushcache(named_g_server, lex);
 	} else if (command_compare(command, NAMED_COMMAND_FLUSHNAME)) {
@@ -278,15 +274,8 @@ named_control_docommand(isccc_sexpr_t *message, bool readonly,
 		   command_compare(command, NAMED_COMMAND_UNFREEZE))
 	{
 		result = named_server_freeze(named_g_server, false, lex, text);
-	} else if (command_compare(command, NAMED_COMMAND_TIMERPOKE)) {
-		isc_timermgr_poke(named_g_timermgr);
-		result = ISC_R_SUCCESS;
 	} else if (command_compare(command, NAMED_COMMAND_TRACE)) {
 		result = named_server_setdebuglevel(named_g_server, lex);
-	} else if (command_compare(command, NAMED_COMMAND_TSIGDELETE)) {
-		result = named_server_tsigdelete(named_g_server, lex, text);
-	} else if (command_compare(command, NAMED_COMMAND_TSIGLIST)) {
-		result = named_server_tsiglist(named_g_server, text);
 	} else if (command_compare(command, NAMED_COMMAND_VALIDATION)) {
 		result = named_server_validation(named_g_server, lex, text);
 	} else if (command_compare(command, NAMED_COMMAND_ZONESTATUS)) {

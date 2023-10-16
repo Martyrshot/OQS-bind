@@ -1,6 +1,8 @@
 /*
  * Copyright (C) Internet Systems Consortium, Inc. ("ISC")
  *
+ * SPDX-License-Identifier: MPL-2.0
+ *
  * This Source Code Form is subject to the terms of the Mozilla Public
  * License, v. 2.0. If a copy of the MPL was not distributed with this
  * file, you can obtain one at https://mozilla.org/MPL/2.0/.
@@ -11,7 +13,10 @@
 
 /*! \file */
 
+#include <stdlib.h>
+
 #include <isc/result.h>
+#include <isc/util.h>
 
 #include <dns/log.h>
 
@@ -46,6 +51,7 @@ isc_result_t
 named_log_init(bool safe) {
 	isc_result_t result;
 	isc_logconfig_t *lcfg = NULL;
+	isc_mem_t *log_mctx = NULL;
 
 	named_g_categories = categories;
 	named_g_modules = modules;
@@ -53,7 +59,10 @@ named_log_init(bool safe) {
 	/*
 	 * Setup a logging context.
 	 */
-	isc_log_create(named_g_mctx, &named_g_lctx, &lcfg);
+	isc_mem_create(&log_mctx);
+	isc_mem_setname(log_mctx, "named_log");
+	isc_log_create(log_mctx, &named_g_lctx, &lcfg);
+	isc_mem_detach(&log_mctx);
 
 	/*
 	 * named-checktool.c:setup_logging() needs to be kept in sync.
@@ -77,6 +86,8 @@ named_log_init(bool safe) {
 	if (result != ISC_R_SUCCESS) {
 		goto cleanup;
 	}
+
+	named_log_setdefaultsslkeylogfile(lcfg);
 
 	return (ISC_R_SUCCESS);
 
@@ -165,6 +176,42 @@ named_log_setsafechannels(isc_logconfig_t *lcfg) {
 	isc_log_createchannel(lcfg, "default_syslog", ISC_LOG_TOSYSLOG,
 			      ISC_LOG_INFO, &destination, 0);
 #endif /* if ISC_FACILITY != LOG_DAEMON */
+}
+
+/*
+ * If the SSLKEYLOGFILE environment variable is set, TLS pre-master secrets are
+ * logged (for debugging purposes) to the file whose path is provided in that
+ * variable.  Set up a default logging channel which maintains up to 10 files
+ * containing TLS pre-master secrets, each up to 100 MB in size.  If the
+ * SSLKEYLOGFILE environment variable is set to the string "config", suppress
+ * creation of the default channel, allowing custom logging channel
+ * configuration for TLS pre-master secrets to be provided via the "logging"
+ * stanza in the configuration file.
+ */
+void
+named_log_setdefaultsslkeylogfile(isc_logconfig_t *lcfg) {
+	const char *sslkeylogfile_path = getenv("SSLKEYLOGFILE");
+	isc_logdestination_t destination = {
+		.file = {
+			.name = sslkeylogfile_path,
+			.versions = 10,
+			.suffix = isc_log_rollsuffix_timestamp,
+			.maximum_size = 100 * 1024 * 1024,
+		},
+	};
+	isc_result_t result;
+
+	if (sslkeylogfile_path == NULL ||
+	    strcmp(sslkeylogfile_path, "config") == 0)
+	{
+		return;
+	}
+
+	isc_log_createchannel(lcfg, "default_sslkeylogfile", ISC_LOG_TOFILE,
+			      ISC_LOG_INFO, &destination, 0);
+	result = isc_log_usechannel(lcfg, "default_sslkeylogfile",
+				    ISC_LOGCATEGORY_SSLKEYLOG, NULL);
+	RUNTIME_CHECK(result == ISC_R_SUCCESS);
 }
 
 isc_result_t

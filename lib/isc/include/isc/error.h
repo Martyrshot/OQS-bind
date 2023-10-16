@@ -1,6 +1,8 @@
 /*
  * Copyright (C) Internet Systems Consortium, Inc. ("ISC")
  *
+ * SPDX-License-Identifier: MPL-2.0
+ *
  * This Source Code Form is subject to the terms of the Mozilla Public
  * License, v. 2.0. If a copy of the MPL was not distributed with this
  * file, you can obtain one at https://mozilla.org/MPL/2.0/.
@@ -9,8 +11,7 @@
  * information regarding copyright ownership.
  */
 
-#ifndef ISC_ERROR_H
-#define ISC_ERROR_H 1
+#pragma once
 
 /*! \file isc/error.h */
 
@@ -19,12 +20,11 @@
 #include <isc/attributes.h>
 #include <isc/formatcheck.h>
 #include <isc/lang.h>
-#include <isc/likely.h>
-#include <isc/platform.h>
 
 ISC_LANG_BEGINDECLS
 
-typedef void (*isc_errorcallback_t)(const char *, int, const char *, va_list);
+typedef void (*isc_errorcallback_t)(const char *, int, const char *,
+				    const char *, va_list);
 
 /*% set unexpected error */
 void isc_error_setunexpected(isc_errorcallback_t);
@@ -34,21 +34,12 @@ void isc_error_setfatal(isc_errorcallback_t);
 
 /*% unexpected error */
 void
-isc_error_unexpected(const char *, int, const char *, ...)
-	ISC_FORMAT_PRINTF(3, 4);
+isc_error_unexpected(const char *, int, const char *, const char *, ...)
+	ISC_FORMAT_PRINTF(4, 5);
 
 /*% fatal error */
-ISC_NORETURN void
-isc_error_fatal(const char *, int, const char *, ...) ISC_FORMAT_PRINTF(3, 4);
-
-/*% runtimecheck error */
-ISC_NORETURN void
-isc_error_runtimecheck(const char *, int, const char *);
-
-#define ISC_ERROR_RUNTIMECHECK(cond) \
-	((void)(ISC_LIKELY(cond) ||  \
-		((isc_error_runtimecheck)(__FILE__, __LINE__, #cond), 0)))
+noreturn void
+isc_error_fatal(const char *, int, const char *, const char *, ...)
+	ISC_FORMAT_PRINTF(4, 5);
 
 ISC_LANG_ENDDECLS
-
-#endif /* ISC_ERROR_H */

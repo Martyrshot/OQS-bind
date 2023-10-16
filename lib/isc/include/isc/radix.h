@@ -1,6 +1,8 @@
 /*
  * Copyright (C) Internet Systems Consortium, Inc. ("ISC")
  *
+ * SPDX-License-Identifier: MPL-2.0
+ *
  * This Source Code Form is subject to the terms of the Mozilla Public
  * License, v. 2.0. If a copy of the MPL was not distributed with this
  * file, you can obtain one at https://mozilla.org/MPL/2.0/.
@@ -9,8 +11,7 @@
  * information regarding copyright ownership.
  */
 
-#ifndef _RADIX_H
-#define _RADIX_H
+#pragma once
 
 #include <inttypes.h>
 #include <string.h>
@@ -42,7 +43,7 @@
 	} while (0)
 
 typedef struct isc_prefix {
-	isc_mem_t *  mctx;
+	isc_mem_t   *mctx;
 	unsigned int family;   /* AF_INET | AF_INET6, or AF_UNSPEC for
 				* "any" */
 	unsigned int   bitlen; /* 0 for "any" */
@@ -85,12 +86,12 @@ typedef void (*isc_radix_processfunc_t)(isc_prefix_t *, void **);
 #define ISC_RADIX_FAMILY(p) (((p)->family == AF_INET6) ? RADIX_V6 : RADIX_V4)
 
 typedef struct isc_radix_node {
-	isc_mem_t *	       mctx;
+	isc_mem_t	      *mctx;
 	uint32_t	       bit;    /* bit length of the prefix */
-	isc_prefix_t *	       prefix; /* who we are in radix tree */
+	isc_prefix_t	      *prefix; /* who we are in radix tree */
 	struct isc_radix_node *l, *r;  /* left and right children */
 	struct isc_radix_node *parent; /* may be used */
-	void *		       data[RADIX_FAMILIES]; /* pointers to IPv4
+	void		      *data[RADIX_FAMILIES]; /* pointers to IPv4
 						      * and IPV6 data */
 	int node_num[RADIX_FAMILIES];		     /* which node
 						      * this was in
@@ -104,7 +105,7 @@ typedef struct isc_radix_node {
 
 typedef struct isc_radix_tree {
 	unsigned int	  magic;
-	isc_mem_t *	  mctx;
+	isc_mem_t	 *mctx;
 	isc_radix_node_t *head;
 	uint32_t	  maxbits;	   /* for IP, 32 bit addresses */
 	int		  num_active_node; /* for debugging purposes */
@@ -196,9 +197,9 @@ isc_radix_process(isc_radix_tree_t *radix, isc_radix_processfunc_t func);
 
 #define RADIX_WALK(Xhead, Xnode)                              \
 	do {                                                  \
-		isc_radix_node_t * Xstack[RADIX_MAXBITS + 1]; \
+		isc_radix_node_t  *Xstack[RADIX_MAXBITS + 1]; \
 		isc_radix_node_t **Xsp = Xstack;              \
-		isc_radix_node_t * Xrn = (Xhead);             \
+		isc_radix_node_t  *Xrn = (Xhead);             \
 		while ((Xnode = Xrn)) {                       \
 			if (Xnode->prefix)
 
@@ -218,5 +219,3 @@ isc_radix_process(isc_radix_tree_t *radix, isc_radix_processfunc_t func);
 	}                                    \
 	}                                    \
 	while (0)
-
-#endif /* _RADIX_H */

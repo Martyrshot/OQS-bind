@@ -1,34 +1,29 @@
 /*
- * Copyright (C) 2014 Maui Systems Ltd, Scotland, contact@maui-systems.co.uk.
+ * Copyright (C) Internet Systems Consortium, Inc. ("ISC")
  *
- * Permission to use, copy, modify, and distribute this software for any
- * purpose with or without fee is hereby granted, provided that the
- * above copyright notice and this permission notice appear in all
- * copies.
+ * SPDX-License-Identifier: MPL-2.0 and ISC
  *
- * THE SOFTWARE IS PROVIDED "AS IS" AND MAUI SYSTEMS LTD DISCLAIMS ALL
- * WARRANTIES WITH REGARD TO THIS SOFTWARE INCLUDING ALL IMPLIED WARRANTIES
- * OF MERCHANTABILITY AND FITNESS. IN NO EVENT SHALL MAUI SYSTEMS LTD  BE
- * LIABLE FOR ANY SPECIAL, DIRECT, INDIRECT, OR CONSEQUENTIAL DAMAGES OR
- * ANY DAMAGES WHATSOEVER RESULTING FROM LOSS OF USE, DATA OR PROFITS,
- * WHETHER IN AN ACTION OF CONTRACT, NEGLIGENCE OR OTHER TORTIOUS ACTION,
- * ARISING OUT OF OR IN CONNECTION WITH THE USE OR PERFORMANCE OF THIS
- * SOFTWARE.
+ * This Source Code Form is subject to the terms of the Mozilla Public
+ * License, v. 2.0. If a copy of the MPL was not distributed with this
+ * file, you can obtain one at https://mozilla.org/MPL/2.0/.
  */
 
 /*
- * Copyright (C) 2011,2014  Internet Systems Consortium, Inc. ("ISC")
+ * Copyright (C) 2002 Stichting NLnet, Netherlands, stichting@nlnet.nl.
  *
- * Permission to use, copy, modify, and/or distribute this software for any
- * purpose with or without fee is hereby granted, provided that the above
- * copyright notice and this permission notice appear in all copies.
+ * The development of Dynamically Loadable Zones (DLZ) for Bind 9 was
+ * conceived and contributed by Rob Butler.
  *
- * THE SOFTWARE IS PROVIDED "AS IS" AND ISC DISCLAIMS ALL WARRANTIES WITH
+ * Permission to use, copy, modify, and distribute this software for any purpose
+ * with or without fee is hereby granted, provided that the above copyright
+ * notice and this permission notice appear in all copies.
+ *
+ * THE SOFTWARE IS PROVIDED "AS IS" AND THE AUTHOR DISCLAIMS ALL WARRANTIES WITH
  * REGARD TO THIS SOFTWARE INCLUDING ALL IMPLIED WARRANTIES OF MERCHANTABILITY
- * AND FITNESS.  IN NO EVENT SHALL ISC BE LIABLE FOR ANY SPECIAL, DIRECT,
+ * AND FITNESS. IN NO EVENT SHALL THE AUTHOR BE LIABLE FOR ANY SPECIAL, DIRECT,
  * INDIRECT, OR CONSEQUENTIAL DAMAGES OR ANY DAMAGES WHATSOEVER RESULTING FROM
- * LOSS OF USE, DATA OR PROFITS, WHETHER IN AN ACTION OF CONTRACT, NEGLIGENCE
- * OR OTHER TORTIOUS ACTION, ARISING OUT OF OR IN CONNECTION WITH THE USE OR
+ * LOSS OF USE, DATA OR PROFITS, WHETHER IN AN ACTION OF CONTRACT, NEGLIGENCE OR
+ * OTHER TORTIOUS ACTION, ARISING OUT OF OR IN CONNECTION WITH THE USE OR
  * PERFORMANCE OF THIS SOFTWARE.
  */
 
@@ -61,9 +56,9 @@
 #include <dlz_minimal.h>
 #include <dlz_pthread.h>
 
-#if !defined(LIBMARIADB) && MYSQL_VERSION_ID >= 80000
+#if !defined(MARIADB_BASE_VERSION) && MYSQL_VERSION_ID >= 80000
 typedef bool my_bool;
-#endif /* !defined(LIBMARIADB) && MYSQL_VERSION_ID >= 80000 */
+#endif /* !defined(MARIADB_BASE_VERSION) && MYSQL_VERSION_ID >= 80000 */
 
 /*
  * The SQL queries that will be used for lookups and updates are defined
@@ -466,9 +461,8 @@ build_query(mysql_data_t *state, mysql_instance_t *dbi, const char *command,
 fail:
 	va_end(ap1);
 
-	for (item = DLZ_LIST_HEAD(arglist); item != NULL;
-	     item = DLZ_LIST_NEXT(item, link))
-	{
+	while ((item = DLZ_LIST_HEAD(arglist)) != NULL) {
+		DLZ_LIST_UNLINK(arglist, item, link);
 		if (item->arg != NULL) {
 			free(item->arg);
 		}
@@ -499,7 +493,7 @@ isrelative(const char *s) {
 }
 
 /* Return a dot if 's' doesn't already end with one */
-static inline const char *
+static const char *
 dot(const char *s) {
 	return (isrelative(s) ? "." : "");
 }
@@ -711,8 +705,9 @@ make_notify(const char *zone, int *packetlen) {
 	/* Make the question into labels */
 	j = 12;
 	while (packet[j]) {
-		for (i = j + 1; packet[i] != '\0' && packet[i] != '.'; i++)
+		for (i = j + 1; packet[i] != '\0' && packet[i] != '.'; i++) {
 			;
+		}
 		packet[j] = i - j - 1;
 		j = i;
 	}
@@ -1082,6 +1077,8 @@ dlz_destroy(void *dbdata) {
 isc_result_t
 dlz_findzonedb(void *dbdata, const char *name, dns_clientinfomethods_t *methods,
 	       dns_clientinfo_t *clientinfo) {
+	UNUSED(methods);
+	UNUSED(clientinfo);
 	isc_result_t result = ISC_R_SUCCESS;
 	mysql_data_t *state = (mysql_data_t *)dbdata;
 	MYSQL_RES *res;
@@ -1114,6 +1111,8 @@ isc_result_t
 dlz_lookup(const char *zone, const char *name, void *dbdata,
 	   dns_sdlzlookup_t *lookup, dns_clientinfomethods_t *methods,
 	   dns_clientinfo_t *clientinfo) {
+	UNUSED(methods);
+	UNUSED(clientinfo);
 	isc_result_t result;
 	mysql_data_t *state = (mysql_data_t *)dbdata;
 	bool found = false;
@@ -1133,8 +1132,7 @@ dlz_lookup(const char *zone, const char *name, void *dbdata,
 	}
 
 	/* Are we okay to try to find the txn version?  */
-	if (clientinfo != NULL && clientinfo->version >= DNS_CLIENTINFO_VERSION)
-	{
+	if (clientinfo != NULL && clientinfo->version >= 2) {
 		txn = (mysql_transaction_t *)clientinfo->dbversion;
 		if (txn != NULL && validate_txn(state, txn) == ISC_R_SUCCESS) {
 			dbi = txn->dbi;

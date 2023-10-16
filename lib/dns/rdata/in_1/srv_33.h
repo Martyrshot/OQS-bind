@@ -1,6 +1,8 @@
 /*
  * Copyright (C) Internet Systems Consortium, Inc. ("ISC")
  *
+ * SPDX-License-Identifier: MPL-2.0
+ *
  * This Source Code Form is subject to the terms of the Mozilla Public
  * License, v. 2.0. If a copy of the MPL was not distributed with this
  * file, you can obtain one at https://mozilla.org/MPL/2.0/.
@@ -9,8 +11,7 @@
  * information regarding copyright ownership.
  */
 
-#ifndef IN_1_SRV_33_H
-#define IN_1_SRV_33_H 1
+#pragma once
 
 /*!
  *  \brief Per RFC2782 */
@@ -23,5 +24,3 @@ typedef struct dns_rdata_in_srv {
 	uint16_t port;
 	dns_name_t target;
 } dns_rdata_in_srv_t;
-
-#endif /* IN_1_SRV_33_H */

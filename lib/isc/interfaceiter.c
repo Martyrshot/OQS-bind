@@ -1,6 +1,8 @@
 /*
  * Copyright (C) Internet Systems Consortium, Inc. ("ISC")
  *
+ * SPDX-License-Identifier: MPL-2.0
+ *
  * This Source Code Form is subject to the terms of the Mozilla Public
  * License, v. 2.0. If a copy of the MPL was not distributed with this
  * file, you can obtain one at https://mozilla.org/MPL/2.0/.
@@ -30,7 +32,6 @@
 #include <isc/magic.h>
 #include <isc/mem.h>
 #include <isc/net.h>
-#include <isc/print.h>
 #include <isc/result.h>
 #include <isc/strerr.h>
 #include <isc/string.h>
@@ -123,8 +124,7 @@ get_addr(unsigned int family, isc_netaddr_t *dst, struct sockaddr *src,
 		}
 		break;
 	default:
-		INSIST(0);
-		ISC_UNREACHABLE();
+		UNREACHABLE();
 	}
 }
 
@@ -201,8 +201,7 @@ isc_interfaceiter_create(isc_mem_t *mctx, isc_interfaceiter_t **iterp) {
 
 	if (getifaddrs(&iter->ifaddrs) < 0) {
 		strerror_r(errno, strbuf, sizeof(strbuf));
-		UNEXPECTED_ERROR(__FILE__, __LINE__,
-				 "getting interface addresses: getifaddrs: %s",
+		UNEXPECTED_ERROR("getting interface addresses: getifaddrs: %s",
 				 strbuf);
 		result = ISC_R_UNEXPECTED;
 		goto failure;

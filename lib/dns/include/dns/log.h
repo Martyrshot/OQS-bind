@@ -1,6 +1,8 @@
 /*
  * Copyright (C) Internet Systems Consortium, Inc. ("ISC")
  *
+ * SPDX-License-Identifier: MPL-2.0
+ *
  * This Source Code Form is subject to the terms of the Mozilla Public
  * License, v. 2.0. If a copy of the MPL was not distributed with this
  * file, you can obtain one at https://mozilla.org/MPL/2.0/.
@@ -12,36 +14,35 @@
 /*! \file dns/log.h
  */
 
-#ifndef DNS_LOG_H
-#define DNS_LOG_H 1
+#pragma once
 
 #include <isc/lang.h>
 #include <isc/log.h>
 
-LIBDNS_EXTERNAL_DATA extern isc_log_t *	      dns_lctx;
-LIBDNS_EXTERNAL_DATA extern isc_logcategory_t dns_categories[];
-LIBDNS_EXTERNAL_DATA extern isc_logmodule_t   dns_modules[];
+extern isc_log_t	*dns_lctx;
+extern isc_logcategory_t dns_categories[];
+extern isc_logmodule_t	 dns_modules[];
 
 #define DNS_LOGCATEGORY_NOTIFY	 (&dns_categories[0])
 #define DNS_LOGCATEGORY_DATABASE (&dns_categories[1])
 #define DNS_LOGCATEGORY_SECURITY (&dns_categories[2])
 /* DNS_LOGCATEGORY_CONFIG superseded by CFG_LOGCATEGORY_CONFIG */
-#define DNS_LOGCATEGORY_DNSSEC		(&dns_categories[4])
-#define DNS_LOGCATEGORY_RESOLVER	(&dns_categories[5])
-#define DNS_LOGCATEGORY_XFER_IN		(&dns_categories[6])
-#define DNS_LOGCATEGORY_XFER_OUT	(&dns_categories[7])
-#define DNS_LOGCATEGORY_DISPATCH	(&dns_categories[8])
-#define DNS_LOGCATEGORY_LAME_SERVERS	(&dns_categories[9])
-#define DNS_LOGCATEGORY_DELEGATION_ONLY (&dns_categories[10])
-#define DNS_LOGCATEGORY_EDNS_DISABLED	(&dns_categories[11])
-#define DNS_LOGCATEGORY_RPZ		(&dns_categories[12])
-#define DNS_LOGCATEGORY_RRL		(&dns_categories[13])
-#define DNS_LOGCATEGORY_CNAME		(&dns_categories[14])
-#define DNS_LOGCATEGORY_SPILL		(&dns_categories[15])
-#define DNS_LOGCATEGORY_DNSTAP		(&dns_categories[16])
-#define DNS_LOGCATEGORY_ZONELOAD	(&dns_categories[17])
-#define DNS_LOGCATEGORY_NSID		(&dns_categories[18])
-#define DNS_LOGCATEGORY_RPZ_PASSTHRU	(&dns_categories[19])
+#define DNS_LOGCATEGORY_DNSSEC	     (&dns_categories[4])
+#define DNS_LOGCATEGORY_RESOLVER     (&dns_categories[5])
+#define DNS_LOGCATEGORY_XFER_IN	     (&dns_categories[6])
+#define DNS_LOGCATEGORY_XFER_OUT     (&dns_categories[7])
+#define DNS_LOGCATEGORY_DISPATCH     (&dns_categories[8])
+#define DNS_LOGCATEGORY_LAME_SERVERS (&dns_categories[9])
+/* #define DNS_LOGCATEGORY_DELEGATION_ONLY removed */
+#define DNS_LOGCATEGORY_EDNS_DISABLED (&dns_categories[10])
+#define DNS_LOGCATEGORY_RPZ	      (&dns_categories[11])
+#define DNS_LOGCATEGORY_RRL	      (&dns_categories[12])
+#define DNS_LOGCATEGORY_CNAME	      (&dns_categories[13])
+#define DNS_LOGCATEGORY_SPILL	      (&dns_categories[14])
+#define DNS_LOGCATEGORY_DNSTAP	      (&dns_categories[15])
+#define DNS_LOGCATEGORY_ZONELOAD      (&dns_categories[16])
+#define DNS_LOGCATEGORY_NSID	      (&dns_categories[17])
+#define DNS_LOGCATEGORY_RPZ_PASSTHRU  (&dns_categories[18])
 
 /* Backwards compatibility. */
 #define DNS_LOGCATEGORY_GENERAL ISC_LOGCATEGORY_GENERAL
@@ -79,6 +80,7 @@ LIBDNS_EXTERNAL_DATA extern isc_logmodule_t   dns_modules[];
 #define DNS_LOGMODULE_DYNDB	 (&dns_modules[30])
 #define DNS_LOGMODULE_DNSTAP	 (&dns_modules[31])
 #define DNS_LOGMODULE_SSU	 (&dns_modules[32])
+#define DNS_LOGMODULE_QP	 (&dns_modules[33])
 
 ISC_LANG_BEGINDECLS
 
@@ -109,5 +111,3 @@ dns_log_setcontext(isc_log_t *lctx);
  */
 
 ISC_LANG_ENDDECLS
-
-#endif /* DNS_LOG_H */

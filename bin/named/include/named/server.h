@@ -1,6 +1,8 @@
 /*
  * Copyright (C) Internet Systems Consortium, Inc. ("ISC")
  *
+ * SPDX-License-Identifier: MPL-2.0
+ *
  * This Source Code Form is subject to the terms of the Mozilla Public
  * License, v. 2.0. If a copy of the MPL was not distributed with this
  * file, you can obtain one at https://mozilla.org/MPL/2.0/.
@@ -9,8 +11,7 @@
  * information regarding copyright ownership.
  */
 
-#ifndef NAMED_SERVER_H
-#define NAMED_SERVER_H 1
+#pragma once
 
 /*! \file */
 
@@ -20,7 +21,9 @@
 #include <isc/log.h>
 #include <isc/magic.h>
 #include <isc/quota.h>
+#include <isc/signal.h>
 #include <isc/sockaddr.h>
+#include <isc/tls.h>
 #include <isc/types.h>
 
 #include <dns/acl.h>
@@ -35,44 +38,35 @@
 
 #include <named/types.h>
 
-#define NAMED_EVENTCLASS    ISC_EVENTCLASS(0x4E43)
-#define NAMED_EVENT_RELOAD  (NAMED_EVENTCLASS + 0)
-#define NAMED_EVENT_DELZONE (NAMED_EVENTCLASS + 1)
-#define NAMED_EVENT_COMMAND (NAMED_EVENTCLASS + 2)
-#define NAMED_EVENT_TATSEND (NAMED_EVENTCLASS + 3)
-
 /*%
  * Name server state.  Better here than in lots of separate global variables.
  */
 struct named_server {
 	unsigned int magic;
-	isc_mem_t *  mctx;
+	isc_mem_t   *mctx;
 
 	ns_server_t *sctx;
-
-	isc_task_t *task;
 
 	char *statsfile;    /*%< Statistics file name */
 	char *dumpfile;	    /*%< Dump file name */
 	char *secrootsfile; /*%< Secroots file name */
-	char *bindkeysfile; /*%< bind.keys file name
-			     * */
+	char *bindkeysfile; /*%< bind.keys file name */
 	char *recfile;	    /*%< Recursive file name */
-	bool  version_set;  /*%< User has set version
-			     * */
+	bool  version_set;  /*%< User has set version */
 	char *version;	    /*%< User-specified version */
-	bool  hostname_set; /*%< User has set hostname
-			     * */
-	char *hostname;	    /*%< User-specified hostname
-			     * */
+	bool  hostname_set; /*%< User has set hostname */
+	char *hostname;	    /*%< User-specified hostname */
+#ifdef USE_DNSRPS
+	char *dnsrpslib;
+#endif /* ifdef USE_DNSRPS */
 
 	/* Server data structures. */
-	dns_loadmgr_t *	   loadmgr;
-	dns_zonemgr_t *	   zonemgr;
+	dns_loadmgr_t	  *loadmgr;
+	dns_zonemgr_t	  *zonemgr;
 	dns_viewlist_t	   viewlist;
 	dns_kasplist_t	   kasplist;
 	ns_interfacemgr_t *interfacemgr;
-	dns_db_t *	   in_roothints;
+	dns_db_t	  *in_roothints;
 
 	isc_timer_t *interface_timer;
 	isc_timer_t *heartbeat_timer;
@@ -92,15 +86,15 @@ struct named_server {
 	isc_stats_t *resolverstats;  /*% Resolver stats */
 	isc_stats_t *sockstats;	     /*%< Socket stats */
 
-	named_controls_t *   controls; /*%< Control channels */
+	named_controls_t    *controls; /*%< Control channels */
 	unsigned int	     dispatchgen;
 	named_dispatchlist_t dispatches;
 
 	named_statschannellist_t statschannels;
 
-	dns_tsigkey_t *sessionkey;
-	char *	       session_keyfile;
-	dns_name_t *   session_keyname;
+	dst_key_t     *sessionkey;
+	char	      *session_keyfile;
+	dns_name_t    *session_keyname;
 	unsigned int   session_keyalg;
 	uint16_t       session_keybits;
 	bool	       interface_auto;
@@ -110,6 +104,11 @@ struct named_server {
 	dns_dtenv_t *dtenv; /*%< Dnstap environment */
 
 	char *lockfile;
+
+	isc_tlsctx_cache_t *tlsctx_server_cache;
+	isc_tlsctx_cache_t *tlsctx_client_cache;
+
+	isc_signal_t *sighup;
 };
 
 #define NAMED_SERVER_MAGIC    ISC_MAGIC('S', 'V', 'E', 'R')
@@ -130,7 +129,7 @@ named_server_destroy(named_server_t **serverp);
  */
 
 void
-named_server_reloadwanted(named_server_t *server);
+named_server_reloadwanted(void *arg, int signum);
 /*%<
  * Inform a server that a reload is wanted.  This function
  * may be called asynchronously, from outside the server's task.
@@ -251,19 +250,6 @@ isc_result_t
 named_server_status(named_server_t *server, isc_buffer_t **text);
 
 /*%
- * Report a list of dynamic and static tsig keys, per view.
- */
-isc_result_t
-named_server_tsiglist(named_server_t *server, isc_buffer_t **text);
-
-/*%
- * Delete a specific key (with optional view).
- */
-isc_result_t
-named_server_tsigdelete(named_server_t *server, isc_lex_t *lex,
-			isc_buffer_t **text);
-
-/*%
  * Enable or disable updates for a zone.
  */
 isc_result_t
@@ -291,12 +277,6 @@ named_server_rekey(named_server_t *server, isc_lex_t *lex, isc_buffer_t **text);
  */
 isc_result_t
 named_server_dumprecursing(named_server_t *server);
-
-/*%
- * Maintain a list of dispatches that require reserved ports.
- */
-void
-named_add_reserved_dispatch(named_server_t *server, const isc_sockaddr_t *addr);
 
 /*%
  * Enable or disable dnssec validation.
@@ -390,4 +370,9 @@ isc_result_t
 named_server_servestale(named_server_t *server, isc_lex_t *lex,
 			isc_buffer_t **text);
 
-#endif /* NAMED_SERVER_H */
+/*%
+ * Report fetch-limited ADB server addresses.
+ */
+isc_result_t
+named_server_fetchlimit(named_server_t *server, isc_lex_t *lex,
+			isc_buffer_t **text);

@@ -2,6 +2,8 @@
 #
 # Copyright (C) Internet Systems Consortium, Inc. ("ISC")
 #
+# SPDX-License-Identifier: MPL-2.0
+#
 # This Source Code Form is subject to the terms of the Mozilla Public
 # License, v. 2.0. If a copy of the MPL was not distributed with this
 # file, you can obtain one at https://mozilla.org/MPL/2.0/.
@@ -70,8 +72,8 @@ then
         then
 	    if ${checkzone} -q -D "$zone" ${dir}/new > ${dir}/nnn
 	    then
-	        sort ${dir}/ooo > ${dir}/s1 
-	        sort ${dir}/nnn > ${dir}/s2 
+	        sort ${dir}/ooo > ${dir}/s1
+	        sort ${dir}/nnn > ${dir}/s2
 	        comm -23 ${dir}/s1 ${dir}/s2 |
 		sed 's/^/update delete /' > ${dir}/ccc
 	        comm -13 ${dir}/s1 ${dir}/s2 |
@@ -109,7 +111,7 @@ then
 		    done
 		else
 		    while :
-		    do 
+		    do
 		        echo ${echo_arg} "Abort (a), Redo (r), Modify (m) : $bsc"
 		        read ans
 		        case "$ans" in
@@ -128,7 +130,7 @@ then
 	        fi
 	    else
 		while :
-		do 
+		do
 		    echo ${echo_arg} "Abort (a), Redo (r), Modify (m) : $bsc"
 		    read ans
 		    case "$ans" in

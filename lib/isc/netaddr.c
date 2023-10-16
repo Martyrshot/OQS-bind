@@ -1,6 +1,8 @@
 /*
  * Copyright (C) Internet Systems Consortium, Inc. ("ISC")
  *
+ * SPDX-License-Identifier: MPL-2.0
+ *
  * This Source Code Form is subject to the terms of the Mozilla Public
  * License, v. 2.0. If a copy of the MPL was not distributed with this
  * file, you can obtain one at https://mozilla.org/MPL/2.0/.
@@ -18,7 +20,6 @@
 #include <isc/buffer.h>
 #include <isc/net.h>
 #include <isc/netaddr.h>
-#include <isc/print.h>
 #include <isc/sockaddr.h>
 #include <isc/string.h>
 #include <isc/util.h>
@@ -243,7 +244,8 @@ isc_netaddr_prefixok(const isc_netaddr_t *na, unsigned int prefixlen) {
 		nbytes++;
 	}
 	if (nbytes < ipbytes &&
-	    memcmp(p + nbytes, zeros, ipbytes - nbytes) != 0) {
+	    memcmp(p + nbytes, zeros, ipbytes - nbytes) != 0)
+	{
 		return (ISC_R_FAILURE);
 	}
 	return (ISC_R_SUCCESS);
@@ -350,8 +352,7 @@ isc_netaddr_fromsockaddr(isc_netaddr_t *t, const isc_sockaddr_t *s) {
 		t->zone = 0;
 		break;
 	default:
-		INSIST(0);
-		ISC_UNREACHABLE();
+		UNREACHABLE();
 	}
 }
 
@@ -438,9 +439,8 @@ isc_netaddr_isnetzero(const isc_netaddr_t *na) {
 
 void
 isc_netaddr_fromv4mapped(isc_netaddr_t *t, const isc_netaddr_t *s) {
-	isc_netaddr_t *src;
-
-	DE_CONST(s, src); /* Must come before IN6_IS_ADDR_V4MAPPED. */
+	isc_netaddr_t *src = UNCONST(s); /* Must come before
+					    IN6_IS_ADDR_V4MAPPED. */
 
 	REQUIRE(s->family == AF_INET6);
 	REQUIRE(IN6_IS_ADDR_V4MAPPED(&src->type.in6));

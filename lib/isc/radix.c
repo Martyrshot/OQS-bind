@@ -1,6 +1,8 @@
 /*
  * Copyright (C) Internet Systems Consortium, Inc. ("ISC")
  *
+ * SPDX-License-Identifier: MPL-2.0
+ *
  * This Source Code Form is subject to the terms of the Mozilla Public
  * License, v. 2.0. If a copy of the MPL was not distributed with this
  * file, you can obtain one at https://mozilla.org/MPL/2.0/.
@@ -121,7 +123,8 @@ _comp_with_mask(void *addr, void *dest, u_int mask) {
 		u_int m = ((~0U) << (8 - (mask % 8)));
 
 		if ((mask % 8) == 0 ||
-		    (((u_char *)addr)[n] & m) == (((u_char *)dest)[n] & m)) {
+		    (((u_char *)addr)[n] & m) == (((u_char *)dest)[n] & m))
+		{
 			return (1);
 		}
 	}
@@ -422,7 +425,8 @@ isc_radix_insert(isc_radix_tree_t *radix, isc_radix_node_t **target,
 				/* Merging nodes */
 				for (i = 0; i < RADIX_FAMILIES; i++) {
 					if (node->node_num[i] == -1 &&
-					    source->node_num[i] != -1) {
+					    source->node_num[i] != -1)
+					{
 						node->node_num[i] =
 							radix->num_added_node +
 							source->node_num[i];
@@ -690,13 +694,13 @@ isc_radix_remove(isc_radix_tree_t *radix, isc_radix_node_t *node) {
 		return;
 	}
 
-	isc_mem_put(radix->mctx, node, sizeof(*node));
-	radix->num_active_node--;
-
 	if (parent->r == node) {
 		parent->r = child;
 	} else {
 		INSIST(parent->l == node);
 		parent->l = child;
 	}
+
+	isc_mem_put(radix->mctx, node, sizeof(*node));
+	radix->num_active_node--;
 }

@@ -1,6 +1,8 @@
 /*
  * Copyright (C) Internet Systems Consortium, Inc. ("ISC")
  *
+ * SPDX-License-Identifier: MPL-2.0
+ *
  * This Source Code Form is subject to the terms of the Mozilla Public
  * License, v. 2.0. If a copy of the MPL was not distributed with this
  * file, you can obtain one at https://mozilla.org/MPL/2.0/.
@@ -9,8 +11,7 @@
  * information regarding copyright ownership.
  */
 
-#ifndef ISC_NETSCOPE_H
-#define ISC_NETSCOPE_H 1
+#pragma once
 
 /*! \file isc/netscope.h */
 
@@ -33,5 +34,3 @@ isc_result_t
 isc_netscope_pton(int af, char *scopename, void *addr, uint32_t *zoneid);
 
 ISC_LANG_ENDDECLS
-
-#endif /* ISC_NETSCOPE_H */

@@ -1,6 +1,8 @@
 /*
  * Copyright (C) Internet Systems Consortium, Inc. ("ISC")
  *
+ * SPDX-License-Identifier: MPL-2.0
+ *
  * This Source Code Form is subject to the terms of the Mozilla Public
  * License, v. 2.0. If a copy of the MPL was not distributed with this
  * file, you can obtain one at https://mozilla.org/MPL/2.0/.
@@ -9,8 +11,7 @@
  * information regarding copyright ownership.
  */
 
-#ifndef DNS_KASP_H
-#define DNS_KASP_H 1
+#pragma once
 
 /*****
 ***** Module Info
@@ -32,6 +33,12 @@
 #include <dns/types.h>
 
 ISC_LANG_BEGINDECLS
+
+/* For storing a list of digest types */
+struct dns_kasp_digest {
+	dns_dsdigest_t digest;
+	ISC_LINK(dns_kasp_digest_t) link;
+};
 
 /* Stores a KASP key */
 struct dns_kasp_key {
@@ -60,8 +67,8 @@ struct dns_kasp_nsec3param {
 /* Stores a DNSSEC policy */
 struct dns_kasp {
 	unsigned int magic;
-	isc_mem_t *  mctx;
-	char *	     name;
+	isc_mem_t   *mctx;
+	char	    *name;
 
 	/* Internals. */
 	isc_mutex_t lock;
@@ -79,8 +86,10 @@ struct dns_kasp {
 	uint32_t signatures_validity_dnskey;
 
 	/* Configuration: Keys */
-	dns_kasp_keylist_t keys;
-	dns_ttl_t	   dnskey_ttl;
+	bool		      cdnskey;
+	dns_kasp_digestlist_t digests;
+	dns_kasp_keylist_t    keys;
+	dns_ttl_t	      dnskey_ttl;
 
 	/* Configuration: Denial of existence */
 	bool		      nsec3;
@@ -94,6 +103,7 @@ struct dns_kasp {
 	/* Zone settings */
 	dns_ttl_t zone_max_ttl;
 	uint32_t  zone_propagation_delay;
+	bool	  inline_signing;
 
 	/* Parent settings */
 	dns_ttl_t parent_ds_ttl;
@@ -104,17 +114,17 @@ struct dns_kasp {
 #define DNS_KASP_VALID(kasp) ISC_MAGIC_VALID(kasp, DNS_KASP_MAGIC)
 
 /* Defaults */
-#define DNS_KASP_SIG_REFRESH	     (86400 * 5)
-#define DNS_KASP_SIG_VALIDITY	     (86400 * 14)
-#define DNS_KASP_SIG_VALIDITY_DNSKEY (86400 * 14)
-#define DNS_KASP_KEY_TTL	     (3600)
-#define DNS_KASP_DS_TTL		     (86400)
-#define DNS_KASP_PUBLISH_SAFETY	     (3600)
-#define DNS_KASP_PURGE_KEYS	     (86400 * 90)
-#define DNS_KASP_RETIRE_SAFETY	     (3600)
-#define DNS_KASP_ZONE_MAXTTL	     (86400)
-#define DNS_KASP_ZONE_PROPDELAY	     (300)
-#define DNS_KASP_PARENT_PROPDELAY    (3600)
+#define DNS_KASP_SIG_REFRESH	     "P5D"
+#define DNS_KASP_SIG_VALIDITY	     "P14D"
+#define DNS_KASP_SIG_VALIDITY_DNSKEY "P14D"
+#define DNS_KASP_KEY_TTL	     "3600"
+#define DNS_KASP_DS_TTL		     "86400"
+#define DNS_KASP_PUBLISH_SAFETY	     "3600"
+#define DNS_KASP_PURGE_KEYS	     "P90D"
+#define DNS_KASP_RETIRE_SAFETY	     "3600"
+#define DNS_KASP_ZONE_MAXTTL	     "86400"
+#define DNS_KASP_ZONE_PROPDELAY	     "300"
+#define DNS_KASP_PARENT_PROPDELAY    "3600"
 
 /* Key roles */
 #define DNS_KASP_KEY_ROLE_KSK 0x01
@@ -380,10 +390,36 @@ dns_kasp_setretiresafety(dns_kasp_t *kasp, uint32_t value);
  *\li   'kasp' is a valid, thawed kasp.
  */
 
-dns_ttl_t
-dns_kasp_zonemaxttl(dns_kasp_t *kasp);
+bool
+dns_kasp_inlinesigning(dns_kasp_t *kasp);
 /*%<
- * Get maximum zone TTL.
+ * Should we use inline-signing for this DNSSEC policy?
+ *
+ * Requires:
+ *
+ *\li   'kasp' is a valid, frozen kasp.
+ *
+ * Returns:
+ *
+ *\li   true or false.
+ */
+
+void
+dns_kasp_setinlinesigning(dns_kasp_t *kasp, bool value);
+/*%<
+ * Set inline-signing.
+ *
+ * Requires:
+ *
+ *\li   'kasp' is a valid, thawed kasp.
+ */
+
+dns_ttl_t
+dns_kasp_zonemaxttl(dns_kasp_t *kasp, bool fallback);
+/*%<
+ * Get maximum zone TTL. If 'fallback' is true, return a default maximum TTL
+ * if the maximum zone TTL is set to unlimited (value 0). Fallback should be
+ * used if determining key rollover timings in keymgr.c
  *
  * Requires:
  *
@@ -710,6 +746,55 @@ dns_kasp_setnsec3param(dns_kasp_t *kasp, uint8_t iter, bool optout,
  *
  */
 
-ISC_LANG_ENDDECLS
+bool
+dns_kasp_cdnskey(dns_kasp_t *kasp);
+/*%<
+ * Do we need to publish a CDNSKEY?
+ *
+ * Requires:
+ *
+ *\li  'kasp' is a valid, frozen kasp.
+ *
+ */
 
-#endif /* DNS_KASP_H */
+void
+dns_kasp_setcdnskey(dns_kasp_t *kasp, bool cdnskey);
+/*%<
+ * Set to enable publication of CDNSKEY records.
+ *
+ * Requires:
+ *
+ *\li  'kasp' is a valid, unfrozen kasp.
+ *
+ */
+
+dns_kasp_digestlist_t
+dns_kasp_digests(dns_kasp_t *kasp);
+/*%<
+ * Get the list of kasp CDS digest types. This determines which CDS records
+ * should be published.
+ *
+ * Requires:
+ *
+ *\li   'kasp' is a valid, frozen kasp.
+ *
+ * Returns:
+ *
+ *\li  #ISC_R_SUCCESS
+ *\li  #ISC_R_NOMEMORY
+ *
+ *\li  Other errors are possible.
+ */
+
+void
+dns_kasp_adddigest(dns_kasp_t *kasp, dns_dsdigest_t alg);
+/*%<
+ * Add a CDS digest type, this will enable publication of a CDS record with
+ * digest type 'alg'.
+ *
+ * Requires:
+ *
+ *\li   'kasp' is a valid, thawed kasp.
+ */
+
+ISC_LANG_ENDDECLS

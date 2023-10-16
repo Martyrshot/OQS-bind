@@ -1,6 +1,8 @@
 /*
  * Copyright (C) Internet Systems Consortium, Inc. ("ISC")
  *
+ * SPDX-License-Identifier: MPL-2.0
+ *
  * This Source Code Form is subject to the terms of the Mozilla Public
  * License, v. 2.0. If a copy of the MPL was not distributed with this
  * file, you can obtain one at https://mozilla.org/MPL/2.0/.
@@ -42,7 +44,7 @@ check_mx(isc_token_t *token) {
 	return (true);
 }
 
-static inline isc_result_t
+static isc_result_t
 fromtext_mx(ARGS_FROMTEXT) {
 	isc_token_t token;
 	dns_name_t name;
@@ -94,12 +96,12 @@ fromtext_mx(ARGS_FROMTEXT) {
 	return (ISC_R_SUCCESS);
 }
 
-static inline isc_result_t
+static isc_result_t
 totext_mx(ARGS_TOTEXT) {
 	isc_region_t region;
 	dns_name_t name;
 	dns_name_t prefix;
-	bool sub;
+	unsigned int opts;
 	char buf[sizeof("64000")];
 	unsigned short num;
 
@@ -118,11 +120,12 @@ totext_mx(ARGS_TOTEXT) {
 	RETERR(str_totext(" ", target));
 
 	dns_name_fromregion(&name, &region);
-	sub = name_prefix(&name, tctx->origin, &prefix);
-	return (dns_name_totext(&prefix, sub, target));
+	opts = name_prefix(&name, tctx->origin, &prefix) ? DNS_NAME_OMITFINALDOT
+							 : 0;
+	return (dns_name_totext(&prefix, opts, target));
 }
 
-static inline isc_result_t
+static isc_result_t
 fromwire_mx(ARGS_FROMWIRE) {
 	dns_name_t name;
 	isc_region_t sregion;
@@ -132,7 +135,7 @@ fromwire_mx(ARGS_FROMWIRE) {
 	UNUSED(type);
 	UNUSED(rdclass);
 
-	dns_decompress_setmethods(dctx, DNS_COMPRESS_GLOBAL14);
+	dctx = dns_decompress_setpermitted(dctx, true);
 
 	dns_name_init(&name, NULL);
 
@@ -142,10 +145,10 @@ fromwire_mx(ARGS_FROMWIRE) {
 	}
 	RETERR(mem_tobuffer(target, sregion.base, 2));
 	isc_buffer_forward(source, 2);
-	return (dns_name_fromwire(&name, source, dctx, options, target));
+	return (dns_name_fromwire(&name, source, dctx, target));
 }
 
-static inline isc_result_t
+static isc_result_t
 towire_mx(ARGS_TOWIRE) {
 	dns_name_t name;
 	dns_offsets_t offsets;
@@ -154,7 +157,7 @@ towire_mx(ARGS_TOWIRE) {
 	REQUIRE(rdata->type == dns_rdatatype_mx);
 	REQUIRE(rdata->length != 0);
 
-	dns_compress_setmethods(cctx, DNS_COMPRESS_GLOBAL14);
+	dns_compress_setpermitted(cctx, true);
 
 	dns_rdata_toregion(rdata, &region);
 	RETERR(mem_tobuffer(target, region.base, 2));
@@ -163,10 +166,10 @@ towire_mx(ARGS_TOWIRE) {
 	dns_name_init(&name, offsets);
 	dns_name_fromregion(&name, &region);
 
-	return (dns_name_towire(&name, cctx, target));
+	return (dns_name_towire(&name, cctx, target, NULL));
 }
 
-static inline int
+static int
 compare_mx(ARGS_COMPARE) {
 	dns_name_t name1;
 	dns_name_t name2;
@@ -200,7 +203,7 @@ compare_mx(ARGS_COMPARE) {
 	return (dns_name_rdatacompare(&name1, &name2));
 }
 
-static inline isc_result_t
+static isc_result_t
 fromstruct_mx(ARGS_FROMSTRUCT) {
 	dns_rdata_mx_t *mx = source;
 	isc_region_t region;
@@ -218,7 +221,7 @@ fromstruct_mx(ARGS_FROMSTRUCT) {
 	return (isc_buffer_copyregion(target, &region));
 }
 
-static inline isc_result_t
+static isc_result_t
 tostruct_mx(ARGS_TOSTRUCT) {
 	isc_region_t region;
 	dns_rdata_mx_t *mx = target;
@@ -238,12 +241,12 @@ tostruct_mx(ARGS_TOSTRUCT) {
 	isc_region_consume(&region, 2);
 	dns_name_fromregion(&name, &region);
 	dns_name_init(&mx->mx, NULL);
-	RETERR(name_duporclone(&name, mctx, &mx->mx));
+	name_duporclone(&name, mctx, &mx->mx);
 	mx->mctx = mctx;
 	return (ISC_R_SUCCESS);
 }
 
-static inline void
+static void
 freestruct_mx(ARGS_FREESTRUCT) {
 	dns_rdata_mx_t *mx = source;
 
@@ -263,7 +266,7 @@ static unsigned char port25_ndata[] = "\003_25\004_tcp";
 static dns_name_t port25 = DNS_NAME_INITNONABSOLUTE(port25_ndata,
 						    port25_offset);
 
-static inline isc_result_t
+static isc_result_t
 additionaldata_mx(ARGS_ADDLDATA) {
 	isc_result_t result;
 	dns_fixedname_t fixed;
@@ -272,6 +275,8 @@ additionaldata_mx(ARGS_ADDLDATA) {
 	isc_region_t region;
 
 	REQUIRE(rdata->type == dns_rdatatype_mx);
+
+	UNUSED(owner);
 
 	dns_name_init(&name, offsets);
 	dns_rdata_toregion(rdata, &region);
@@ -282,7 +287,7 @@ additionaldata_mx(ARGS_ADDLDATA) {
 		return (ISC_R_SUCCESS);
 	}
 
-	result = (add)(arg, &name, dns_rdatatype_a);
+	result = (add)(arg, &name, dns_rdatatype_a, NULL DNS__DB_FILELINE);
 	if (result != ISC_R_SUCCESS) {
 		return (result);
 	}
@@ -294,10 +299,11 @@ additionaldata_mx(ARGS_ADDLDATA) {
 		return (ISC_R_SUCCESS);
 	}
 
-	return ((add)(arg, dns_fixedname_name(&fixed), dns_rdatatype_tlsa));
+	return ((add)(arg, dns_fixedname_name(&fixed), dns_rdatatype_tlsa,
+		      NULL DNS__DB_FILELINE));
 }
 
-static inline isc_result_t
+static isc_result_t
 digest_mx(ARGS_DIGEST) {
 	isc_region_t r1, r2;
 	dns_name_t name;
@@ -314,7 +320,7 @@ digest_mx(ARGS_DIGEST) {
 	return (dns_name_digest(&name, digest, arg));
 }
 
-static inline bool
+static bool
 checkowner_mx(ARGS_CHECKOWNER) {
 	REQUIRE(type == dns_rdatatype_mx);
 
@@ -324,7 +330,7 @@ checkowner_mx(ARGS_CHECKOWNER) {
 	return (dns_name_ishostname(name, wildcard));
 }
 
-static inline bool
+static bool
 checknames_mx(ARGS_CHECKNAMES) {
 	isc_region_t region;
 	dns_name_t name;
@@ -346,7 +352,7 @@ checknames_mx(ARGS_CHECKNAMES) {
 	return (true);
 }
 
-static inline int
+static int
 casecompare_mx(ARGS_COMPARE) {
 	return (compare_mx(rdata1, rdata2));
 }

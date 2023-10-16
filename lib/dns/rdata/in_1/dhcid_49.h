@@ -1,6 +1,8 @@
 /*
  * Copyright (C) Internet Systems Consortium, Inc. ("ISC")
  *
+ * SPDX-License-Identifier: MPL-2.0
+ *
  * This Source Code Form is subject to the terms of the Mozilla Public
  * License, v. 2.0. If a copy of the MPL was not distributed with this
  * file, you can obtain one at https://mozilla.org/MPL/2.0/.
@@ -10,8 +12,7 @@
  */
 
 /* */
-#ifndef IN_1_DHCID_49_H
-#define IN_1_DHCID_49_H 1
+#pragma once
 
 typedef struct dns_rdata_in_dhcid {
 	dns_rdatacommon_t common;
@@ -19,5 +20,3 @@ typedef struct dns_rdata_in_dhcid {
 	unsigned char *dhcid;
 	unsigned int length;
 } dns_rdata_in_dhcid_t;
-
-#endif /* IN_1_DHCID_49_H */

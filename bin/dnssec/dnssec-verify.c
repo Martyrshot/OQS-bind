@@ -1,6 +1,8 @@
 /*
  * Copyright (C) Internet Systems Consortium, Inc. ("ISC")
  *
+ * SPDX-License-Identifier: MPL-2.0
+ *
  * This Source Code Form is subject to the terms of the Mozilla Public
  * License, v. 2.0. If a copy of the MPL was not distributed with this
  * file, you can obtain one at https://mozilla.org/MPL/2.0/.
@@ -15,19 +17,17 @@
 #include <stdlib.h>
 #include <time.h>
 
-#include <isc/app.h>
 #include <isc/attributes.h>
 #include <isc/base32.h>
 #include <isc/commandline.h>
-#include <isc/event.h>
 #include <isc/file.h>
 #include <isc/hash.h>
 #include <isc/hex.h>
 #include <isc/mem.h>
 #include <isc/mutex.h>
 #include <isc/os.h>
-#include <isc/print.h>
 #include <isc/random.h>
+#include <isc/result.h>
 #include <isc/rwlock.h>
 #include <isc/serial.h>
 #include <isc/stdio.h>
@@ -54,16 +54,11 @@
 #include <dns/rdatasetiter.h>
 #include <dns/rdatastruct.h>
 #include <dns/rdatatype.h>
-#include <dns/result.h>
 #include <dns/soa.h>
 #include <dns/time.h>
 #include <dns/zoneverify.h>
 
 #include <dst/dst.h>
-
-#if USE_PKCS11
-#include <pk11/result.h>
-#endif /* if USE_PKCS11 */
 
 #include "dnssectool.h"
 
@@ -72,10 +67,10 @@ const char *program = "dnssec-verify";
 static isc_stdtime_t now;
 static isc_mem_t *mctx = NULL;
 static dns_masterformat_t inputformat = dns_masterformat_text;
-static dns_db_t *gdb;		  /* The database */
-static dns_dbversion_t *gversion; /* The database version */
-static dns_rdataclass_t gclass;	  /* The class */
-static dns_name_t *gorigin;	  /* The database origin */
+static dns_db_t *gdb = NULL;		 /* The database */
+static dns_dbversion_t *gversion = NULL; /* The database version */
+static dns_rdataclass_t gclass;		 /* The class */
+static dns_name_t *gorigin = NULL;	 /* The database origin */
 static bool ignore_kskflag = false;
 static bool keyset_kskonly = false;
 
@@ -134,14 +129,14 @@ loadzone(char *file, char *origin, dns_rdataclass_t rdclass, dns_db_t **db) {
 			      "use -o to specify a different zone origin",
 			      origin, file);
 		}
-	/* FALLTHROUGH */
+		FALLTHROUGH;
 	default:
 		fatal("failed loading zone from '%s': %s", file,
 		      isc_result_totext(result));
 	}
 }
 
-ISC_NORETURN static void
+noreturn static void
 usage(void);
 
 static void
@@ -163,14 +158,7 @@ usage(void) {
 	fprintf(stderr, "\t\tfile format of input zonefile (text)\n");
 	fprintf(stderr, "\t-c class (IN)\n");
 	fprintf(stderr, "\t-E engine:\n");
-#if USE_PKCS11
-	fprintf(stderr,
-		"\t\tpath to PKCS#11 provider library "
-		"(default is %s)\n",
-		PK11_LIB_LOCATION);
-#else  /* if USE_PKCS11 */
 	fprintf(stderr, "\t\tname of an OpenSSL engine to use\n");
-#endif /* if USE_PKCS11 */
 	fprintf(stderr, "\t-x:\tDNSKEY record signed with KSKs only, "
 			"not ZSKs\n");
 	fprintf(stderr, "\t-z:\tAll records signed with KSKs\n");
@@ -189,7 +177,7 @@ main(int argc, char *argv[]) {
 	char *endp;
 	int ch;
 
-#define CMDLINE_FLAGS "c:E:hm:o:I:qv:Vxz"
+#define CMDLINE_FLAGS "c:E:hJ:m:o:I:qv:Vxz"
 
 	/*
 	 * Process memory debugging argument first.
@@ -209,26 +197,14 @@ main(int argc, char *argv[]) {
 			{
 				isc_mem_debugging |= ISC_MEM_DEBUGUSAGE;
 			}
-			if (strcasecmp(isc_commandline_argument, "size") == 0) {
-				isc_mem_debugging |= ISC_MEM_DEBUGSIZE;
-			}
-			if (strcasecmp(isc_commandline_argument, "mctx") == 0) {
-				isc_mem_debugging |= ISC_MEM_DEBUGCTX;
-			}
 			break;
 		default:
 			break;
 		}
 	}
 	isc_commandline_reset = true;
-	check_result(isc_app_start(), "isc_app_start");
 
 	isc_mem_create(&mctx);
-
-#if USE_PKCS11
-	pk11_result_register();
-#endif /* if USE_PKCS11 */
-	dns_result_register();
 
 	isc_commandline_errprint = false;
 
@@ -244,6 +220,10 @@ main(int argc, char *argv[]) {
 
 		case 'I':
 			inputformatstr = isc_commandline_argument;
+			break;
+
+		case 'J':
+			journal = isc_commandline_argument;
 			break;
 
 		case 'm':
@@ -278,7 +258,7 @@ main(int argc, char *argv[]) {
 				fprintf(stderr, "%s: invalid argument -%c\n",
 					program, isc_commandline_option);
 			}
-			/* FALLTHROUGH */
+			FALLTHROUGH;
 
 		case 'h':
 			/* Does not return. */
@@ -301,7 +281,7 @@ main(int argc, char *argv[]) {
 		      isc_result_totext(result));
 	}
 
-	isc_stdtime_get(&now);
+	now = isc_stdtime_now();
 
 	rdclass = strtoclass(classname);
 
@@ -339,6 +319,9 @@ main(int argc, char *argv[]) {
 	gdb = NULL;
 	report("Loading zone '%s' from file '%s'\n", origin, file);
 	loadzone(file, origin, rdclass, &gdb);
+	if (journal != NULL) {
+		loadjournal(mctx, gdb, journal);
+	}
 	gorigin = dns_db_origin(gdb);
 	gclass = dns_db_class(gdb);
 
@@ -358,8 +341,6 @@ main(int argc, char *argv[]) {
 		isc_mem_stats(mctx, stdout);
 	}
 	isc_mem_destroy(&mctx);
-
-	(void)isc_app_finish();
 
 	return (result == ISC_R_SUCCESS ? 0 : 1);
 }

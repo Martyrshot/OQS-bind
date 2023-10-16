@@ -1,6 +1,8 @@
 /*
  * Copyright (C) Internet Systems Consortium, Inc. ("ISC")
  *
+ * SPDX-License-Identifier: MPL-2.0
+ *
  * This Source Code Form is subject to the terms of the Mozilla Public
  * License, v. 2.0. If a copy of the MPL was not distributed with this
  * file, you can obtain one at https://mozilla.org/MPL/2.0/.
@@ -17,6 +19,7 @@
 
 #include <inttypes.h>
 
+#include <isc/result.h>
 #include <isc/string.h>
 #include <isc/util.h>
 
@@ -25,7 +28,6 @@
 #include <dns/rdata.h>
 #include <dns/rdataset.h>
 #include <dns/rdatasetiter.h>
-#include <dns/result.h>
 #include <dns/rriterator.h>
 
 /***
@@ -82,7 +84,7 @@ dns_rriterator_first(dns_rriterator_t *it) {
 			return (it->result);
 		}
 
-		it->result = dns_db_allrdatasets(it->db, it->node, it->ver,
+		it->result = dns_db_allrdatasets(it->db, it->node, it->ver, 0,
 						 it->now, &it->rdatasetit);
 		if (it->result != ISC_R_SUCCESS) {
 			return (it->result);
@@ -136,7 +138,7 @@ dns_rriterator_nextrrset(dns_rriterator_t *it) {
 		if (it->result != ISC_R_SUCCESS) {
 			return (it->result);
 		}
-		it->result = dns_db_allrdatasets(it->db, it->node, it->ver,
+		it->result = dns_db_allrdatasets(it->db, it->node, it->ver, 0,
 						 it->now, &it->rdatasetit);
 		if (it->result != ISC_R_SUCCESS) {
 			return (it->result);
@@ -208,11 +210,7 @@ dns_rriterator_current(dns_rriterator_t *it, dns_name_t **name, uint32_t *ttl,
 	dns_rdata_reset(&it->rdata);
 	dns_rdataset_current(&it->rdataset, &it->rdata);
 
-	if (rdataset != NULL) {
-		*rdataset = &it->rdataset;
-	}
+	SET_IF_NOT_NULL(rdataset, &it->rdataset);
 
-	if (rdata != NULL) {
-		*rdata = &it->rdata;
-	}
+	SET_IF_NOT_NULL(rdata, &it->rdata);
 }

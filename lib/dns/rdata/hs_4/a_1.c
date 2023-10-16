@@ -1,6 +1,8 @@
 /*
  * Copyright (C) Internet Systems Consortium, Inc. ("ISC")
  *
+ * SPDX-License-Identifier: MPL-2.0
+ *
  * This Source Code Form is subject to the terms of the Mozilla Public
  * License, v. 2.0. If a copy of the MPL was not distributed with this
  * file, you can obtain one at https://mozilla.org/MPL/2.0/.
@@ -9,14 +11,13 @@
  * information regarding copyright ownership.
  */
 
-#ifndef RDATA_HS_4_A_1_C
-#define RDATA_HS_4_A_1_C
+#pragma once
 
 #include <isc/net.h>
 
 #define RRTYPE_A_ATTRIBUTES (0)
 
-static inline isc_result_t
+static isc_result_t
 fromtext_hs_a(ARGS_FROMTEXT) {
 	isc_token_t token;
 	struct in_addr addr;
@@ -46,7 +47,7 @@ fromtext_hs_a(ARGS_FROMTEXT) {
 	return (ISC_R_SUCCESS);
 }
 
-static inline isc_result_t
+static isc_result_t
 totext_hs_a(ARGS_TOTEXT) {
 	isc_region_t region;
 
@@ -60,7 +61,7 @@ totext_hs_a(ARGS_TOTEXT) {
 	return (inet_totext(AF_INET, tctx->flags, &region, target));
 }
 
-static inline isc_result_t
+static isc_result_t
 fromwire_hs_a(ARGS_FROMWIRE) {
 	isc_region_t sregion;
 	isc_region_t tregion;
@@ -70,7 +71,6 @@ fromwire_hs_a(ARGS_FROMWIRE) {
 
 	UNUSED(type);
 	UNUSED(dctx);
-	UNUSED(options);
 	UNUSED(rdclass);
 
 	isc_buffer_activeregion(source, &sregion);
@@ -88,7 +88,7 @@ fromwire_hs_a(ARGS_FROMWIRE) {
 	return (ISC_R_SUCCESS);
 }
 
-static inline isc_result_t
+static isc_result_t
 towire_hs_a(ARGS_TOWIRE) {
 	isc_region_t region;
 
@@ -107,7 +107,7 @@ towire_hs_a(ARGS_TOWIRE) {
 	return (ISC_R_SUCCESS);
 }
 
-static inline int
+static int
 compare_hs_a(ARGS_COMPARE) {
 	int order;
 
@@ -126,7 +126,7 @@ compare_hs_a(ARGS_COMPARE) {
 	return (order);
 }
 
-static inline isc_result_t
+static isc_result_t
 fromstruct_hs_a(ARGS_FROMSTRUCT) {
 	dns_rdata_hs_a_t *a = source;
 	uint32_t n;
@@ -145,7 +145,7 @@ fromstruct_hs_a(ARGS_FROMSTRUCT) {
 	return (uint32_tobuffer(n, target));
 }
 
-static inline isc_result_t
+static isc_result_t
 tostruct_hs_a(ARGS_TOSTRUCT) {
 	dns_rdata_hs_a_t *a = target;
 	uint32_t n;
@@ -169,26 +169,27 @@ tostruct_hs_a(ARGS_TOSTRUCT) {
 	return (ISC_R_SUCCESS);
 }
 
-static inline void
+static void
 freestruct_hs_a(ARGS_FREESTRUCT) {
 	UNUSED(source);
 
 	REQUIRE(source != NULL);
 }
 
-static inline isc_result_t
+static isc_result_t
 additionaldata_hs_a(ARGS_ADDLDATA) {
 	REQUIRE(rdata->type == dns_rdatatype_a);
 	REQUIRE(rdata->rdclass == dns_rdataclass_hs);
 
 	UNUSED(rdata);
+	UNUSED(owner);
 	UNUSED(add);
 	UNUSED(arg);
 
 	return (ISC_R_SUCCESS);
 }
 
-static inline isc_result_t
+static isc_result_t
 digest_hs_a(ARGS_DIGEST) {
 	isc_region_t r;
 
@@ -200,7 +201,7 @@ digest_hs_a(ARGS_DIGEST) {
 	return ((digest)(arg, &r));
 }
 
-static inline bool
+static bool
 checkowner_hs_a(ARGS_CHECKOWNER) {
 	REQUIRE(type == dns_rdatatype_a);
 	REQUIRE(rdclass == dns_rdataclass_hs);
@@ -213,7 +214,7 @@ checkowner_hs_a(ARGS_CHECKOWNER) {
 	return (true);
 }
 
-static inline bool
+static bool
 checknames_hs_a(ARGS_CHECKNAMES) {
 	REQUIRE(rdata->type == dns_rdatatype_a);
 	REQUIRE(rdata->rdclass == dns_rdataclass_hs);
@@ -225,9 +226,7 @@ checknames_hs_a(ARGS_CHECKNAMES) {
 	return (true);
 }
 
-static inline int
+static int
 casecompare_hs_a(ARGS_COMPARE) {
 	return (compare_hs_a(rdata1, rdata2));
 }
-
-#endif /* RDATA_HS_4_A_1_C */

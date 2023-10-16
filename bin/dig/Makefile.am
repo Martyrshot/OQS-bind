@@ -4,23 +4,20 @@ AM_CPPFLAGS +=			\
 	$(LIBISC_CFLAGS)	\
 	$(LIBDNS_CFLAGS)	\
 	$(LIBISCCFG_CFLAGS)	\
-	$(LIBIRS_CFLAGS)	\
-	$(LIBBIND9_CFLAGS)	\
-	$(LIBIDN2_CFLAGS)
+	$(LIBIDN2_CFLAGS)	\
+	$(LIBUV_CFLAGS)
 
-LDADD =				\
+LDADD +=			\
 	libdighost.la		\
 	$(LIBISC_LIBS)		\
 	$(LIBDNS_LIBS)		\
 	$(LIBISCCFG_LIBS)	\
-	$(LIBIRS_LIBS)		\
-	$(LIBBIND9_LIBS)	\
 	$(LIBIDN2_LIBS)
 
 noinst_LTLIBRARIES = libdighost.la
 
-libdighost_la_SOURCES = \
-	dighost.h	\
+libdighost_la_SOURCES =		\
+	dighost.h		\
 	dighost.c
 
 bin_PROGRAMS = dig host nslookup

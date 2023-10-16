@@ -1,6 +1,8 @@
 /*
  * Copyright (C) Internet Systems Consortium, Inc. ("ISC")
  *
+ * SPDX-License-Identifier: MPL-2.0
+ *
  * This Source Code Form is subject to the terms of the Mozilla Public
  * License, v. 2.0. If a copy of the MPL was not distributed with this
  * file, you can obtain one at https://mozilla.org/MPL/2.0/.
@@ -22,18 +24,13 @@
 #include <isc/file.h>
 #include <isc/hash.h>
 #include <isc/mem.h>
-#include <isc/print.h>
+#include <isc/result.h>
 #include <isc/string.h>
 #include <isc/util.h>
 
 #include <dns/keyvalues.h>
-#include <dns/result.h>
 
 #include <dst/dst.h>
-
-#if USE_PKCS11
-#include <pk11/result.h>
-#endif /* if USE_PKCS11 */
 
 #include "dnssectool.h"
 
@@ -41,7 +38,7 @@ const char *program = "dnssec-revoke";
 
 static isc_mem_t *mctx = NULL;
 
-ISC_NORETURN static void
+noreturn static void
 usage(void);
 
 static void
@@ -49,14 +46,7 @@ usage(void) {
 	fprintf(stderr, "Usage:\n");
 	fprintf(stderr, "    %s [options] keyfile\n\n", program);
 	fprintf(stderr, "Version: %s\n", PACKAGE_VERSION);
-#if USE_PKCS11
-	fprintf(stderr,
-		"    -E engine:    specify PKCS#11 provider "
-		"(default: %s)\n",
-		PK11_LIB_LOCATION);
-#else  /* if USE_PKCS11 */
 	fprintf(stderr, "    -E engine:    specify OpenSSL engine\n");
-#endif /* if USE_PKCS11 */
 	fprintf(stderr, "    -f:           force overwrite\n");
 	fprintf(stderr, "    -h:           help\n");
 	fprintf(stderr, "    -K directory: use directory for key files\n");
@@ -94,11 +84,6 @@ main(int argc, char **argv) {
 
 	isc_mem_create(&mctx);
 
-#if USE_PKCS11
-	pk11_result_register();
-#endif /* if USE_PKCS11 */
-	dns_result_register();
-
 	isc_commandline_errprint = false;
 
 	while ((ch = isc_commandline_parse(argc, argv, "E:fK:rRhv:V")) != -1) {
@@ -133,7 +118,7 @@ main(int argc, char **argv) {
 				fprintf(stderr, "%s: invalid argument -%c\n",
 					program, isc_commandline_option);
 			}
-		/* FALLTHROUGH */
+			FALLTHROUGH;
 		case 'h':
 			/* Does not return. */
 			usage();
@@ -150,7 +135,8 @@ main(int argc, char **argv) {
 	}
 
 	if (argc < isc_commandline_index + 1 ||
-	    argv[isc_commandline_index] == NULL) {
+	    argv[isc_commandline_index] == NULL)
+	{
 		fatal("The key file name was not specified");
 	}
 	if (argc > isc_commandline_index + 1) {
@@ -204,7 +190,7 @@ main(int argc, char **argv) {
 
 	flags = dst_key_flags(key);
 	if ((flags & DNS_KEYFLAG_REVOKE) == 0) {
-		isc_stdtime_t now;
+		isc_stdtime_t now = isc_stdtime_now();
 
 		if ((flags & DNS_KEYFLAG_KSK) == 0) {
 			fprintf(stderr,
@@ -214,7 +200,6 @@ main(int argc, char **argv) {
 				program);
 		}
 
-		isc_stdtime_get(&now);
 		dst_key_settime(key, DST_TIME_REVOKE, now);
 
 		dst_key_setflags(key, flags | DNS_KEYFLAG_REVOKE);

@@ -1,6 +1,8 @@
 /*
  * Copyright (C) Internet Systems Consortium, Inc. ("ISC")
  *
+ * SPDX-License-Identifier: MPL-2.0
+ *
  * This Source Code Form is subject to the terms of the Mozilla Public
  * License, v. 2.0. If a copy of the MPL was not distributed with this
  * file, you can obtain one at https://mozilla.org/MPL/2.0/.
@@ -9,12 +11,9 @@
  * information regarding copyright ownership.
  */
 
-#ifndef ISCCFG_KASPCONF_H
-#define ISCCFG_KASPCONF_H 1
+#pragma once
 
 #include <isc/lang.h>
-
-#include <dns/types.h>
 
 #include <isccfg/cfg.h>
 
@@ -25,14 +24,18 @@
 ISC_LANG_BEGINDECLS
 
 isc_result_t
-cfg_kasp_fromconfig(const cfg_obj_t *config, const char *name, isc_mem_t *mctx,
-		    isc_log_t *logctx, dns_kasplist_t *kasplist,
-		    dns_kasp_t **kaspp);
+cfg_kasp_fromconfig(const cfg_obj_t *config, dns_kasp_t *default_kasp,
+		    bool check_algorithms, isc_mem_t *mctx, isc_log_t *logctx,
+		    dns_kasplist_t *kasplist, dns_kasp_t **kaspp);
 /*%<
- * Create and configure a KASP. If 'config' is NULL, a built-in configuration
- * is used, referred to by 'name'. If a 'kasplist' is provided, a lookup
- * happens and if a KASP already exists with the same name, no new KASP is
- * created, and no attach to 'kaspp' happens.
+ * Create and configure a KASP. If 'default_kasp' is not NULL, the built-in
+ * default configuration is used to set values that are not explicitly set in
+ * the policy. If a 'kasplist' is provided, a lookup happens and if a KASP
+ * already exists with the same name, no new KASP is created, and no attach to
+ * 'kaspp' happens.
+ *
+ * If 'check_algorithms' is true then the dnssec-policy DNSSEC key
+ * algorithms are checked against those supported by the crypto provider.
  *
  * Requires:
  *
@@ -54,5 +57,3 @@ cfg_kasp_fromconfig(const cfg_obj_t *config, const char *name, isc_mem_t *mctx,
  */
 
 ISC_LANG_ENDDECLS
-
-#endif /* ISCCFG_KASPCONF_H */

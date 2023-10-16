@@ -1,26 +1,17 @@
-.. 
-   Copyright (C) Internet Systems Consortium, Inc. ("ISC")
-   
-   This Source Code Form is subject to the terms of the Mozilla Public
-   License, v. 2.0. If a copy of the MPL was not distributed with this
-   file, you can obtain one at https://mozilla.org/MPL/2.0/.
-   
-   See the COPYRIGHT file distributed with this work for additional
-   information regarding copyright ownership.
-
+.. Copyright (C) Internet Systems Consortium, Inc. ("ISC")
 ..
-   Copyright (C) Internet Systems Consortium, Inc. ("ISC")
-
-   This Source Code Form is subject to the terms of the Mozilla Public
-   License, v. 2.0. If a copy of the MPL was not distributed with this
-   file, You can obtain one at http://mozilla.org/MPL/2.0/.
-
-   See the COPYRIGHT file distributed with this work for additional
-   information regarding copyright ownership.
-
+.. SPDX-License-Identifier: MPL-2.0
+..
+.. This Source Code Form is subject to the terms of the Mozilla Public
+.. License, v. 2.0.  If a copy of the MPL was not distributed with this
+.. file, you can obtain one at https://mozilla.org/MPL/2.0/.
+..
+.. See the COPYRIGHT file distributed with this work for additional
+.. information regarding copyright ownership.
 
 .. highlight: console
 
+.. iscman:: filter-aaaa
 .. _man_filter-aaaa:
 
 filter-aaaa.so - filter AAAA in DNS responses when A is present
@@ -34,18 +25,18 @@ Synopsis
 Description
 ~~~~~~~~~~~
 
-``filter-aaaa.so`` is a query plugin module for ``named``, enabling
-``named`` to omit some IPv6 addresses when responding to clients.
+:program:`filter-aaaa.so` is a query plugin module for :iscman:`named`, enabling
+:iscman:`named` to omit some IPv6 addresses when responding to clients.
 
-Until BIND 9.12, this feature was implemented natively in ``named`` and
+Until BIND 9.12, this feature was implemented natively in :iscman:`named` and
 enabled with the ``filter-aaaa`` ACL and the ``filter-aaaa-on-v4`` and
-``filter-aaaa-on-v6`` options. These options are now deprecated in
-``named.conf`` but can be passed as parameters to the
+``filter-aaaa-on-v6`` options. These options are no longer available in
+:iscman:`named.conf` but can be passed as parameters to the
 ``filter-aaaa.so`` plugin, for example:
 
 ::
 
-   plugin query "/usr/local/lib/filter-aaaa.so" {
+   plugin query "filter-aaaa.so" {
            filter-aaaa-on-v4 yes;
            filter-aaaa-on-v6 yes;
            filter-aaaa { 192.0.2.1; 2001:db8:2::1; };

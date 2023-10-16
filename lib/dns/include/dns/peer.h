@@ -1,6 +1,8 @@
 /*
  * Copyright (C) Internet Systems Consortium, Inc. ("ISC")
  *
+ * SPDX-License-Identifier: MPL-2.0
+ *
  * This Source Code Form is subject to the terms of the Mozilla Public
  * License, v. 2.0. If a copy of the MPL was not distributed with this
  * file, you can obtain one at https://mozilla.org/MPL/2.0/.
@@ -9,8 +11,7 @@
  * information regarding copyright ownership.
  */
 
-#ifndef DNS_PEER_H
-#define DNS_PEER_H 1
+#pragma once
 
 /*****
 ***** Module Info
@@ -118,6 +119,12 @@ isc_result_t
 dns_peer_getsendcookie(dns_peer_t *peer, bool *retval);
 
 isc_result_t
+dns_peer_setrequirecookie(dns_peer_t *peer, bool newval);
+
+isc_result_t
+dns_peer_getrequirecookie(dns_peer_t *peer, bool *retval);
+
+isc_result_t
 dns_peer_setrequestexpire(dns_peer_t *peer, bool newval);
 
 isc_result_t
@@ -163,7 +170,7 @@ isc_result_t
 dns_peer_setkey(dns_peer_t *peer, dns_name_t **keyval);
 
 isc_result_t
-dns_peer_settransfersource(dns_peer_t *		 peer,
+dns_peer_settransfersource(dns_peer_t		*peer,
 			   const isc_sockaddr_t *transfer_source);
 
 isc_result_t
@@ -200,28 +207,8 @@ isc_result_t
 dns_peer_getquerysource(dns_peer_t *peer, isc_sockaddr_t *query_source);
 
 isc_result_t
-dns_peer_setnotifydscp(dns_peer_t *peer, isc_dscp_t dscp);
-
-isc_result_t
-dns_peer_getnotifydscp(dns_peer_t *peer, isc_dscp_t *dscpp);
-
-isc_result_t
-dns_peer_settransferdscp(dns_peer_t *peer, isc_dscp_t dscp);
-
-isc_result_t
-dns_peer_gettransferdscp(dns_peer_t *peer, isc_dscp_t *dscpp);
-
-isc_result_t
-dns_peer_setquerydscp(dns_peer_t *peer, isc_dscp_t dscp);
-
-isc_result_t
-dns_peer_getquerydscp(dns_peer_t *peer, isc_dscp_t *dscpp);
-
-isc_result_t
 dns_peer_setednsversion(dns_peer_t *peer, uint8_t ednsversion);
 
 isc_result_t
 dns_peer_getednsversion(dns_peer_t *peer, uint8_t *ednsversion);
 ISC_LANG_ENDDECLS
-
-#endif /* DNS_PEER_H */

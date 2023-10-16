@@ -11,27 +11,36 @@ dist-hook:
 
 SUBDIRS = dyndb/driver dlzexternal/driver hooks/driver
 
-AM_CPPFLAGS +=			\
-	$(LIBISC_CFLAGS)
+if DNSRPS
+SUBDIRS += rpz/testlib
+endif
 
-LDADD =				\
-	$(LIBISC_LIBS)
+AM_CPPFLAGS +=			\
+	$(LIBISC_CFLAGS) 	\
+	$(LIBDNS_CFLAGS)
+
+LDADD +=			\
+	$(LIBISC_LIBS)		\
+	$(LIBDNS_LIBS)
 
 if HAVE_PERL
 
-check_PROGRAMS =		\
+noinst_PROGRAMS =		\
 	feature-test		\
 	makejournal		\
 	pipelined/pipequeries	\
-	resolve			\
 	rndc/gencheck		\
-	rpz/dnsrps		\
-	tkey/keycreate		\
-	tkey/keydelete
+	rpz/dnsrps
 
 feature_test_CPPFLAGS =		\
 	$(AM_CPPFLAGS)		\
-	$(LIBDNS_CFLAGS)
+	$(LIBDNS_CFLAGS)	\
+	$(OPENSSL_CFLAGS)
+
+feature_test_LDADD =		\
+	$(LDADD)		\
+	$(LIBDNS_LIBS)		\
+	$(OPENSSL_LIBS)
 
 makejournal_CPPFLAGS =		\
 	$(AM_CPPFLAGS)		\
@@ -49,29 +58,15 @@ pipelined_pipequeries_LDADD =	\
 	$(LDADD)		\
 	$(LIBDNS_LIBS)
 
-resolve_CPPFLAGS =		\
+rpz_dnsrps_CPPFLAGS =		\
 	$(AM_CPPFLAGS)		\
-	$(LIBISC_CFLAGS)	\
 	$(LIBDNS_CFLAGS)	\
-	$(LIBIRS_CFLAGS)
+	-DLIBRPZ_LIB_OPEN=\"$(abs_builddir)/rpz/testlib/.libs/libdummyrpz.so\"
 
-resolve_LDADD = $(LIBISC_LIBS) $(LIBIRS_LIBS) $(LIBDNS_LIBS)
-
-tkey_keycreate_CPPFLAGS =	\
-	$(AM_CPPFLAGS)		\
-	$(LIBDNS_CFLAGS)
-
-tkey_keycreate_LDADD =		\
+rpz_dnsrps_LDADD =		\
 	$(LDADD)		\
-	$(LIBDNS_LIBS)
-
-tkey_keydelete_CPPFLAGS =	\
-	$(AM_CPPFLAGS)		\
-	$(LIBDNS_CFLAGS)
-
-tkey_keydelete_LDADD =		\
-	$(LDADD)		\
-	$(LIBDNS_LIBS)
+	$(LIBDNS_LIBS)		\
+	$(DLOPEN_LIBS)
 
 TESTS =
 
@@ -83,6 +78,11 @@ if HAVE_PERLMOD_NET_DNS
 TESTS +=		\
 	rpzrecurse
 endif HAVE_PERLMOD_NET_DNS
+
+if HAVE_LIBNGHTTP2
+TESTS +=		\
+	doth
+endif
 
 TESTS +=			\
 	acl			\
@@ -99,19 +99,17 @@ TESTS +=			\
 	checkconf		\
 	checknames		\
 	checkzone		\
-	cpu			\
 	database		\
-	dlz			\
+	dialup			\
 	dlzexternal		\
 	dns64			\
-	doth			\
-	dscp			\
 	dsdigest		\
 	dyndb			\
 	ecdsa			\
 	eddsa			\
 	ednscompliance		\
 	emptyzones		\
+	enginepkcs11		\
 	filter-aaaa		\
 	formerr			\
 	geoip2			\
@@ -121,8 +119,10 @@ TESTS +=			\
 	inline			\
 	integrity		\
 	hooks			\
+	host			\
 	journal			\
 	keepalive		\
+	keyfromlabel		\
 	legacy			\
 	limits			\
 	logfileconfig		\
@@ -153,8 +153,8 @@ TESTS +=			\
 	staticstub		\
 	stub			\
 	synthfromdnssec		\
-	tkey			\
 	tools			\
+	transport-acl		\
 	tsig			\
 	tsiggss			\
 	ttl			\
@@ -165,12 +165,6 @@ TESTS +=			\
 	xferquota		\
 	zonechecks
 
-# The "stress" test is not run by default since it creates enough
-# load on the machine to make it unusable to other users.
-# The "dialup", "delzone", and "dupsigs" tests are also not run by
-# default because they take a very long time to complete.
-# TESTS += delzone dialup dupsigs stress
-
 if HAVE_LMDB
 TESTS += nzd2nzf
 endif # HAVE_LMDB
@@ -178,13 +172,12 @@ endif # HAVE_LMDB
 if HAVE_PERLMOD_NET_DNS
 
 TESTS +=		\
-	digdelv		\
 	fetchlimit	\
-	forward		\
 	ixfr		\
 	nsupdate	\
 	resolver	\
 	statistics	\
+	stress		\
 	upforwd		\
 	zero
 
@@ -207,29 +200,23 @@ endif HAVE_PERLMOD_NET_DNS_NAMESERVER
 endif HAVE_PERLMOD_NET_DNS
 
 if HAVE_PYTHON
-TESTS += kasp keymgr2kasp tcp pipelined
+TESTS += kasp multisigner tcp pipelined
+
+if HAVE_PYTEST
+TESTS += checkds dispatch rpzextra shutdown timeouts
+endif
 
 if HAVE_PYMOD_DNS
-TESTS += qmin cookie timeouts
-
+TESTS += qmin cookie
 if HAVE_PERLMOD_NET_DNS
-TESTS += dnssec
+TESTS += digdelv dnssec forward
 if HAVE_PERLMOD_NET_DNS_NAMESERVER
 TESTS += chain
 endif HAVE_PERLMOD_NET_DNS_NAMESERVER
 endif HAVE_PERLMOD_NET_DNS
-
-if HAVE_PYTEST
-TESTS += rpzextra shutdown
-endif
-
 endif HAVE_PYMOD_DNS
 
 endif HAVE_PYTHON
-
-if HAVE_PKCS11
-TESTS += pkcs11
-endif
 
 else !HAVE_PERL
 check:
@@ -245,9 +232,12 @@ LOG_DRIVER_V_1 = --verbose yes
 LOG_DRIVER = $(srcdir)/custom-test-driver
 AM_LOG_DRIVER_FLAGS = $(LOG_DRIVER_V)
 
-LOG_COMPILER = $(builddir)/run.sh
+LOG_COMPILER = $(builddir)/legacy.run.sh
 AM_LOG_FLAGS = -r
 
-$(TESTS): run.sh
+$(TESTS): legacy.run.sh
 
 test-local: check
+
+clean-local::
+	-find $(builddir) -maxdepth 1 -type d -name "*_*" | xargs rm -rf

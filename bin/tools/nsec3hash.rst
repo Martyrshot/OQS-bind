@@ -1,26 +1,18 @@
-.. 
-   Copyright (C) Internet Systems Consortium, Inc. ("ISC")
-   
-   This Source Code Form is subject to the terms of the Mozilla Public
-   License, v. 2.0. If a copy of the MPL was not distributed with this
-   file, you can obtain one at https://mozilla.org/MPL/2.0/.
-   
-   See the COPYRIGHT file distributed with this work for additional
-   information regarding copyright ownership.
-
+.. Copyright (C) Internet Systems Consortium, Inc. ("ISC")
 ..
-   Copyright (C) Internet Systems Consortium, Inc. ("ISC")
-
-   This Source Code Form is subject to the terms of the Mozilla Public
-   License, v. 2.0. If a copy of the MPL was not distributed with this
-   file, You can obtain one at http://mozilla.org/MPL/2.0/.
-
-   See the COPYRIGHT file distributed with this work for additional
-   information regarding copyright ownership.
-
+.. SPDX-License-Identifier: MPL-2.0
+..
+.. This Source Code Form is subject to the terms of the Mozilla Public
+.. License, v. 2.0.  If a copy of the MPL was not distributed with this
+.. file, you can obtain one at https://mozilla.org/MPL/2.0/.
+..
+.. See the COPYRIGHT file distributed with this work for additional
+.. information regarding copyright ownership.
 
 .. highlight: console
 
+.. iscman:: nsec3hash
+.. program:: nsec3hash
 .. _man_nsec3hash:
 
 nsec3hash - generate NSEC3 hash
@@ -36,7 +28,7 @@ Synopsis
 Description
 ~~~~~~~~~~~
 
-``nsec3hash`` generates an NSEC3 hash based on a set of NSEC3
+:program:`nsec3hash` generates an NSEC3 hash based on a set of NSEC3
 parameters. This can be used to check the validity of NSEC3 records in a
 signed zone.
 
@@ -49,22 +41,27 @@ into a command line to confirm the correctness of an NSEC3 hash.
 Arguments
 ~~~~~~~~~
 
-``salt``
+.. option:: salt
+
    This is the salt provided to the hash algorithm.
 
-``algorithm``
+.. option:: algorithm
+
    This is a number indicating the hash algorithm. Currently the only supported
    hash algorithm for NSEC3 is SHA-1, which is indicated by the number
    1; consequently "1" is the only useful value for this argument.
 
-``flags``
+.. option:: flags
+
    This is provided for compatibility with NSEC3 record presentation format, but
    is ignored since the flags do not affect the hash.
 
-``iterations``
+.. option:: iterations
+
    This is the number of additional times the hash should be performed.
 
-``domain``
+.. option:: domain
+
    This is the domain name to be hashed.
 
 See Also

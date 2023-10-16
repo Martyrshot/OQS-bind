@@ -1,6 +1,8 @@
 /*
  * Copyright (C) Internet Systems Consortium, Inc. ("ISC")
  *
+ * SPDX-License-Identifier: MPL-2.0
+ *
  * This Source Code Form is subject to the terms of the Mozilla Public
  * License, v. 2.0. If a copy of the MPL was not distributed with this
  * file, you can obtain one at https://mozilla.org/MPL/2.0/.
@@ -14,7 +16,7 @@
 
 #define RRTYPE_MD_ATTRIBUTES (0)
 
-static inline isc_result_t
+static isc_result_t
 fromtext_md(ARGS_FROMTEXT) {
 	isc_token_t token;
 	dns_name_t name;
@@ -38,12 +40,12 @@ fromtext_md(ARGS_FROMTEXT) {
 	return (ISC_R_SUCCESS);
 }
 
-static inline isc_result_t
+static isc_result_t
 totext_md(ARGS_TOTEXT) {
 	isc_region_t region;
 	dns_name_t name;
 	dns_name_t prefix;
-	bool sub;
+	unsigned int opts;
 
 	REQUIRE(rdata->type == dns_rdatatype_md);
 	REQUIRE(rdata->length != 0);
@@ -54,12 +56,12 @@ totext_md(ARGS_TOTEXT) {
 	dns_rdata_toregion(rdata, &region);
 	dns_name_fromregion(&name, &region);
 
-	sub = name_prefix(&name, tctx->origin, &prefix);
-
-	return (dns_name_totext(&prefix, sub, target));
+	opts = name_prefix(&name, tctx->origin, &prefix) ? DNS_NAME_OMITFINALDOT
+							 : 0;
+	return (dns_name_totext(&prefix, opts, target));
 }
 
-static inline isc_result_t
+static isc_result_t
 fromwire_md(ARGS_FROMWIRE) {
 	dns_name_t name;
 
@@ -68,13 +70,13 @@ fromwire_md(ARGS_FROMWIRE) {
 	UNUSED(type);
 	UNUSED(rdclass);
 
-	dns_decompress_setmethods(dctx, DNS_COMPRESS_GLOBAL14);
+	dctx = dns_decompress_setpermitted(dctx, true);
 
 	dns_name_init(&name, NULL);
-	return (dns_name_fromwire(&name, source, dctx, options, target));
+	return (dns_name_fromwire(&name, source, dctx, target));
 }
 
-static inline isc_result_t
+static isc_result_t
 towire_md(ARGS_TOWIRE) {
 	dns_name_t name;
 	dns_offsets_t offsets;
@@ -83,16 +85,16 @@ towire_md(ARGS_TOWIRE) {
 	REQUIRE(rdata->type == dns_rdatatype_md);
 	REQUIRE(rdata->length != 0);
 
-	dns_compress_setmethods(cctx, DNS_COMPRESS_GLOBAL14);
+	dns_compress_setpermitted(cctx, true);
 
 	dns_name_init(&name, offsets);
 	dns_rdata_toregion(rdata, &region);
 	dns_name_fromregion(&name, &region);
 
-	return (dns_name_towire(&name, cctx, target));
+	return (dns_name_towire(&name, cctx, target, NULL));
 }
 
-static inline int
+static int
 compare_md(ARGS_COMPARE) {
 	dns_name_t name1;
 	dns_name_t name2;
@@ -117,7 +119,7 @@ compare_md(ARGS_COMPARE) {
 	return (dns_name_rdatacompare(&name1, &name2));
 }
 
-static inline isc_result_t
+static isc_result_t
 fromstruct_md(ARGS_FROMSTRUCT) {
 	dns_rdata_md_t *md = source;
 	isc_region_t region;
@@ -134,7 +136,7 @@ fromstruct_md(ARGS_FROMSTRUCT) {
 	return (isc_buffer_copyregion(target, &region));
 }
 
-static inline isc_result_t
+static isc_result_t
 tostruct_md(ARGS_TOSTRUCT) {
 	dns_rdata_md_t *md = target;
 	isc_region_t r;
@@ -152,12 +154,12 @@ tostruct_md(ARGS_TOSTRUCT) {
 	dns_rdata_toregion(rdata, &r);
 	dns_name_fromregion(&name, &r);
 	dns_name_init(&md->md, NULL);
-	RETERR(name_duporclone(&name, mctx, &md->md));
+	name_duporclone(&name, mctx, &md->md);
 	md->mctx = mctx;
 	return (ISC_R_SUCCESS);
 }
 
-static inline void
+static void
 freestruct_md(ARGS_FREESTRUCT) {
 	dns_rdata_md_t *md = source;
 
@@ -172,7 +174,7 @@ freestruct_md(ARGS_FREESTRUCT) {
 	md->mctx = NULL;
 }
 
-static inline isc_result_t
+static isc_result_t
 additionaldata_md(ARGS_ADDLDATA) {
 	dns_name_t name;
 	dns_offsets_t offsets;
@@ -180,14 +182,16 @@ additionaldata_md(ARGS_ADDLDATA) {
 
 	REQUIRE(rdata->type == dns_rdatatype_md);
 
+	UNUSED(owner);
+
 	dns_name_init(&name, offsets);
 	dns_rdata_toregion(rdata, &region);
 	dns_name_fromregion(&name, &region);
 
-	return ((add)(arg, &name, dns_rdatatype_a));
+	return ((add)(arg, &name, dns_rdatatype_a, NULL DNS__DB_FILELINE));
 }
 
-static inline isc_result_t
+static isc_result_t
 digest_md(ARGS_DIGEST) {
 	isc_region_t r;
 	dns_name_t name;
@@ -201,7 +205,7 @@ digest_md(ARGS_DIGEST) {
 	return (dns_name_digest(&name, digest, arg));
 }
 
-static inline bool
+static bool
 checkowner_md(ARGS_CHECKOWNER) {
 	REQUIRE(type == dns_rdatatype_md);
 
@@ -213,7 +217,7 @@ checkowner_md(ARGS_CHECKOWNER) {
 	return (true);
 }
 
-static inline bool
+static bool
 checknames_md(ARGS_CHECKNAMES) {
 	REQUIRE(rdata->type == dns_rdatatype_md);
 
@@ -224,7 +228,7 @@ checknames_md(ARGS_CHECKNAMES) {
 	return (true);
 }
 
-static inline int
+static int
 casecompare_md(ARGS_COMPARE) {
 	return (compare_md(rdata1, rdata2));
 }

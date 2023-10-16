@@ -1,5 +1,7 @@
 /*
- * Portions Copyright (C) Internet Systems Consortium, Inc. ("ISC")
+ * Copyright (C) Internet Systems Consortium, Inc. ("ISC")
+ *
+ * SPDX-License-Identifier: MPL-2.0 AND ISC
  *
  * This Source Code Form is subject to the terms of the Mozilla Public
  * License, v. 2.0. If a copy of the MPL was not distributed with this
@@ -7,8 +9,10 @@
  *
  * See the COPYRIGHT file distributed with this work for additional
  * information regarding copyright ownership.
- *
- * Portions Copyright (C) 2001 Nominum, Inc.
+ */
+
+/*
+ * Copyright (C) 2001 Nominum, Inc.
  *
  * Permission to use, copy, modify, and/or distribute this software for any
  * purpose with or without fee is hereby granted, provided that the above
@@ -23,8 +27,7 @@
  * OR IN CONNECTION WITH THE USE OR PERFORMANCE OF THIS SOFTWARE.
  */
 
-#ifndef ISCCC_ALIST_H
-#define ISCCC_ALIST_H 1
+#pragma once
 
 /*! \file isccc/alist.h */
 
@@ -81,5 +84,3 @@ isccc_alist_prettyprint(isccc_sexpr_t *sexpr, unsigned int indent,
 			FILE *stream);
 
 ISC_LANG_ENDDECLS
-
-#endif /* ISCCC_ALIST_H */

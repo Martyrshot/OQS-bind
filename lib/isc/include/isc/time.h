@@ -1,6 +1,8 @@
 /*
  * Copyright (C) Internet Systems Consortium, Inc. ("ISC")
  *
+ * SPDX-License-Identifier: MPL-2.0
+ *
  * This Source Code Form is subject to the terms of the Mozilla Public
  * License, v. 2.0. If a copy of the MPL was not distributed with this
  * file, you can obtain one at https://mozilla.org/MPL/2.0/.
@@ -9,34 +11,23 @@
  * information regarding copyright ownership.
  */
 
-#ifndef ISC_TIME_H
-#define ISC_TIME_H 1
+#pragma once
 
 /*! \file */
 
-#include <inttypes.h>
-#include <stdbool.h>
+#include <time.h>
 
 #include <isc/lang.h>
 #include <isc/types.h>
 
-/***
- *** Intervals
- ***/
-
-/*!
- *  \brief
- * The contents of this structure are private, and MUST NOT be accessed
- * directly by callers.
- *
- * The contents are exposed only to allow callers to avoid dynamic allocation.
- */
-struct isc_interval {
-	unsigned int seconds;
-	unsigned int nanoseconds;
+enum {
+	MS_PER_SEC = 1000,		 /*%< Milliseonds per second. */
+	US_PER_MS = 1000,		 /*%< Microseconds per millisecond. */
+	US_PER_SEC = 1000 * 1000,	 /*%< Microseconds per second. */
+	NS_PER_US = 1000,		 /*%< Nanoseconds per microsecond. */
+	NS_PER_MS = 1000 * 1000,	 /*%< Nanoseconds per millisecond. */
+	NS_PER_SEC = 1000 * 1000 * 1000, /*%< Nanoseconds per second. */
 };
-
-extern const isc_interval_t *const isc_interval_zero;
 
 /*
  * ISC_FORMATHTTPTIMESTAMP_SIZE needs to be 30 in C locale and potentially
@@ -45,11 +36,16 @@ extern const isc_interval_t *const isc_interval_zero;
  */
 #define ISC_FORMATHTTPTIMESTAMP_SIZE 50
 
+/*
+ * Semantic shims to distinguish between relative and absolute time
+ */
+#define isc_interval_zero isc_time_epoch
+#define isc_interval_t	  isc_time_t
+
 ISC_LANG_BEGINDECLS
 
-void
-isc_interval_set(isc_interval_t *i, unsigned int seconds,
-		 unsigned int nanoseconds);
+#define isc_interval_set(i, seconds, nanoseconds) \
+	isc_time_set((isc_time_t *)i, seconds, nanoseconds)
 /*%<
  * Set 'i' to a value representing an interval of 'seconds' seconds and
  * 'nanoseconds' nanoseconds, suitable for use in isc_time_add() and
@@ -61,8 +57,7 @@ isc_interval_set(isc_interval_t *i, unsigned int seconds,
  *\li	nanoseconds < 1000000000.
  */
 
-bool
-isc_interval_iszero(const isc_interval_t *i);
+#define isc_interval_iszero(i) isc_time_isepoch((const isc_time_t *)i)
 /*%<
  * Returns true iff. 'i' is the zero interval.
  *
@@ -71,9 +66,43 @@ isc_interval_iszero(const isc_interval_t *i);
  *\li	'i' is a valid pointer.
  */
 
+#define isc_interval_ms(i) isc_time_miliseconds((const isc_time_t *)i)
+/*%<
+ * Returns interval 'i' expressed as a number of milliseconds.
+ *
+ * Requires:
+ *
+ *\li	'i' is a valid pointer.
+ */
+
+#define isc_interval_fromnanosecs(ns) isc_time_fromnanosecs(ns)
+#define isc_interval_tonanosecs(i)    isc_time_tonanosecs(i)
+
 /***
  *** Absolute Times
  ***/
+
+/*%
+ * A linear count of nanoseconds.
+ *
+ * 64 bits of nanoseconds is more than 500 years.
+ */
+typedef uint64_t isc_nanosecs_t;
+
+/*%
+ * Convert linear nanoseconds to an isc_time_t
+ */
+#define isc_nanosecs_fromtime(time) \
+	(NS_PER_SEC * (isc_nanosecs_t)(time).seconds + (time).nanoseconds)
+
+/*%
+ * Construct an isc_time_t from linear nanoseconds
+ */
+#define isc_time_fromnanosecs(ns)                 \
+	((isc_time_t){                            \
+		.seconds = (ns) / NS_PER_SEC,     \
+		.nanoseconds = (ns) % NS_PER_SEC, \
+	})
 
 /*%
  * The contents of this structure are private, and MUST NOT be accessed
@@ -131,8 +160,14 @@ isc_time_isepoch(const isc_time_t *t);
  *\li	't' is a valid pointer.
  */
 
-isc_result_t
-isc_time_now(isc_time_t *t);
+isc_nanosecs_t
+isc_time_monotonic(void);
+/*%<
+ * Returns the system's monotonic time in linear nanoseconds.
+ */
+
+isc_time_t
+isc_time_now(void);
 /*%<
  * Set 't' to the current absolute time.
  *
@@ -150,8 +185,8 @@ isc_time_now(isc_time_t *t);
  *		in the current definition of isc_time_t.
  */
 
-isc_result_t
-isc_time_now_hires(isc_time_t *t);
+isc_time_t
+isc_time_now_hires(void);
 /*%<
  * Set 't' to the current absolute time. Uses higher resolution clocks
  * recommended when microsecond accuracy is required.
@@ -309,6 +344,16 @@ isc_time_nanoseconds(const isc_time_t *t);
  *\li	The returned value is less than 1*10^9.
  */
 
+uint32_t
+isc_time_miliseconds(const isc_time_t *t);
+/*%<
+ * Returns time 't' expressed as a number of milliseconds.
+ *
+ * Requires:
+ *
+ *\li	't' is a valid pointer.
+ */
+
 void
 isc_time_formattimestamp(const isc_time_t *t, char *buf, unsigned int len);
 /*%<
@@ -446,5 +491,3 @@ isc_time_formatshorttimestamp(const isc_time_t *t, char *buf, unsigned int len);
  */
 
 ISC_LANG_ENDDECLS
-
-#endif /* ISC_TIME_H */

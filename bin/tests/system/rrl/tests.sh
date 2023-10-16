@@ -1,11 +1,17 @@
+#!/bin/sh
+
 # Copyright (C) Internet Systems Consortium, Inc. ("ISC")
 #
+# SPDX-License-Identifier: MPL-2.0
+#
 # This Source Code Form is subject to the terms of the Mozilla Public
-# License, v. 2.0. If a copy of the MPL was not distributed with this
+# License, v. 2.0.  If a copy of the MPL was not distributed with this
 # file, you can obtain one at https://mozilla.org/MPL/2.0/.
 #
 # See the COPYRIGHT file distributed with this work for additional
 # information regarding copyright ownership.
+
+set -e
 
 # test response rate limiting
 
@@ -28,7 +34,7 @@ while getopts "x" c; do
 	*) echo "$USAGE" 1>&2; exit 1;;
     esac
 done
-shift `expr $OPTIND - 1 || true`
+shift $((OPTIND - 1))
 if test "$#" -ne 0; then
     echo "$USAGE" 1>&2
     exit 1
@@ -48,9 +54,9 @@ setret () {
 #   The start of a second credits a rate limit.
 #   This would be far easier in C or by assuming a modern version of perl.
 sec_start () {
-    START=`date`
+    START=$(date)
     while true; do
-	NOW=`date`
+	NOW=$(date)
 	if test "$START" != "$NOW"; then
 	    return
 	fi
@@ -74,7 +80,7 @@ burst () {
     CNT=$XCNT
 
     DOMS=""
-    CNTS=`$PERL -e 'for ( $i = 0; $i < '$BURST_LIMIT'; $i++) { printf "%03d\n", '$QNUM' + $i; }'`
+    CNTS=$($PERL -e 'for ( $i = 0; $i < '$BURST_LIMIT'; $i++) { printf "%03d\n", '$QNUM' + $i; }')
     for CNT in $CNTS
     do
         eval BURST_DOM="$BURST_DOM_BASE"
@@ -82,7 +88,6 @@ burst () {
     done
     ARGS="+burst +nocookie +continue +time=1 +tries=1 -p ${PORT} $* @$ns2 $DOMS"
     $MDIG $ARGS 2>&1 |                                                  \
-        tr -d '\r' |                                                    \
         tee -a full-$FILENAME |                                         \
         sed -n -e '/^;; AUTHORITY/,/^$/d'			        \
 		-e '/^;; ADDITIONAL/,/^$/d'				\
@@ -93,7 +98,7 @@ burst () {
 		-e 's/;; .* status: SERVFAIL.*/SERVFAIL/p'		\
 		-e 's/response failed with timed out.*/drop/p'		\
 		-e 's/;; communications error to.*/drop/p' >> $FILENAME &
-    QNUM=`expr $QNUM + $BURST_LIMIT`
+    QNUM=$((QNUM + BURST_LIMIT))
 }
 
 # compare integers $1 and $2; ensure the difference is no more than $3
@@ -107,31 +112,31 @@ ck_result() {
     # wait to the background mdig calls to complete.
     wait
     BAD=no
-    ADDRS=`egrep "^$2$" mdig.out-$1				2>/dev/null | wc -l`
+    ADDRS=$(grep -E "^$2$" mdig.out-$1				2>/dev/null | wc -l)
     # count simple truncated and truncated NXDOMAIN as TC
-    TC=`egrep "^TC|NXDOMAINTC$" mdig.out-$1			2>/dev/null | wc -l`
-    DROP=`egrep "^drop$" mdig.out-$1				2>/dev/null | wc -l`
+    TC=$(grep -E "^TC|NXDOMAINTC$" mdig.out-$1			2>/dev/null | wc -l)
+    DROP=$(grep -E "^drop$" mdig.out-$1				2>/dev/null | wc -l)
     # count NXDOMAIN and truncated NXDOMAIN as NXDOMAIN
-    NXDOMAIN=`egrep "^NXDOMAIN|NXDOMAINTC$" mdig.out-$1		2>/dev/null | wc -l`
-    SERVFAIL=`egrep "^SERVFAIL$" mdig.out-$1			2>/dev/null | wc -l`
-    NOERROR=`egrep "^NOERROR$" mdig.out-$1			2>/dev/null | wc -l`
-    
+    NXDOMAIN=$(grep -E "^NXDOMAIN|NXDOMAINTC$" mdig.out-$1		2>/dev/null | wc -l)
+    SERVFAIL=$(grep -E "^SERVFAIL$" mdig.out-$1			2>/dev/null | wc -l)
+    NOERROR=$(grep -E "^NOERROR$" mdig.out-$1			2>/dev/null | wc -l)
+
     range $ADDRS "$3" 1 ||
     setret "$ADDRS instead of $3 '$2' responses for $1" &&
     BAD=yes
-    
+
     range $TC "$4" 1 ||
     setret "$TC instead of $4 truncation responses for $1" &&
     BAD=yes
-    
+
     range $DROP "$5" 1 ||
     setret "$DROP instead of $5 dropped responses for $1" &&
     BAD=yes
-    
+
     range $NXDOMAIN "$6" 1 ||
     setret "$NXDOMAIN instead of $6 NXDOMAIN responses for $1" &&
     BAD=yes
-    
+
     range $SERVFAIL "$7" 1 ||
     setret "$SERVFAIL instead of $7 error responses for $1" &&
     BAD=yes
@@ -139,7 +144,7 @@ ck_result() {
     range $NOERROR "$8" 1 ||
     setret "$NOERROR instead of $8 NOERROR responses for $1" &&
     BAD=yes
-    
+
     if test -z "$BAD"; then
 	rm -f mdig.out-$1
     fi
@@ -150,11 +155,11 @@ ckstats () {
     LABEL="$1"; shift
     TYPE="$1"; shift
     EXPECTED="$1"; shift
-    C=`tr -d '\r' < ns2/named.stats |
+    C=$(cat ns2/named.stats |
         sed -n -e "s/[	 ]*\([0-9]*\).responses $TYPE for rate limits.*/\1/p" |
-        tail -1`
-    C=`expr 0$C + 0`
-    
+        tail -1)
+    C=$((C))
+
     range "$C" $EXPECTED 1 ||
     setret "wrong $LABEL $TYPE statistics of $C instead of $EXPECTED"
 }
@@ -171,9 +176,7 @@ burst 3 a1.tld2
 sleep 1
 burst 10 a1.tld2
 # Request 30 different qnames to try a wildcard.
-burst 30 'x$CNT.a2.tld2'
-# These should be counted and limited but are not.  See RT33138.
-burst 10 'y.x$CNT.a2.tld2'
+burst 30 'y.x$CNT.a2.tld2'
 
 #					IP      TC      drop  NXDOMAIN SERVFAIL NOERROR
 # referrals to "."
@@ -181,12 +184,9 @@ ck_result   a1.tld3	x		0	1	2	0	0	2
 # check 13 results including 1 second delay that allows an additional response
 ck_result   a1.tld2	192.0.2.1	3	4	6	0	0	8
 
-# Check the wild card answers.
-# The parent name of the 30 requests is counted.
-ck_result 'x*.a2.tld2'	192.0.2.2	2	10	18	0	0	12
-
-# These should be limited but are not.  See RT33138.
-ck_result 'y.x*.a2.tld2' 192.0.2.2	10	0	0	0	0	10
+# Check the wildcard answers.
+# The zone origin name of the 30 requests is counted.
+ck_result 'y.x*.a2.tld2'	192.0.2.2	2	10	18	0	0	12
 
 #########
 sec_start
@@ -254,33 +254,38 @@ $RNDCCMD $ns2 stats
 ckstats final dropped 56
 ckstats final truncated 23
 
+
 #########
 sec_start
 
+# check that "would limit" is emitted for "log-only yes;"
 DIGOPTS="+nocookie +nosearch +time=1 +tries=1 +ignore -p ${PORT}"
-$DIG $DIGOPTS @$ns4 A a7.tld4 > /dev/null 2>&1
-$DIG $DIGOPTS @$ns4 A a7.tld4 > /dev/null 2>&1
-$DIG $DIGOPTS @$ns4 A a7.tld4 > /dev/null 2>&1
-$DIG $DIGOPTS @$ns4 A a7.tld4 > /dev/null 2>&1
-$DIG $DIGOPTS @$ns4 A a7.tld4 > /dev/null 2>&1
-$DIG $DIGOPTS @$ns4 A a7.tld4 > /dev/null 2>&1
-$DIG $DIGOPTS @$ns4 A a7.tld4 > /dev/null 2>&1
-$DIG $DIGOPTS @$ns4 A a7.tld4 > /dev/null 2>&1
-$DIG $DIGOPTS @$ns4 A a7.tld4 > /dev/null 2>&1
-$DIG $DIGOPTS @$ns4 A a7.tld4 > /dev/null 2>&1
-$DIG $DIGOPTS @$ns4 A a7.tld4 > /dev/null 2>&1
+$DIG $DIGOPTS @$ns4 A a7.tld4 > dig.out.a7.tld 2> /dev/null
+# skip this check if query takes over 500ms
+if grep -E ';; Query time: [1-4]?[0-9]?[0-9] msec' dig.out.a7.tld > /dev/null 2>&1; then
+    for i in 1 2 3 4 5; do
+        $DIG $DIGOPTS @$ns4 A a7.tld4 > /dev/null 2>&1 &
+    done
+    wait
+    grep "would limit" ns4/named.run > /dev/null 2>&1 || setret "\"would limit\" not found in log file."
+fi
 
-grep "would limit" ns4/named.run >/dev/null 2>&1 ||
-setret "\"would limit\" not found in log file."
 
+# regression test for GL #2839
+DIGOPTS="+bufsize=4096 +ignore -p ${PORT}"
+$DIG $DIGOPTS @$ns4 TXT big.tld4 > /dev/null 2>&1
+
+
+# check named doesn't start with a broken config
 $NAMED -D rrl-ns5 -gc broken.conf > broken.out 2>&1 &
 sleep 2
 grep "min-table-size 1" broken.out > /dev/null || setret "min-table-size 0 was not changed to 1"
 
 if [ -f named.pid ]; then
-    $KILL `cat named.pid`
+    kill $(cat named.pid)
     setret "named should not have started, but did"
 fi
+
 
 echo_i "exit status: $ret"
 [ $ret -eq 0 ] || exit 1

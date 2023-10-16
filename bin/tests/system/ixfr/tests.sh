@@ -1,19 +1,22 @@
 #!/bin/sh
-#
+
 # Copyright (C) Internet Systems Consortium, Inc. ("ISC")
 #
+# SPDX-License-Identifier: MPL-2.0
+#
 # This Source Code Form is subject to the terms of the Mozilla Public
-# License, v. 2.0. If a copy of the MPL was not distributed with this
+# License, v. 2.0.  If a copy of the MPL was not distributed with this
 # file, you can obtain one at https://mozilla.org/MPL/2.0/.
 #
 # See the COPYRIGHT file distributed with this work for additional
 # information regarding copyright ownership.
 
-
 # WARNING: The test labelled "testing request-ixfr option in view vs zone"
 #          is fragile because it depends upon counting instances of records
 #          in the log file - need a better approach <sdm> - until then,
 #          if you add any tests above that point, you will break the test.
+
+set -e
 
 . ../conf.sh
 
@@ -205,8 +208,8 @@ status=$((status+ret))
 n=$((n+1))
 echo_i "testing ixfr-from-differences option ($n)"
 # ns3 is primary; ns4 is secondary
-$CHECKZONE test. ns3/mytest.db > /dev/null 2>&1
-if [ $? -ne 0 ]
+{ $CHECKZONE test. ns3/mytest.db > /dev/null 2>&1; rc=$?; } || true
+if [ $rc -ne 0 ]
 then
     echo_i "named-checkzone returned failure on ns3/mytest.db"
 fi
@@ -216,6 +219,7 @@ retry_quiet 10 wait_for_serial 10.53.0.4 test. 1 dig.out.test$n || ret=1
 nextpart ns4/named.run > /dev/null
 
 # modify the primary
+sleep 1
 cp ns3/mytest1.db ns3/mytest.db
 $RNDCCMD 10.53.0.3 reload | sed 's/^/ns3 /' | cat_i
 
@@ -243,6 +247,7 @@ ret=0
 # we want to make sure that a change to sub.test results in AXFR, while
 # changes to test. result in IXFR
 
+sleep 1
 cp ns3/subtest1.db ns3/subtest.db # change to sub.test zone, should be AXFR
 nextpart ns4/named.run > /dev/null
 $RNDCCMD 10.53.0.3 reload | sed 's/^/ns3 /' | cat_i
@@ -266,6 +271,7 @@ status=$((status+ret))
 n=$((n+1))
 echo_i "testing 'request-ixfr yes' option inheritance from view ($n)"
 ret=0
+sleep 1
 cp ns3/mytest2.db ns3/mytest.db # change to test zone, should be IXFR
 nextpart ns4/named.run > /dev/null
 $RNDCCMD 10.53.0.3 reload | sed 's/^/ns3 /' | cat_i
@@ -295,9 +301,9 @@ sub=$!
 $DIG -p ${PORT} ixfr=0 large @10.53.0.3 > dig.out.test$n
 kill $sub
 )
-lines=`grep hostmaster.large dig.out.test$n | wc -l`
+lines=$(grep hostmaster.large dig.out.test$n | wc -l)
 test ${lines:-0} -eq 2 || ret=1
-messages=`sed -n 's/^;;.*messages \([0-9]*\),.*/\1/p' dig.out.test$n`
+messages=$(sed -n 's/^;;.*messages \([0-9]*\),.*/\1/p' dig.out.test$n)
 test ${messages:-0} -gt 1 || ret=1
 if [ $ret != 0 ]; then echo_i "failed"; fi
 status=$((status+ret))
@@ -382,9 +388,9 @@ status=$((status+ret))
 n=$((n+1))
 echo_i "checking whether dig calculates IXFR statistics correctly ($n)"
 ret=0
-$DIG $DIGOPTS +noedns +stat -b 10.53.0.4 @10.53.0.4 test. ixfr=2 > dig.out1.test$n
+$DIG $DIGOPTS +expire +nocookie +stat -b 10.53.0.4 @10.53.0.4 test. ixfr=2 > dig.out1.test$n
 get_dig_xfer_stats dig.out1.test$n > stats.dig
-diff ixfr-stats.good stats.dig > /dev/null || ret=1
+diff ixfr-stats-with-expire.good stats.dig > /dev/null || ret=1
 if [ $ret != 0 ]; then echo_i "failed"; fi
 status=$((status+ret))
 
@@ -394,20 +400,20 @@ status=$((status+ret))
 
 _wait_for_stats () {
     get_named_xfer_stats ns4/named.run "$1" test "$2" > "$3"
-    diff ixfr-stats.good "$3" > /dev/null || return 1
+    diff "$4" "$3" > /dev/null || return 1
     return 0
 }
 
 n=$((n+1))
 echo_i "checking whether named calculates incoming IXFR statistics correctly ($n)"
 ret=0
-retry_quiet 10 _wait_for_stats 10.53.0.3 "Transfer completed" stats.incoming
+retry_quiet 10 _wait_for_stats 10.53.0.3 "Transfer completed" stats.incoming ixfr-stats-without-expire.good || ret=1
 if [ $ret != 0 ]; then echo_i "failed"; fi
 status=$((status+ret))
 
 n=$((n+1))
 echo_i "checking whether named calculates outgoing IXFR statistics correctly ($n)"
-retry_quiet 10 _wait_for_stats 10.53.0.4 "IXFR ended" stats.outgoing
+retry_quiet 10 _wait_for_stats 10.53.0.4 "IXFR ended" stats.outgoing ixfr-stats-with-expire.good || ret=1
 if [ $ret != 0 ]; then echo_i "failed"; fi
 status=$((status+ret))
 
@@ -416,6 +422,7 @@ ret=0
 echo_i "testing fallback to AXFR when max-ixfr-ratio is exceeded ($n)"
 nextpart ns4/named.run > /dev/null
 
+sleep 1
 cp ns3/mytest3.db ns3/mytest.db # change to test zone, too big for IXFR
 $RNDCCMD 10.53.0.3 reload | sed 's/^/ns3 /' | cat_i
 

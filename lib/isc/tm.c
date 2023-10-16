@@ -1,6 +1,8 @@
 /*
  * Copyright (C) Internet Systems Consortium, Inc. ("ISC")
  *
+ * SPDX-License-Identifier: MPL-2.0 AND BSD-2-Clause
+ *
  * This Source Code Form is subject to the terms of the Mozilla Public
  * License, v. 2.0. If a copy of the MPL was not distributed with this
  * file, you can obtain one at https://mozilla.org/MPL/2.0/.
@@ -94,11 +96,10 @@ conv_num(const char **buf, int *dest, int llim, int ulim) {
 	}
 
 	do {
-		result *= 10;
-		result += *(*buf)++ - '0';
+		result = 10 * result + *(*buf)++ - '0';
 		rulim /= 10;
-	} while ((result * 10 <= ulim) && rulim && **buf >= '0' &&
-		 **buf <= '9');
+	} while ((result * 10 <= ulim) && rulim &&
+		 isdigit((unsigned char)**buf));
 
 	if (result < llim || result > ulim) {
 		return (0);
@@ -134,7 +135,7 @@ isc_tm_timegm(struct tm *tm) {
 
 char *
 isc_tm_strptime(const char *buf, const char *fmt, struct tm *tm) {
-	char c, *ret;
+	char c;
 	const char *bp;
 	size_t len = 0;
 	int alt_format, i, split_year = 0;
@@ -320,7 +321,7 @@ isc_tm_strptime(const char *buf, const char *fmt, struct tm *tm) {
 
 		case 'k': /* The hour (24-hour clock representation). */
 			LEGAL_ALT(0);
-		/* FALLTHROUGH */
+			FALLTHROUGH;
 		case 'H':
 			LEGAL_ALT(ALT_O);
 			if (!(conv_num(&bp, &tm->tm_hour, 0, 23))) {
@@ -330,7 +331,7 @@ isc_tm_strptime(const char *buf, const char *fmt, struct tm *tm) {
 
 		case 'l': /* The hour (12-hour clock representation). */
 			LEGAL_ALT(0);
-		/* FALLTHROUGH */
+			FALLTHROUGH;
 		case 'I':
 			LEGAL_ALT(ALT_O);
 			if (!(conv_num(&bp, &tm->tm_hour, 1, 12))) {
@@ -462,6 +463,5 @@ isc_tm_strptime(const char *buf, const char *fmt, struct tm *tm) {
 	}
 
 	/* LINTED functional specification */
-	DE_CONST(bp, ret);
-	return (ret);
+	return (UNCONST(bp));
 }

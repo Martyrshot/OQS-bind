@@ -1,6 +1,8 @@
 /*
  * Copyright (C) Internet Systems Consortium, Inc. ("ISC")
  *
+ * SPDX-License-Identifier: MPL-2.0
+ *
  * This Source Code Form is subject to the terms of the Mozilla Public
  * License, v. 2.0. If a copy of the MPL was not distributed with this
  * file, you can obtain one at https://mozilla.org/MPL/2.0/.
@@ -9,19 +11,21 @@
  * information regarding copyright ownership.
  */
 
-#ifndef ISC_SOCKADDR_H
-#define ISC_SOCKADDR_H 1
+#pragma once
 
 /*! \file isc/sockaddr.h */
 
 #include <stdbool.h>
+#include <sys/un.h>
 
 #include <isc/lang.h>
 #include <isc/net.h>
 #include <isc/types.h>
 
-#include <sys/un.h>
-
+/*
+ * Any updates to this structure should also be applied in
+ * contrib/modules/dlz/dlz_minmal.h.
+ */
 struct isc_sockaddr {
 	union {
 		struct sockaddr		sa;
@@ -241,5 +245,3 @@ isc_sockaddr_fromsockaddr(isc_sockaddr_t *isa, const struct sockaddr *sa);
  */
 
 ISC_LANG_ENDDECLS
-
-#endif /* ISC_SOCKADDR_H */

@@ -1,62 +1,33 @@
 /*
- * Copyright (C) 2002 Stichting NLnet, Netherlands, stichting@nlnet.nl.
+ * Copyright (C) Internet Systems Consortium, Inc. ("ISC")
  *
- * Permission to use, copy, modify, and distribute this software for any
- * purpose with or without fee is hereby granted, provided that the
- * above copyright notice and this permission notice appear in all
- * copies.
+ * SPDX-License-Identifier: MPL-2.0 and ISC
  *
- * THE SOFTWARE IS PROVIDED "AS IS" AND STICHTING NLNET
- * DISCLAIMS ALL WARRANTIES WITH REGARD TO THIS SOFTWARE INCLUDING ALL
- * IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS. IN NO EVENT SHALL
- * STICHTING NLNET BE LIABLE FOR ANY SPECIAL, DIRECT, INDIRECT, OR
- * CONSEQUENTIAL DAMAGES OR ANY DAMAGES WHATSOEVER RESULTING FROM LOSS
- * OF USE, DATA OR PROFITS, WHETHER IN AN ACTION OF CONTRACT, NEGLIGENCE
- * OR OTHER TORTIOUS ACTION, ARISING OUT OF OR IN CONNECTION WITH THE
- * USE OR PERFORMANCE OF THIS SOFTWARE.
+ * This Source Code Form is subject to the terms of the Mozilla Public
+ * License, v. 2.0. If a copy of the MPL was not distributed with this
+ * file, you can obtain one at https://mozilla.org/MPL/2.0/.
+ */
+
+/*
+ * Copyright (C) Stichting NLnet, Netherlands, stichting@nlnet.nl.
+ * Copyright (C) John Eaglesham
  *
  * The development of Dynamically Loadable Zones (DLZ) for Bind 9 was
  * conceived and contributed by Rob Butler.
  *
- * Permission to use, copy, modify, and distribute this software for any
- * purpose with or without fee is hereby granted, provided that the
- * above copyright notice and this permission notice appear in all
- * copies.
+ * Permission to use, copy, modify, and distribute this software for any purpose
+ * with or without fee is hereby granted, provided that the above copyright
+ * notice and this permission notice appear in all copies.
  *
- * THE SOFTWARE IS PROVIDED "AS IS" AND ROB BUTLER
- * DISCLAIMS ALL WARRANTIES WITH REGARD TO THIS SOFTWARE INCLUDING ALL
- * IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS. IN NO EVENT SHALL
- * ROB BUTLER BE LIABLE FOR ANY SPECIAL, DIRECT, INDIRECT, OR
- * CONSEQUENTIAL DAMAGES OR ANY DAMAGES WHATSOEVER RESULTING FROM LOSS
- * OF USE, DATA OR PROFITS, WHETHER IN AN ACTION OF CONTRACT, NEGLIGENCE
- * OR OTHER TORTIOUS ACTION, ARISING OUT OF OR IN CONNECTION WITH THE
- * USE OR PERFORMANCE OF THIS SOFTWARE.
+ * THE SOFTWARE IS PROVIDED "AS IS" AND THE AUTHOR DISCLAIMS ALL WARRANTIES WITH
+ * REGARD TO THIS SOFTWARE INCLUDING ALL IMPLIED WARRANTIES OF MERCHANTABILITY
+ * AND FITNESS. IN NO EVENT SHALL THE AUTHOR BE LIABLE FOR ANY SPECIAL, DIRECT,
+ * INDIRECT, OR CONSEQUENTIAL DAMAGES OR ANY DAMAGES WHATSOEVER RESULTING FROM
+ * LOSS OF USE, DATA OR PROFITS, WHETHER IN AN ACTION OF CONTRACT, NEGLIGENCE OR
+ * OTHER TORTIOUS ACTION, ARISING OUT OF OR IN CONNECTION WITH THE USE OR
+ * PERFORMANCE OF THIS SOFTWARE.
  */
 
-/*
- * Copyright (C) 1999-2001, 2016  Internet Systems Consortium, Inc. ("ISC")
- *
- * This Source Code Form is subject to the terms of the Mozilla Public
- * License, v. 2.0. If a copy of the MPL was not distributed with this
- * file, You can obtain one at http://mozilla.org/MPL/2.0/.
- */
-
-/*
- * Copyright (C) 2009-2012  John Eaglesham
- *
- * Permission to use, copy, modify, and distribute this software for any
- * purpose with or without fee is hereby granted, provided that the above
- * copyright notice and this permission notice appear in all copies.
- *
- * THE SOFTWARE IS PROVIDED "AS IS" AND JOHN EAGLESHAM
- * DISCLAIMS ALL WARRANTIES WITH REGARD TO THIS SOFTWARE INCLUDING ALL
- * IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS. IN NO EVENT SHALL
- * JOHN EAGLESHAM BE LIABLE FOR ANY SPECIAL, DIRECT,
- * INDIRECT, OR CONSEQUENTIAL DAMAGES OR ANY DAMAGES WHATSOEVER RESULTING
- * FROM LOSS OF USE, DATA OR PROFITS, WHETHER IN AN ACTION OF CONTRACT,
- * NEGLIGENCE OR OTHER TORTIOUS ACTION, ARISING OUT OF OR IN CONNECTION
- * WITH THE USE OR PERFORMANCE OF THIS SOFTWARE.
- */
 #include "dlz_perl_driver.h"
 #include <EXTERN.h>
 #include <perl.h>
@@ -65,6 +36,8 @@
 #include <string.h>
 
 #include <dlz_minimal.h>
+
+#define BUF_LEN 64 /* Should be big enough, right? hah */
 
 /* Enable debug logging? */
 #if 0
@@ -108,7 +81,7 @@ EXTERN_C void
 boot_DLZ_Perl(pTHX_ CV *cv);
 EXTERN_C void
 xs_init(pTHX) {
-	char *file = __FILE__;
+	const char *file = __FILE__;
 	dXSUB_SYS;
 
 	/* DynaLoader is a special case */
@@ -143,6 +116,7 @@ b9_add_helper(config_data_t *state, const char *helper_name, void *ptr) {
 
 int
 dlz_version(unsigned int *flags) {
+	UNUSED(flags);
 	return (DLZ_DLOPEN_VERSION);
 }
 
@@ -177,7 +151,7 @@ dlz_allnodes(const char *zone, void *dbdata, dns_sdlzallnodes_t *allnodes) {
 	SPAGAIN;
 
 	if (SvTRUE(ERRSV)) {
-		POPs;
+		(void)POPs;
 		cd->log(ISC_LOG_ERROR,
 			"DLZ Perl: allnodes for zone %s died in eval: %s", zone,
 			SvPV_nolen(ERRSV));
@@ -195,7 +169,8 @@ dlz_allnodes(const char *zone, void *dbdata, dns_sdlzallnodes_t *allnodes) {
 	while (r++ < rrcount) {
 		record_ref = POPs;
 		if ((!SvROK(record_ref)) ||
-		    (SvTYPE(SvRV(record_ref)) != SVt_PVAV)) {
+		    (SvTYPE(SvRV(record_ref)) != SVt_PVAV))
+		{
 			cd->log(ISC_LOG_ERROR,
 				"DLZ Perl: allnodes for zone %s "
 				"returned an invalid value "
@@ -213,7 +188,8 @@ dlz_allnodes(const char *zone, void *dbdata, dns_sdlzallnodes_t *allnodes) {
 		rr_data = av_fetch((AV *)record_ref, 3, 0);
 
 		if (rr_name == NULL || rr_type == NULL || rr_ttl == NULL ||
-		    rr_data == NULL) {
+		    rr_data == NULL)
+		{
 			cd->log(ISC_LOG_ERROR,
 				"DLZ Perl: allnodes for zone %s "
 				"returned an array that was missing data",
@@ -277,7 +253,7 @@ dlz_allowzonexfr(void *dbdata, const char *name, const char *client) {
 		 * it away so we don't leave junk on the stack for the next
 		 * caller.
 		 */
-		POPs;
+		(void)POPs;
 		cd->log(ISC_LOG_ERROR,
 			"DLZ Perl: allowzonexfr died in eval: %s",
 			SvPV_nolen(ERRSV));
@@ -354,7 +330,7 @@ dlz_findzonedb(void *dbdata, const char *name, dns_clientinfomethods_t *methods,
 		 * it away so we don't leave junk on the stack for the next
 		 * caller.
 		 */
-		POPs;
+		(void)POPs;
 		cd->log(ISC_LOG_ERROR, "DLZ Perl: findzone died in eval: %s",
 			SvPV_nolen(ERRSV));
 		retval = ISC_R_FAILURE;
@@ -433,7 +409,7 @@ dlz_lookup(const char *zone, const char *name, void *dbdata,
 	SPAGAIN;
 
 	if (SvTRUE(ERRSV)) {
-		POPs;
+		(void)POPs;
 		cd->log(ISC_LOG_ERROR, "DLZ Perl: lookup died in eval: %s",
 			SvPV_nolen(ERRSV));
 		retval = ISC_R_FAILURE;
@@ -450,7 +426,8 @@ dlz_lookup(const char *zone, const char *name, void *dbdata,
 	while (r++ < rrcount) {
 		record_ref = POPs;
 		if ((!SvROK(record_ref)) ||
-		    (SvTYPE(SvRV(record_ref)) != SVt_PVAV)) {
+		    (SvTYPE(SvRV(record_ref)) != SVt_PVAV))
+		{
 			cd->log(ISC_LOG_ERROR, "DLZ Perl: lookup returned an "
 					       "invalid value (expected array "
 					       "of arrayrefs)!");
@@ -499,14 +476,13 @@ CLEAN_UP_AND_RETURN:
 	return (retval);
 }
 
-const char *
+static const char *
 #ifdef MULTIPLICITY
 missing_perl_method(const char *perl_class_name, PerlInterpreter *my_perl)
 #else  /* ifdef MULTIPLICITY */
 missing_perl_method(const char *perl_class_name)
 #endif /* ifdef MULTIPLICITY */
 {
-	const int BUF_LEN = 64; /* Should be big enough, right? hah */
 	char full_name[BUF_LEN];
 	const char *methods[] = { "new", "findzone", "lookup", NULL };
 	int i = 0;
@@ -528,8 +504,7 @@ isc_result_t
 dlz_create(const char *dlzname, unsigned int argc, char *argv[], void **dbdata,
 	   ...) {
 	config_data_t *cd;
-	char *init_args[] = { NULL, NULL };
-	char *perlrun[] = { "", NULL, "dlz perl", NULL };
+	char *perlrun[] = { (char *)"", NULL, (char *)"dlz perl", NULL };
 	char *perl_class_name;
 	int r;
 	va_list ap;
@@ -639,9 +614,10 @@ dlz_create(const char *dlzname, unsigned int argc, char *argv[], void **dbdata,
 	}
 
 #ifdef MULTIPLICITY
-	if (missing_method_name = missing_perl_method(perl_class_name, my_perl))
+	if ((missing_method_name = missing_perl_method(perl_class_name,
+						       my_perl)))
 #else  /* ifdef MULTIPLICITY */
-	if (missing_method_name = missing_perl_method(perl_class_name))
+	if ((missing_method_name = missing_perl_method(perl_class_name)))
 #endif /* ifdef MULTIPLICITY */
 	{
 		cd->log(ISC_LOG_ERROR,
@@ -683,7 +659,7 @@ dlz_create(const char *dlzname, unsigned int argc, char *argv[], void **dbdata,
 	LEAVE;
 
 	if (SvTRUE(ERRSV)) {
-		POPs;
+		(void)POPs;
 		cd->log(ISC_LOG_ERROR, "DLZ Perl '%s': new died in eval: %s",
 			dlzname, SvPV_nolen(ERRSV));
 		goto CLEAN_UP_PERL_AND_FAIL;

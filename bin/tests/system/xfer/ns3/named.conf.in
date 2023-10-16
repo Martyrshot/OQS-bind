@@ -1,9 +1,11 @@
 /*
  * Copyright (C) Internet Systems Consortium, Inc. ("ISC")
  *
+ * SPDX-License-Identifier: MPL-2.0
+ *
  * This Source Code Form is subject to the terms of the Mozilla Public
- * License, v. 2.0. If a copy of the MPL was not distributed with this
- * file, You can obtain one at http://mozilla.org/MPL/2.0/.
+ * License, v. 2.0.  If a copy of the MPL was not distributed with this
+ * file, you can obtain one at https://mozilla.org/MPL/2.0/.
  *
  * See the COPYRIGHT file distributed with this work for additional
  * information regarding copyright ownership.
@@ -18,12 +20,13 @@ options {
 	listen-on { 10.53.0.3; };
 	listen-on-v6 { none; };
 	recursion yes;
+	dnssec-validation no;
 	notify yes;
 };
 
 key rndc_key {
 	secret "1234abcd8765";
-	algorithm hmac-sha256;
+	algorithm @DEFAULT_HMAC@;
 };
 
 controls {
@@ -31,7 +34,7 @@ controls {
 };
 
 key tsigzone. {
-	algorithm hmac-md5;
+	algorithm @DEFAULT_HMAC@;
 	secret "1234abcd8765";
 };
 
@@ -48,6 +51,7 @@ zone "example" {
 
 zone "primary" {
 	type secondary;
+        transfer-source 10.53.0.3 port @EXTRAPORT1@;
 	primaries { 10.53.0.6; };
 	file "primary.bk";
 };
@@ -66,7 +70,7 @@ zone "tsigzone" {
 zone "mapped" {
 	type secondary;
 	primaries { 10.53.0.2; };
-	masterfile-format map;
+	masterfile-format raw;
 	file "mapped.bk";
 };
 

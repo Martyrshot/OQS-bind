@@ -1,9 +1,11 @@
 #!/bin/sh
-#
+
 # Copyright (C) Internet Systems Consortium, Inc. ("ISC")
 #
+# SPDX-License-Identifier: MPL-2.0
+#
 # This Source Code Form is subject to the terms of the Mozilla Public
-# License, v. 2.0. If a copy of the MPL was not distributed with this
+# License, v. 2.0.  If a copy of the MPL was not distributed with this
 # file, you can obtain one at https://mozilla.org/MPL/2.0/.
 #
 # See the COPYRIGHT file distributed with this work for additional
@@ -43,3 +45,7 @@ cp ns1/maxjournal2.jnl.saved ns1/maxjournal2.db.jnl
 
 cp ns1/managed-keys.bind.in ns1/managed-keys.bind
 $PERL ../fromhex.pl < ns1/managed-keys.bind.jnl.in > ns1/managed-keys.bind.jnl
+
+copy_setports ns2/named.conf.in ns2/named.conf
+cp ns2/managed-keys.bind.in ns2/managed-keys.bind
+cp ns2/managed-keys.bind.jnl.in ns2/managed-keys.bind.jnl

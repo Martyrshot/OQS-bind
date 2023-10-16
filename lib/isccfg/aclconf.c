@@ -1,6 +1,8 @@
 /*
  * Copyright (C) Internet Systems Consortium, Inc. ("ISC")
  *
+ * SPDX-License-Identifier: MPL-2.0
+ *
  * This Source Code Form is subject to the terms of the Mozilla Public
  * License, v. 2.0. If a copy of the MPL was not distributed with this
  * file, you can obtain one at https://mozilla.org/MPL/2.0/.
@@ -14,8 +16,7 @@
 #include <stdlib.h>
 
 #include <isc/mem.h>
-#include <isc/print.h>
-#include <isc/string.h> /* Required for HP/UX (and others?) */
+#include <isc/string.h>
 #include <isc/util.h>
 
 #include <dns/acl.h>
@@ -76,7 +77,8 @@ cfg_aclconfctx_detach(cfg_aclconfctx_t **actxp) {
 		dns_acl_t *dacl, *next;
 		isc_refcount_destroy(&actx->references);
 		for (dacl = ISC_LIST_HEAD(actx->named_acl_cache); dacl != NULL;
-		     dacl = next) {
+		     dacl = next)
+		{
 			next = ISC_LIST_NEXT(dacl, nextincache);
 			ISC_LIST_UNLINK(actx->named_acl_cache, dacl,
 					nextincache);
@@ -128,8 +130,6 @@ convert_named_acl(const cfg_obj_t *nameobj, const cfg_obj_t *cctx,
 	for (dacl = ISC_LIST_HEAD(ctx->named_acl_cache); dacl != NULL;
 	     dacl = ISC_LIST_NEXT(dacl, nextincache))
 	{
-		/* cppcheck-suppress nullPointerRedundantCheck symbolName=dacl
-		 */
 		if (strcasecmp(aclname, dacl->name) == 0) {
 			if (ISC_MAGIC_VALID(dacl, LOOP_MAGIC)) {
 				cfg_obj_log(nameobj, lctx, ISC_LOG_ERROR,
@@ -152,7 +152,7 @@ convert_named_acl(const cfg_obj_t *nameobj, const cfg_obj_t *cctx,
 	 */
 	memset(&loop, 0, sizeof(loop));
 	ISC_LINK_INIT(&loop, nextincache);
-	DE_CONST(aclname, loop.name);
+	loop.name = UNCONST(aclname);
 	loop.magic = LOOP_MAGIC;
 	ISC_LIST_APPEND(ctx->named_acl_cache, &loop, nextincache);
 	result = cfg_acl_fromconfig(cacl, cctx, lctx, ctx, mctx, nest_level,
@@ -246,7 +246,8 @@ count_acl_elements(const cfg_obj_t *caml, const cfg_obj_t *cctx,
 			}
 #if defined(HAVE_GEOIP2)
 		} else if (cfg_obj_istuple(ce) &&
-			   cfg_obj_isvoid(cfg_tuple_get(ce, "negated"))) {
+			   cfg_obj_isvoid(cfg_tuple_get(ce, "negated")))
+		{
 			n++;
 #endif /* HAVE_GEOIP2 */
 		} else if (cfg_obj_isstring(ce)) {
@@ -399,8 +400,7 @@ get_subtype(const cfg_obj_t *obj, isc_log_t *lctx, dns_geoip_subtype_t subtype,
 		}
 		return (subtype);
 	default:
-		INSIST(0);
-		ISC_UNREACHABLE();
+		UNREACHABLE();
 	}
 }
 
@@ -426,8 +426,8 @@ geoip_can_answer(dns_aclelement_t *elt, cfg_aclconfctx_t *ctx) {
 		if (ctx->geoip->country != NULL) {
 			return (true);
 		}
-	/* city db can answer these too, so: */
-	/* FALLTHROUGH */
+		/* city db can answer these too, so: */
+		FALLTHROUGH;
 	case dns_geoip_region:
 	case dns_geoip_regionname:
 	case dns_geoip_city_countrycode:
@@ -574,7 +574,8 @@ parse_geoip_element(const cfg_obj_t *obj, isc_log_t *lctx,
 		subtype = dns_geoip_city_metrocode;
 		de.geoip_elem.as_int = atoi(search);
 	} else if (strcasecmp(stype, "tz") == 0 ||
-		   strcasecmp(stype, "timezone") == 0) {
+		   strcasecmp(stype, "timezone") == 0)
+	{
 		subtype = dns_geoip_city_timezonecode;
 		strlcpy(de.geoip_elem.as_string, search,
 			sizeof(de.geoip_elem.as_string));
@@ -619,18 +620,9 @@ parse_geoip_element(const cfg_obj_t *obj, isc_log_t *lctx,
 #endif /* HAVE_GEOIP2 */
 
 isc_result_t
-cfg_acl_fromconfig(const cfg_obj_t *caml, const cfg_obj_t *cctx,
+cfg_acl_fromconfig(const cfg_obj_t *acl_data, const cfg_obj_t *cctx,
 		   isc_log_t *lctx, cfg_aclconfctx_t *ctx, isc_mem_t *mctx,
 		   unsigned int nest_level, dns_acl_t **target) {
-	return (cfg_acl_fromconfig2(caml, cctx, lctx, ctx, mctx, nest_level, 0,
-				    target));
-}
-
-isc_result_t
-cfg_acl_fromconfig2(const cfg_obj_t *caml, const cfg_obj_t *cctx,
-		    isc_log_t *lctx, cfg_aclconfctx_t *ctx, isc_mem_t *mctx,
-		    unsigned int nest_level, uint16_t family,
-		    dns_acl_t **target) {
 	isc_result_t result;
 	dns_acl_t *dacl = NULL, *inneracl = NULL;
 	dns_aclelement_t *de;
@@ -638,6 +630,10 @@ cfg_acl_fromconfig2(const cfg_obj_t *caml, const cfg_obj_t *cctx,
 	dns_iptable_t *iptab;
 	int new_nest_level = 0;
 	bool setpos;
+	const cfg_obj_t *caml = NULL;
+	const cfg_obj_t *obj_acl_tuple = NULL;
+	const cfg_obj_t *obj_port = NULL, *obj_transport = NULL;
+	bool is_tuple = false;
 
 	if (nest_level != 0) {
 		new_nest_level = nest_level - 1;
@@ -646,6 +642,20 @@ cfg_acl_fromconfig2(const cfg_obj_t *caml, const cfg_obj_t *cctx,
 	REQUIRE(ctx != NULL);
 	REQUIRE(target != NULL);
 	REQUIRE(*target == NULL || DNS_ACL_VALID(*target));
+
+	REQUIRE(acl_data != NULL);
+	if (cfg_obj_islist(acl_data)) {
+		caml = acl_data;
+	} else {
+		INSIST(cfg_obj_istuple(acl_data));
+		caml = cfg_tuple_get(acl_data, "aml");
+		INSIST(caml != NULL);
+		obj_acl_tuple = cfg_tuple_get(acl_data, "port-transport");
+		INSIST(obj_acl_tuple != NULL);
+		obj_port = cfg_tuple_get(obj_acl_tuple, "port");
+		obj_transport = cfg_tuple_get(obj_acl_tuple, "transport");
+		is_tuple = true;
+	}
 
 	if (*target != NULL) {
 		/*
@@ -678,6 +688,60 @@ cfg_acl_fromconfig2(const cfg_obj_t *caml, const cfg_obj_t *cctx,
 		result = dns_acl_create(mctx, nelem, &dacl);
 		if (result != ISC_R_SUCCESS) {
 			return (result);
+		}
+	}
+
+	if (is_tuple) {
+		uint16_t port = 0;
+		uint32_t transports = 0;
+		bool encrypted = false;
+
+		if (obj_port != NULL && cfg_obj_isuint32(obj_port)) {
+			port = (uint16_t)cfg_obj_asuint32(obj_port);
+		}
+
+		if (obj_transport != NULL && cfg_obj_isstring(obj_transport)) {
+			if (strcasecmp(cfg_obj_asstring(obj_transport),
+				       "udp") == 0)
+			{
+				transports = isc_nm_udpsocket;
+				encrypted = false;
+			} else if (strcasecmp(cfg_obj_asstring(obj_transport),
+					      "tcp") == 0)
+			{
+				transports = isc_nm_streamdnssocket;
+				encrypted = false;
+			} else if (strcasecmp(cfg_obj_asstring(obj_transport),
+					      "udp-tcp") == 0)
+			{
+				/* Good ol' DNS over port 53 */
+				transports = isc_nm_streamdnssocket |
+					     isc_nm_udpsocket;
+				encrypted = false;
+			} else if (strcasecmp(cfg_obj_asstring(obj_transport),
+					      "tls") == 0)
+			{
+				transports = isc_nm_streamdnssocket;
+				encrypted = true;
+			} else if (strcasecmp(cfg_obj_asstring(obj_transport),
+					      "http") == 0)
+			{
+				transports = isc_nm_httpsocket;
+				encrypted = true;
+			} else if (strcasecmp(cfg_obj_asstring(obj_transport),
+					      "http-plain") == 0)
+			{
+				transports = isc_nm_httpsocket;
+				encrypted = false;
+			} else {
+				result = ISC_R_FAILURE;
+				goto cleanup;
+			}
+		}
+
+		if (port != 0 || transports != 0) {
+			dns_acl_add_port_transports(dacl, port, transports,
+						    encrypted, false);
 		}
 	}
 
@@ -722,18 +786,6 @@ cfg_acl_fromconfig2(const cfg_obj_t *caml, const cfg_obj_t *cctx,
 			unsigned int bitlen;
 
 			cfg_obj_asnetprefix(ce, &addr, &bitlen);
-			if (family != 0 && family != addr.family) {
-				char buf[ISC_NETADDR_FORMATSIZE + 1];
-				isc_netaddr_format(&addr, buf, sizeof(buf));
-				cfg_obj_log(ce, lctx, ISC_LOG_WARNING,
-					    "'%s': incorrect address family; "
-					    "ignoring",
-					    buf);
-				if (nest_level != 0) {
-					dns_acl_detach(&de->nestedacl);
-				}
-				continue;
-			}
 			result = isc_netaddr_prefixok(&addr, bitlen);
 			if (result != ISC_R_SUCCESS) {
 				char buf[ISC_NETADDR_FORMATSIZE + 1];
@@ -787,6 +839,12 @@ cfg_acl_fromconfig2(const cfg_obj_t *caml, const cfg_obj_t *cctx,
 				if (de->nestedacl != NULL) {
 					dns_acl_detach(&de->nestedacl);
 				}
+				/*
+				 * Merge the port-transports entries from the
+				 * nested ACL into its parent.
+				 */
+				dns_acl_merge_ports_transports(dacl, inneracl,
+							       !neg);
 				dns_acl_attach(inneracl, &de->nestedacl);
 				dns_acl_detach(&inneracl);
 				/* Fall through. */
@@ -811,7 +869,8 @@ cfg_acl_fromconfig2(const cfg_obj_t *caml, const cfg_obj_t *cctx,
 			}
 #if defined(HAVE_GEOIP2)
 		} else if (cfg_obj_istuple(ce) &&
-			   cfg_obj_isvoid(cfg_tuple_get(ce, "negated"))) {
+			   cfg_obj_isvoid(cfg_tuple_get(ce, "negated")))
+		{
 			INSIST(dacl->length < dacl->alloc);
 			result = parse_geoip_element(ce, lctx, ctx, de);
 			if (result != ISC_R_SUCCESS) {
@@ -904,7 +963,8 @@ cfg_acl_fromconfig2(const cfg_obj_t *caml, const cfg_obj_t *cctx,
 		 * nonzero (i.e., in sortlists).
 		 */
 		if (de->nestedacl != NULL &&
-		    de->type != dns_aclelementtype_nestedacl) {
+		    de->type != dns_aclelementtype_nestedacl)
+		{
 			dns_acl_detach(&de->nestedacl);
 		}
 

@@ -1,6 +1,8 @@
 /*
  * Copyright (C) Internet Systems Consortium, Inc. ("ISC")
  *
+ * SPDX-License-Identifier: MPL-2.0
+ *
  * This Source Code Form is subject to the terms of the Mozilla Public
  * License, v. 2.0. If a copy of the MPL was not distributed with this
  * file, you can obtain one at https://mozilla.org/MPL/2.0/.
@@ -20,12 +22,12 @@
 #endif /* if defined(HAVE_SYS_SYSCTL_H) && !defined(__linux__) */
 #include <errno.h>
 #include <fcntl.h>
+#include <netdb.h>
 #include <sys/uio.h>
 #include <unistd.h>
 
 #include <isc/log.h>
 #include <isc/net.h>
-#include <isc/netdb.h>
 #include <isc/once.h>
 #include <isc/strerr.h>
 #include <isc/string.h>
@@ -107,20 +109,17 @@ static isc_once_t once_ipv6pktinfo = ISC_ONCE_INIT;
 #endif /* ! ISC_CMSG_IP_TOS */
 
 static isc_once_t once = ISC_ONCE_INIT;
-static isc_once_t once_dscp = ISC_ONCE_INIT;
 
 static isc_result_t ipv4_result = ISC_R_NOTFOUND;
 static isc_result_t ipv6_result = ISC_R_NOTFOUND;
 static isc_result_t unix_result = ISC_R_NOTFOUND;
 static isc_result_t ipv6only_result = ISC_R_NOTFOUND;
 static isc_result_t ipv6pktinfo_result = ISC_R_NOTFOUND;
-static unsigned int dscp_result = 0;
 
 static isc_result_t
 try_proto(int domain) {
 	int s;
 	isc_result_t result = ISC_R_SUCCESS;
-	char strbuf[ISC_STRERRORSIZE];
 
 	s = socket(domain, SOCK_STREAM, 0);
 	if (s == -1) {
@@ -139,9 +138,7 @@ try_proto(int domain) {
 #endif /* ifdef EINVAL */
 			return (ISC_R_NOTFOUND);
 		default:
-			strerror_r(errno, strbuf, sizeof(strbuf));
-			UNEXPECTED_ERROR(__FILE__, __LINE__,
-					 "socket() failed: %s", strbuf);
+			UNEXPECTED_SYSERROR(errno, "socket()");
 			return (ISC_R_UNEXPECTED);
 		}
 	}
@@ -196,7 +193,7 @@ initialize_action(void) {
 
 static void
 initialize(void) {
-	RUNTIME_CHECK(isc_once_do(&once, initialize_action) == ISC_R_SUCCESS);
+	isc_once_do(&once, initialize_action);
 }
 
 isc_result_t
@@ -221,7 +218,6 @@ static void
 try_ipv6only(void) {
 #ifdef IPV6_V6ONLY
 	int s, on;
-	char strbuf[ISC_STRERRORSIZE];
 #endif /* ifdef IPV6_V6ONLY */
 	isc_result_t result;
 
@@ -238,9 +234,7 @@ try_ipv6only(void) {
 	/* check for TCP sockets */
 	s = socket(PF_INET6, SOCK_STREAM, 0);
 	if (s == -1) {
-		strerror_r(errno, strbuf, sizeof(strbuf));
-		UNEXPECTED_ERROR(__FILE__, __LINE__, "socket() failed: %s",
-				 strbuf);
+		UNEXPECTED_SYSERROR(errno, "socket()");
 		ipv6only_result = ISC_R_UNEXPECTED;
 		return;
 	}
@@ -256,9 +250,7 @@ try_ipv6only(void) {
 	/* check for UDP sockets */
 	s = socket(PF_INET6, SOCK_DGRAM, 0);
 	if (s == -1) {
-		strerror_r(errno, strbuf, sizeof(strbuf));
-		UNEXPECTED_ERROR(__FILE__, __LINE__, "socket() failed: %s",
-				 strbuf);
+		UNEXPECTED_SYSERROR(errno, "socket()");
 		ipv6only_result = ISC_R_UNEXPECTED;
 		return;
 	}
@@ -279,15 +271,13 @@ close:
 
 static void
 initialize_ipv6only(void) {
-	RUNTIME_CHECK(isc_once_do(&once_ipv6only, try_ipv6only) ==
-		      ISC_R_SUCCESS);
+	isc_once_do(&once_ipv6only, try_ipv6only);
 }
 
 #ifdef __notyet__
 static void
 try_ipv6pktinfo(void) {
 	int s, on;
-	char strbuf[ISC_STRERRORSIZE];
 	isc_result_t result;
 	int optname;
 
@@ -300,9 +290,7 @@ try_ipv6pktinfo(void) {
 	/* we only use this for UDP sockets */
 	s = socket(PF_INET6, SOCK_DGRAM, IPPROTO_UDP);
 	if (s == -1) {
-		strerror_r(errno, strbuf, sizeof(strbuf));
-		UNEXPECTED_ERROR(__FILE__, __LINE__, "socket() failed: %s",
-				 strbuf);
+		UNEXPECTED_SYSERROR(errno, "socket()");
 		ipv6pktinfo_result = ISC_R_UNEXPECTED;
 		return;
 	}
@@ -327,8 +315,7 @@ close:
 
 static void
 initialize_ipv6pktinfo(void) {
-	RUNTIME_CHECK(isc_once_do(&once_ipv6pktinfo, try_ipv6pktinfo) ==
-		      ISC_R_SUCCESS);
+	isc_once_do(&once_ipv6pktinfo, try_ipv6pktinfo);
 }
 #endif /* ifdef __notyet__ */
 
@@ -353,355 +340,6 @@ isc_net_probe_ipv6pktinfo(void) {
 	initialize_ipv6pktinfo();
 #endif /* ifdef __notyet__ */
 	return (ipv6pktinfo_result);
-}
-
-#if ISC_CMSG_IP_TOS || defined(IPV6_TCLASS)
-
-static inline socklen_t
-cmsg_len(socklen_t len) {
-#ifdef CMSG_LEN
-	return (CMSG_LEN(len));
-#else  /* ifdef CMSG_LEN */
-	socklen_t hdrlen;
-
-	/*
-	 * Cast NULL so that any pointer arithmetic performed by CMSG_DATA
-	 * is correct.
-	 */
-	hdrlen = (socklen_t)CMSG_DATA(((struct cmsghdr *)NULL));
-	return (hdrlen + len);
-#endif /* ifdef CMSG_LEN */
-}
-
-static inline socklen_t
-cmsg_space(socklen_t len) {
-#ifdef CMSG_SPACE
-	return (CMSG_SPACE(len));
-#else  /* ifdef CMSG_SPACE */
-	struct msghdr msg;
-	struct cmsghdr *cmsgp;
-	/*
-	 * XXX: The buffer length is an ad-hoc value, but should be enough
-	 * in a practical sense.
-	 */
-	char dummybuf[sizeof(struct cmsghdr) + 1024];
-
-	memset(&msg, 0, sizeof(msg));
-	msg.msg_control = dummybuf;
-	msg.msg_controllen = sizeof(dummybuf);
-
-	cmsgp = (struct cmsghdr *)dummybuf;
-	cmsgp->cmsg_len = cmsg_len(len);
-
-	cmsgp = CMSG_NXTHDR(&msg, cmsgp);
-	if (cmsgp != NULL) {
-		return ((char *)cmsgp - (char *)msg.msg_control);
-	} else {
-		return (0);
-	}
-#endif /* ifdef CMSG_SPACE */
-}
-
-/*
- * Make a fd non-blocking.
- */
-static isc_result_t
-make_nonblock(int fd) {
-	int ret;
-	int flags;
-	char strbuf[ISC_STRERRORSIZE];
-#ifdef USE_FIONBIO_IOCTL
-	int on = 1;
-
-	ret = ioctl(fd, FIONBIO, (char *)&on);
-#else  /* ifdef USE_FIONBIO_IOCTL */
-	flags = fcntl(fd, F_GETFL, 0);
-	flags |= O_NONBLOCK;
-	ret = fcntl(fd, F_SETFL, flags);
-#endif /* ifdef USE_FIONBIO_IOCTL */
-
-	if (ret == -1) {
-		strerror_r(errno, strbuf, sizeof(strbuf));
-		UNEXPECTED_ERROR(__FILE__, __LINE__,
-#ifdef USE_FIONBIO_IOCTL
-				 "ioctl(%d, FIONBIO, &on): %s", fd,
-#else  /* ifdef USE_FIONBIO_IOCTL */
-				 "fcntl(%d, F_SETFL, %d): %s", fd, flags,
-#endif /* ifdef USE_FIONBIO_IOCTL */
-				 strbuf);
-
-		return (ISC_R_UNEXPECTED);
-	}
-
-	return (ISC_R_SUCCESS);
-}
-
-static bool
-cmsgsend(int s, int level, int type, struct addrinfo *res) {
-	char strbuf[ISC_STRERRORSIZE];
-	struct sockaddr_storage ss;
-	socklen_t len = sizeof(ss);
-	struct msghdr msg;
-	union {
-		struct cmsghdr h;
-		unsigned char b[256];
-	} control;
-	struct cmsghdr *cmsgp;
-	int dscp = (46 << 2); /* Expedited forwarding. */
-	struct iovec iovec;
-	char buf[1] = { 0 };
-	isc_result_t result;
-
-	if (bind(s, res->ai_addr, res->ai_addrlen) < 0) {
-		strerror_r(errno, strbuf, sizeof(strbuf));
-		isc_log_write(isc_lctx, ISC_LOGCATEGORY_GENERAL,
-			      ISC_LOGMODULE_SOCKET, ISC_LOG_DEBUG(10),
-			      "bind: %s", strbuf);
-		return (false);
-	}
-
-	if (getsockname(s, (struct sockaddr *)&ss, &len) < 0) {
-		strerror_r(errno, strbuf, sizeof(strbuf));
-		isc_log_write(isc_lctx, ISC_LOGCATEGORY_GENERAL,
-			      ISC_LOGMODULE_SOCKET, ISC_LOG_DEBUG(10),
-			      "getsockname: %s", strbuf);
-		return (false);
-	}
-
-	iovec.iov_base = buf;
-	iovec.iov_len = sizeof(buf);
-
-	memset(&msg, 0, sizeof(msg));
-	msg.msg_name = (struct sockaddr *)&ss;
-	msg.msg_namelen = len;
-	msg.msg_iov = &iovec;
-	msg.msg_iovlen = 1;
-	msg.msg_control = (void *)&control;
-	msg.msg_controllen = 0;
-	msg.msg_flags = 0;
-
-	cmsgp = msg.msg_control;
-
-	switch (type) {
-#ifdef IP_TOS
-	case IP_TOS:
-		memset(cmsgp, 0, cmsg_space(sizeof(char)));
-		cmsgp->cmsg_level = level;
-		cmsgp->cmsg_type = type;
-		cmsgp->cmsg_len = cmsg_len(sizeof(char));
-		*(unsigned char *)CMSG_DATA(cmsgp) = dscp;
-		msg.msg_controllen += cmsg_space(sizeof(char));
-		break;
-#endif /* ifdef IP_TOS */
-#ifdef IPV6_TCLASS
-	case IPV6_TCLASS:
-		memset(cmsgp, 0, cmsg_space(sizeof(dscp)));
-		cmsgp->cmsg_level = level;
-		cmsgp->cmsg_type = type;
-		cmsgp->cmsg_len = cmsg_len(sizeof(dscp));
-		memmove(CMSG_DATA(cmsgp), &dscp, sizeof(dscp));
-		msg.msg_controllen += cmsg_space(sizeof(dscp));
-		break;
-#endif /* ifdef IPV6_TCLASS */
-	default:
-		INSIST(0);
-		ISC_UNREACHABLE();
-	}
-
-	if (sendmsg(s, &msg, 0) < 0) {
-		int debug = ISC_LOG_DEBUG(10);
-		const char *typestr;
-		switch (errno) {
-#ifdef ENOPROTOOPT
-		case ENOPROTOOPT:
-#endif /* ifdef ENOPROTOOPT */
-#ifdef EOPNOTSUPP
-		case EOPNOTSUPP:
-#endif /* ifdef EOPNOTSUPP */
-		case EINVAL:
-		case EPERM:
-			break;
-		default:
-			debug = ISC_LOG_NOTICE;
-		}
-		strerror_r(errno, strbuf, sizeof(strbuf));
-		if (debug != ISC_LOG_NOTICE) {
-			isc_log_write(isc_lctx, ISC_LOGCATEGORY_GENERAL,
-				      ISC_LOGMODULE_SOCKET, ISC_LOG_DEBUG(10),
-				      "sendmsg: %s", strbuf);
-		} else {
-			typestr = (type == IP_TOS) ? "IP_TOS" : "IPV6_TCLASS";
-			UNEXPECTED_ERROR(__FILE__, __LINE__,
-					 "probing "
-					 "sendmsg() with %s=%02x failed: %s",
-					 typestr, dscp, strbuf);
-		}
-		return (false);
-	}
-
-	/*
-	 * Make sure the message actually got sent.
-	 */
-	result = make_nonblock(s);
-	RUNTIME_CHECK(result == ISC_R_SUCCESS);
-
-	iovec.iov_base = buf;
-	iovec.iov_len = sizeof(buf);
-
-	memset(&msg, 0, sizeof(msg));
-	msg.msg_name = (struct sockaddr *)&ss;
-	msg.msg_namelen = sizeof(ss);
-	msg.msg_iov = &iovec;
-	msg.msg_iovlen = 1;
-	msg.msg_control = NULL;
-	msg.msg_controllen = 0;
-	msg.msg_flags = 0;
-
-	if (recvmsg(s, &msg, 0) < 0) {
-		return (false);
-	}
-
-	return (true);
-}
-#endif /* if ISC_CMSG_IP_TOS || defined(IPV6_TCLASS) */
-
-static void
-try_dscp_v4(void) {
-#ifdef IP_TOS
-	char strbuf[ISC_STRERRORSIZE];
-	struct addrinfo hints, *res0;
-	int s, dscp = 0, n;
-#ifdef IP_RECVTOS
-	int on = 1;
-#endif /* IP_RECVTOS */
-
-	memset(&hints, 0, sizeof(hints));
-	hints.ai_family = AF_INET;
-	hints.ai_socktype = SOCK_DGRAM;
-	hints.ai_protocol = IPPROTO_UDP;
-#ifdef AI_NUMERICHOST
-	hints.ai_flags = AI_PASSIVE | AI_NUMERICHOST;
-#else  /* ifdef AI_NUMERICHOST */
-	hints.ai_flags = AI_PASSIVE;
-#endif /* ifdef AI_NUMERICHOST */
-
-	n = getaddrinfo("127.0.0.1", NULL, &hints, &res0);
-	if (n != 0 || res0 == NULL) {
-		isc_log_write(isc_lctx, ISC_LOGCATEGORY_GENERAL,
-			      ISC_LOGMODULE_SOCKET, ISC_LOG_DEBUG(10),
-			      "getaddrinfo(127.0.0.1): %s", gai_strerror(n));
-		return;
-	}
-
-	s = socket(res0->ai_family, res0->ai_socktype, res0->ai_protocol);
-
-	if (s == -1) {
-		strerror_r(errno, strbuf, sizeof(strbuf));
-		isc_log_write(isc_lctx, ISC_LOGCATEGORY_GENERAL,
-			      ISC_LOGMODULE_SOCKET, ISC_LOG_DEBUG(10),
-			      "socket: %s", strbuf);
-		freeaddrinfo(res0);
-		return;
-	}
-
-	if (setsockopt(s, IPPROTO_IP, IP_TOS, &dscp, sizeof(dscp)) == 0) {
-		dscp_result |= ISC_NET_DSCPSETV4;
-	}
-
-#ifdef IP_RECVTOS
-	on = 1;
-	if (setsockopt(s, IPPROTO_IP, IP_RECVTOS, &on, sizeof(on)) == 0) {
-		dscp_result |= ISC_NET_DSCPRECVV4;
-	}
-#endif /* IP_RECVTOS */
-
-#if ISC_CMSG_IP_TOS
-	if (cmsgsend(s, IPPROTO_IP, IP_TOS, res0)) {
-		dscp_result |= ISC_NET_DSCPPKTV4;
-	}
-#endif /* ISC_CMSG_IP_TOS */
-
-	freeaddrinfo(res0);
-	close(s);
-
-#endif /* IP_TOS */
-}
-
-static void
-try_dscp_v6(void) {
-#ifdef IPV6_TCLASS
-	char strbuf[ISC_STRERRORSIZE];
-	struct addrinfo hints, *res0;
-	int s, dscp = 0, n;
-#if defined(IPV6_RECVTCLASS)
-	int on = 1;
-#endif /* IPV6_RECVTCLASS */
-
-	memset(&hints, 0, sizeof(hints));
-	hints.ai_family = AF_INET6;
-	hints.ai_socktype = SOCK_DGRAM;
-	hints.ai_protocol = IPPROTO_UDP;
-#ifdef AI_NUMERICHOST
-	hints.ai_flags = AI_PASSIVE | AI_NUMERICHOST;
-#else  /* ifdef AI_NUMERICHOST */
-	hints.ai_flags = AI_PASSIVE;
-#endif /* ifdef AI_NUMERICHOST */
-
-	n = getaddrinfo("::1", NULL, &hints, &res0);
-	if (n != 0 || res0 == NULL) {
-		isc_log_write(isc_lctx, ISC_LOGCATEGORY_GENERAL,
-			      ISC_LOGMODULE_SOCKET, ISC_LOG_DEBUG(10),
-			      "getaddrinfo(::1): %s", gai_strerror(n));
-		return;
-	}
-
-	s = socket(res0->ai_family, res0->ai_socktype, res0->ai_protocol);
-	if (s == -1) {
-		strerror_r(errno, strbuf, sizeof(strbuf));
-		isc_log_write(isc_lctx, ISC_LOGCATEGORY_GENERAL,
-			      ISC_LOGMODULE_SOCKET, ISC_LOG_DEBUG(10),
-			      "socket: %s", strbuf);
-		freeaddrinfo(res0);
-		return;
-	}
-	if (setsockopt(s, IPPROTO_IPV6, IPV6_TCLASS, &dscp, sizeof(dscp)) == 0)
-	{
-		dscp_result |= ISC_NET_DSCPSETV6;
-	}
-
-#ifdef IPV6_RECVTCLASS
-	on = 1;
-	if (setsockopt(s, IPPROTO_IPV6, IPV6_RECVTCLASS, &on, sizeof(on)) == 0)
-	{
-		dscp_result |= ISC_NET_DSCPRECVV6;
-	}
-#endif /* IPV6_RECVTCLASS */
-
-	if (cmsgsend(s, IPPROTO_IPV6, IPV6_TCLASS, res0)) {
-		dscp_result |= ISC_NET_DSCPPKTV6;
-	}
-
-	freeaddrinfo(res0);
-	close(s);
-
-#endif /* IPV6_TCLASS */
-}
-
-static void
-try_dscp(void) {
-	try_dscp_v4();
-	try_dscp_v6();
-}
-
-static void
-initialize_dscp(void) {
-	RUNTIME_CHECK(isc_once_do(&once_dscp, try_dscp) == ISC_R_SUCCESS);
-}
-
-unsigned int
-isc_net_probedscp(void) {
-	initialize_dscp();
-	return (dscp_result);
 }
 
 #if defined(USE_SYSCTL_PORTRANGE)

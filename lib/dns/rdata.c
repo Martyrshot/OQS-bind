@@ -1,6 +1,8 @@
 /*
  * Copyright (C) Internet Systems Consortium, Inc. ("ISC")
  *
+ * SPDX-License-Identifier: MPL-2.0
+ *
  * This Source Code Form is subject to the terms of the Mozilla Public
  * License, v. 2.0. If a copy of the MPL was not distributed with this
  * file, you can obtain one at https://mozilla.org/MPL/2.0/.
@@ -15,29 +17,35 @@
 #include <inttypes.h>
 #include <stdbool.h>
 
+#include <openssl/err.h>
+#include <openssl/objects.h>
+
+#include <isc/ascii.h>
 #include <isc/base64.h>
 #include <isc/hex.h>
 #include <isc/lex.h>
 #include <isc/mem.h>
 #include <isc/parseint.h>
-#include <isc/print.h>
+#include <isc/result.h>
 #include <isc/string.h>
 #include <isc/util.h>
 
 #include <dns/callbacks.h>
 #include <dns/cert.h>
 #include <dns/compress.h>
+#include <dns/db.h>
 #include <dns/dsdigest.h>
 #include <dns/enumtype.h>
+#include <dns/fixedname.h>
 #include <dns/keyflags.h>
 #include <dns/keyvalues.h>
 #include <dns/message.h>
 #include <dns/rcode.h>
 #include <dns/rdata.h>
 #include <dns/rdataclass.h>
+#include <dns/rdataset.h>
 #include <dns/rdatastruct.h>
 #include <dns/rdatatype.h>
-#include <dns/result.h>
 #include <dns/secalg.h>
 #include <dns/secproto.h>
 #include <dns/time.h>
@@ -91,10 +99,9 @@
 
 #define ARGS_FROMWIRE                                            \
 	int rdclass, dns_rdatatype_t type, isc_buffer_t *source, \
-		dns_decompress_t *dctx, unsigned int options,    \
-		isc_buffer_t *target
+		dns_decompress_t dctx, isc_buffer_t *target
 
-#define CALL_FROMWIRE rdclass, type, source, dctx, options, target
+#define CALL_FROMWIRE rdclass, type, source, dctx, target
 
 #define ARGS_TOWIRE \
 	dns_rdata_t *rdata, dns_compress_t *cctx, isc_buffer_t *target
@@ -118,10 +125,11 @@
 
 #define CALL_FREESTRUCT source
 
-#define ARGS_ADDLDATA \
-	dns_rdata_t *rdata, dns_additionaldatafunc_t add, void *arg
+#define ARGS_ADDLDATA                                \
+	dns_rdata_t *rdata, const dns_name_t *owner, \
+		dns_additionaldatafunc_t add, void *arg
 
-#define CALL_ADDLDATA rdata, add, arg
+#define CALL_ADDLDATA rdata, owner, add, arg
 
 #define ARGS_DIGEST dns_rdata_t *rdata, dns_digestfunc_t digest, void *arg
 
@@ -158,6 +166,13 @@ txt_fromtext(isc_textregion_t *source, isc_buffer_t *target);
 
 static isc_result_t
 txt_fromwire(isc_buffer_t *source, isc_buffer_t *target);
+
+static isc_result_t
+commatxt_fromtext(isc_textregion_t *source, bool comma, isc_buffer_t *target);
+
+static isc_result_t
+commatxt_totext(isc_region_t *source, bool quote, bool comma,
+		isc_buffer_t *target);
 
 static isc_result_t
 multitxt_totext(isc_region_t *source, isc_buffer_t *target);
@@ -247,17 +262,17 @@ static isc_result_t
 unknown_totext(dns_rdata_t *rdata, dns_rdata_textctx_t *tctx,
 	       isc_buffer_t *target);
 
-static inline isc_result_t generic_fromtext_key(ARGS_FROMTEXT);
+static isc_result_t generic_fromtext_key(ARGS_FROMTEXT);
 
-static inline isc_result_t generic_totext_key(ARGS_TOTEXT);
+static isc_result_t generic_totext_key(ARGS_TOTEXT);
 
-static inline isc_result_t generic_fromwire_key(ARGS_FROMWIRE);
+static isc_result_t generic_fromwire_key(ARGS_FROMWIRE);
 
-static inline isc_result_t generic_fromstruct_key(ARGS_FROMSTRUCT);
+static isc_result_t generic_fromstruct_key(ARGS_FROMSTRUCT);
 
-static inline isc_result_t generic_tostruct_key(ARGS_TOSTRUCT);
+static isc_result_t generic_tostruct_key(ARGS_TOSTRUCT);
 
-static inline void generic_freestruct_key(ARGS_FREESTRUCT);
+static void generic_freestruct_key(ARGS_FREESTRUCT);
 
 static isc_result_t generic_fromtext_txt(ARGS_FROMTEXT);
 
@@ -302,6 +317,22 @@ static isc_result_t generic_tostruct_tlsa(ARGS_TOSTRUCT);
 
 static void generic_freestruct_tlsa(ARGS_FREESTRUCT);
 
+static isc_result_t generic_fromtext_in_svcb(ARGS_FROMTEXT);
+static isc_result_t generic_totext_in_svcb(ARGS_TOTEXT);
+static isc_result_t generic_fromwire_in_svcb(ARGS_FROMWIRE);
+static isc_result_t generic_towire_in_svcb(ARGS_TOWIRE);
+static isc_result_t generic_fromstruct_in_svcb(ARGS_FROMSTRUCT);
+static isc_result_t generic_tostruct_in_svcb(ARGS_TOSTRUCT);
+static void generic_freestruct_in_svcb(ARGS_FREESTRUCT);
+static isc_result_t generic_additionaldata_in_svcb(ARGS_ADDLDATA);
+static bool generic_checknames_in_svcb(ARGS_CHECKNAMES);
+static isc_result_t
+generic_rdata_in_svcb_first(dns_rdata_in_svcb_t *);
+static isc_result_t
+generic_rdata_in_svcb_next(dns_rdata_in_svcb_t *);
+static void
+generic_rdata_in_svcb_current(dns_rdata_in_svcb_t *, isc_region_t *);
+
 /*% INT16 Size */
 #define NS_INT16SZ 2
 /*% IPv6 Address Size */
@@ -323,30 +354,22 @@ static dns_name_t const gc_msdcs = DNS_NAME_INITNONABSOLUTE(gc_msdcs_data,
  * \note
  *	(1) does not touch `dst' unless it's returning 1.
  */
-static inline int
+static int
 locator_pton(const char *src, unsigned char *dst) {
-	static const char xdigits_l[] = "0123456789abcdef",
-			  xdigits_u[] = "0123456789ABCDEF";
 	unsigned char tmp[NS_LOCATORSZ];
 	unsigned char *tp = tmp, *endp;
-	const char *xdigits;
 	int ch, seen_xdigits;
-	unsigned int val;
+	unsigned int val, hexval;
 
 	memset(tp, '\0', NS_LOCATORSZ);
 	endp = tp + NS_LOCATORSZ;
 	seen_xdigits = 0;
 	val = 0;
 	while ((ch = *src++) != '\0') {
-		const char *pch;
-
-		pch = strchr((xdigits = xdigits_l), ch);
-		if (pch == NULL) {
-			pch = strchr((xdigits = xdigits_u), ch);
-		}
-		if (pch != NULL) {
+		hexval = isc_hex_char(ch);
+		if (hexval != 0) {
 			val <<= 4;
-			val |= (pch - xdigits);
+			val |= (ch - hexval);
 			if (++seen_xdigits > 4) {
 				return (0);
 			}
@@ -381,30 +404,32 @@ locator_pton(const char *src, unsigned char *dst) {
 	return (1);
 }
 
-static inline isc_result_t
+static void
 name_duporclone(const dns_name_t *source, isc_mem_t *mctx, dns_name_t *target) {
 	if (mctx != NULL) {
 		dns_name_dup(source, mctx, target);
 	} else {
 		dns_name_clone(source, target);
 	}
-	return (ISC_R_SUCCESS);
 }
 
-static inline void *
+static void *
 mem_maybedup(isc_mem_t *mctx, void *source, size_t length) {
-	void *copy;
+	void *copy = NULL;
+
+	REQUIRE(source != NULL);
 
 	if (mctx == NULL) {
 		return (source);
 	}
+
 	copy = isc_mem_allocate(mctx, length);
 	memmove(copy, source, length);
 
 	return (copy);
 }
 
-static inline isc_result_t
+static isc_result_t
 typemap_fromtext(isc_lex_t *lexer, isc_buffer_t *target, bool allow_empty) {
 	isc_token_t token;
 	unsigned char bm[8 * 1024]; /* 64k bits */
@@ -472,7 +497,7 @@ typemap_fromtext(isc_lex_t *lexer, isc_buffer_t *target, bool allow_empty) {
 	return (ISC_R_SUCCESS);
 }
 
-static inline isc_result_t
+static isc_result_t
 typemap_totext(isc_region_t *sr, dns_rdata_textctx_t *tctx,
 	       isc_buffer_t *target) {
 	unsigned int i, j, k;
@@ -481,7 +506,8 @@ typemap_totext(isc_region_t *sr, dns_rdata_textctx_t *tctx,
 
 	for (i = 0; i < sr->length; i += len) {
 		if (tctx != NULL &&
-		    (tctx->flags & DNS_STYLEFLAG_MULTILINE) != 0) {
+		    (tctx->flags & DNS_STYLEFLAG_MULTILINE) != 0)
+		{
 			RETERR(str_totext(tctx->linebreak, target));
 			first = true;
 		}
@@ -571,8 +597,44 @@ typemap_test(isc_region_t *sr, bool allow_empty) {
 	return (ISC_R_SUCCESS);
 }
 
-static const char hexdigits[] = "0123456789abcdef";
-static const char decdigits[] = "0123456789";
+static isc_result_t
+check_private(isc_buffer_t *source, dns_secalg_t alg) {
+	isc_region_t sr;
+	if (alg == DNS_KEYALG_PRIVATEDNS) {
+		dns_fixedname_t fixed;
+
+		RETERR(dns_name_fromwire(dns_fixedname_initname(&fixed), source,
+					 DNS_DECOMPRESS_DEFAULT, NULL));
+		/*
+		 * There should be a public key or signature after the key name.
+		 */
+		isc_buffer_activeregion(source, &sr);
+		if (sr.length == 0) {
+			return (ISC_R_UNEXPECTEDEND);
+		}
+	} else if (alg == DNS_KEYALG_PRIVATEOID) {
+		/*
+		 * Check that we can extract the OID from the start of the
+		 * key data.
+		 */
+		const unsigned char *in = NULL;
+		ASN1_OBJECT *obj = NULL;
+
+		isc_buffer_activeregion(source, &sr);
+		in = sr.base;
+		obj = d2i_ASN1_OBJECT(NULL, &in, sr.length);
+		if (obj == NULL) {
+			ERR_clear_error();
+			RETERR(DNS_R_FORMERR);
+		}
+		ASN1_OBJECT_free(obj);
+		/* There should be a public key or signature after the OID. */
+		if (in >= sr.base + sr.length) {
+			return (ISC_R_UNEXPECTEDEND);
+		}
+	}
+	return (ISC_R_SUCCESS);
+}
 
 #include "code.h"
 
@@ -734,8 +796,7 @@ dns_rdata_toregion(const dns_rdata_t *rdata, isc_region_t *r) {
 isc_result_t
 dns_rdata_fromwire(dns_rdata_t *rdata, dns_rdataclass_t rdclass,
 		   dns_rdatatype_t type, isc_buffer_t *source,
-		   dns_decompress_t *dctx, unsigned int options,
-		   isc_buffer_t *target) {
+		   dns_decompress_t dctx, isc_buffer_t *target) {
 	isc_result_t result = ISC_R_NOTIMPLEMENTED;
 	isc_region_t region;
 	isc_buffer_t ss;
@@ -744,7 +805,6 @@ dns_rdata_fromwire(dns_rdata_t *rdata, dns_rdataclass_t rdclass,
 	uint32_t activelength;
 	unsigned int length;
 
-	REQUIRE(dctx != NULL);
 	if (rdata != NULL) {
 		REQUIRE(DNS_RDATA_INITIALIZED(rdata));
 		REQUIRE(DNS_RDATA_VALIDFLAGS(rdata));
@@ -838,8 +898,7 @@ dns_rdata_towire(dns_rdata_t *rdata, dns_compress_t *cctx,
 	}
 	if (result != ISC_R_SUCCESS) {
 		*target = st;
-		INSIST(target->used < 65536);
-		dns_compress_rollback(cctx, (uint16_t)target->used);
+		dns_compress_rollback(cctx, target->used);
 	}
 	return (result);
 }
@@ -852,13 +911,11 @@ dns_rdata_towire(dns_rdata_t *rdata, dns_compress_t *cctx,
 static isc_result_t
 rdata_validate(isc_buffer_t *src, isc_buffer_t *dest, dns_rdataclass_t rdclass,
 	       dns_rdatatype_t type) {
-	dns_decompress_t dctx;
 	isc_result_t result;
 
-	dns_decompress_init(&dctx, -1, DNS_DECOMPRESS_NONE);
 	isc_buffer_setactive(src, isc_buffer_usedlength(src));
-	result = dns_rdata_fromwire(NULL, rdclass, type, src, &dctx, 0, dest);
-	dns_decompress_invalidate(&dctx);
+	result = dns_rdata_fromwire(NULL, rdclass, type, src,
+				    DNS_DECOMPRESS_NEVER, dest);
 
 	return (result);
 }
@@ -960,7 +1017,8 @@ dns_rdata_fromtext(dns_rdata_t *rdata, dns_rdataclass_t rdclass,
 
 	unknown = false;
 	if (token.type == isc_tokentype_string &&
-	    strcmp(DNS_AS_STR(token), "\\#") == 0) {
+	    strcmp(DNS_AS_STR(token), "\\#") == 0)
+	{
 		/*
 		 * If this is a TXT record '\#' could be a escaped '#'.
 		 * Look to see if the next token is a number and if so
@@ -1008,7 +1066,8 @@ dns_rdata_fromtext(dns_rdata_t *rdata, dns_rdataclass_t rdclass,
 			}
 			break;
 		} else if (token.type != isc_tokentype_eol &&
-			   token.type != isc_tokentype_eof) {
+			   token.type != isc_tokentype_eof)
+		{
 			if (result == ISC_R_SUCCESS) {
 				result = DNS_R_EXTRATOKEN;
 			}
@@ -1084,7 +1143,8 @@ unknown_totext(dns_rdata_t *rdata, dns_rdata_textctx_t *tctx,
 						tctx->linebreak, target);
 		}
 		if (result == ISC_R_SUCCESS &&
-		    (tctx->flags & DNS_STYLEFLAG_MULTILINE) != 0) {
+		    (tctx->flags & DNS_STYLEFLAG_MULTILINE) != 0)
+		{
 			result = str_totext(" )", target);
 		}
 	}
@@ -1222,6 +1282,7 @@ dns_rdata_tostruct(const dns_rdata_t *rdata, void *target, isc_mem_t *mctx) {
 
 	REQUIRE(rdata != NULL);
 	REQUIRE(DNS_RDATA_VALIDFLAGS(rdata));
+	REQUIRE((rdata->flags & DNS_RDATA_UPDATE) == 0);
 
 	TOSTRUCTSWITCH
 
@@ -1241,8 +1302,8 @@ dns_rdata_freestruct(void *source) {
 }
 
 isc_result_t
-dns_rdata_additionaldata(dns_rdata_t *rdata, dns_additionaldatafunc_t add,
-			 void *arg) {
+dns_rdata_additionaldata(dns_rdata_t *rdata, const dns_name_t *owner,
+			 dns_additionaldatafunc_t add, void *arg) {
 	isc_result_t result = ISC_R_NOTIMPLEMENTED;
 	bool use_default = false;
 
@@ -1328,8 +1389,8 @@ dns_rdatatype_fromtext(dns_rdatatype_t *typep, isc_textregion_t *source) {
 		return (DNS_R_UNKNOWN);
 	}
 
-	a = tolower((unsigned char)source->base[0]);
-	b = tolower((unsigned char)source->base[n - 1]);
+	a = isc_ascii_tolower(source->base[0]);
+	b = isc_ascii_tolower(source->base[n - 1]);
 
 	hash = ((a + n) * b) % 256;
 
@@ -1414,7 +1475,8 @@ name_length(const dns_name_t *name) {
 }
 
 static isc_result_t
-txt_totext(isc_region_t *source, bool quote, isc_buffer_t *target) {
+commatxt_totext(isc_region_t *source, bool quote, bool comma,
+		isc_buffer_t *target) {
 	unsigned int tl;
 	unsigned int n;
 	unsigned char *sp;
@@ -1444,30 +1506,48 @@ txt_totext(isc_region_t *source, bool quote, isc_buffer_t *target) {
 		/*
 		 * \DDD space (0x20) if not quoting.
 		 */
-		if (*sp < (quote ? 0x20 : 0x21) || *sp >= 0x7f) {
+		if (*sp < (quote ? ' ' : '!') || *sp >= 0x7f) {
 			if (tl < 4) {
 				return (ISC_R_NOSPACE);
 			}
-			*tp++ = 0x5c;
-			*tp++ = 0x30 + ((*sp / 100) % 10);
-			*tp++ = 0x30 + ((*sp / 10) % 10);
-			*tp++ = 0x30 + (*sp % 10);
+			*tp++ = '\\';
+			*tp++ = '0' + ((*sp / 100) % 10);
+			*tp++ = '0' + ((*sp / 10) % 10);
+			*tp++ = '0' + (*sp % 10);
 			sp++;
 			tl -= 4;
 			continue;
 		}
 		/*
 		 * Escape double quote and backslash.  If we are not
-		 * enclosing the string in double quotes also escape
-		 * at sign and semicolon.
+		 * enclosing the string in double quotes, also escape
+		 * at sign (@) and semicolon (;) unless comma is set.
+		 * If comma is set, then only escape commas (,).
 		 */
-		if (*sp == 0x22 || *sp == 0x5c ||
-		    (!quote && (*sp == 0x40 || *sp == 0x3b))) {
+		if (*sp == '"' || *sp == '\\' || (comma && *sp == ',') ||
+		    (!comma && !quote && (*sp == '@' || *sp == ';')))
+		{
 			if (tl < 2) {
 				return (ISC_R_NOSPACE);
 			}
 			*tp++ = '\\';
 			tl--;
+			/*
+			 * Perform comma escape processing.
+			 * ',' => '\\,'
+			 * '\' => '\\\\'
+			 */
+			if (comma && (*sp == ',' || *sp == '\\')) {
+				if (tl < ((*sp == '\\') ? 3 : 2)) {
+					return (ISC_R_NOSPACE);
+				}
+				*tp++ = '\\';
+				tl--;
+				if (*sp == '\\') {
+					*tp++ = '\\';
+					tl--;
+				}
+			}
 		}
 		if (tl < 1) {
 			return (ISC_R_NOSPACE);
@@ -1489,9 +1569,14 @@ txt_totext(isc_region_t *source, bool quote, isc_buffer_t *target) {
 }
 
 static isc_result_t
-txt_fromtext(isc_textregion_t *source, isc_buffer_t *target) {
+txt_totext(isc_region_t *source, bool quote, isc_buffer_t *target) {
+	return (commatxt_totext(source, quote, false, target));
+}
+
+static isc_result_t
+commatxt_fromtext(isc_textregion_t *source, bool comma, isc_buffer_t *target) {
 	isc_region_t tregion;
-	bool escape;
+	bool escape = false, comma_escape = false, seen_comma = false;
 	unsigned int n, nrem;
 	char *s;
 	unsigned char *t;
@@ -1503,7 +1588,6 @@ txt_fromtext(isc_textregion_t *source, isc_buffer_t *target) {
 	n = source->length;
 	t = tregion.base;
 	nrem = tregion.length;
-	escape = false;
 	if (nrem < 1) {
 		return (ISC_R_NOSPACE);
 	}
@@ -1548,6 +1632,25 @@ txt_fromtext(isc_textregion_t *source, isc_buffer_t *target) {
 			continue;
 		}
 		escape = false;
+		/*
+		 * Level 1 escape processing complete.
+		 * If comma is set perform comma escape processing.
+		 *
+		 * Level 1	Level 2		ALPN's
+		 * h1\,h2   =>	h1,h2   =>	h1 and h2
+		 * h1\\,h2  =>	h1\,h2  =>	h1,h2
+		 * h1\\h2   =>	h1\h2   =>	h1h2
+		 * h1\\\\h2 =>	h1\\h2  =>	h1\h2
+		 */
+		if (comma && !comma_escape && c == ',') {
+			seen_comma = true;
+			break;
+		}
+		if (comma && !comma_escape && c == '\\') {
+			comma_escape = true;
+			continue;
+		}
+		comma_escape = false;
 		if (nrem == 0) {
 			return ((tregion.length <= 256U) ? ISC_R_NOSPACE
 							 : DNS_R_SYNTAX);
@@ -1555,12 +1658,39 @@ txt_fromtext(isc_textregion_t *source, isc_buffer_t *target) {
 		*t++ = c;
 		nrem--;
 	}
-	if (escape) {
+
+	/*
+	 * Incomplete escape processing?
+	 */
+	if (escape || (comma && comma_escape)) {
 		return (DNS_R_SYNTAX);
+	}
+
+	if (comma) {
+		/*
+		 * Disallow empty ALPN at start (",h1") or in the
+		 * middle ("h1,,h2").
+		 */
+		if (s == source->base || (seen_comma && s == source->base + 1))
+		{
+			return (DNS_R_SYNTAX);
+		}
+		isc_textregion_consume(source, s - source->base);
+		/*
+		 * Disallow empty ALPN at end ("h1,").
+		 */
+		if (seen_comma && source->length == 0) {
+			return (DNS_R_SYNTAX);
+		}
 	}
 	*tregion.base = (unsigned char)(t - tregion.base - 1);
 	isc_buffer_add(target, *tregion.base + 1);
 	return (ISC_R_SUCCESS);
+}
+
+static isc_result_t
+txt_fromtext(isc_textregion_t *source, isc_buffer_t *target) {
+	return (commatxt_fromtext(source, false, target));
 }
 
 static isc_result_t
@@ -1617,20 +1747,20 @@ multitxt_totext(isc_region_t *source, isc_buffer_t *target) {
 		n0 = source->length - 1;
 
 		while (n--) {
-			if (*sp < 0x20 || *sp >= 0x7f) {
+			if (*sp < ' ' || *sp >= 0x7f) {
 				if (tl < 4) {
 					return (ISC_R_NOSPACE);
 				}
-				*tp++ = 0x5c;
-				*tp++ = 0x30 + ((*sp / 100) % 10);
-				*tp++ = 0x30 + ((*sp / 10) % 10);
-				*tp++ = 0x30 + (*sp % 10);
+				*tp++ = '\\';
+				*tp++ = '0' + ((*sp / 100) % 10);
+				*tp++ = '0' + ((*sp / 10) % 10);
+				*tp++ = '0' + (*sp % 10);
 				sp++;
 				tl -= 4;
 				continue;
 			}
 			/* double quote, backslash */
-			if (*sp == 0x22 || *sp == 0x5c) {
+			if (*sp == '"' || *sp == '\\') {
 				if (tl < 2) {
 					return (ISC_R_NOSPACE);
 				}
@@ -1795,9 +1925,9 @@ inet_totext(int af, uint32_t flags, isc_region_t *src, isc_buffer_t *target) {
 	 * parsing, so append 0 in that case.
 	 */
 	if (af == AF_INET6 && (flags & DNS_STYLEFLAG_YAML) != 0) {
-		isc_textregion_t tr;
-		isc_buffer_usedregion(target, (isc_region_t *)&tr);
-		if (tr.base[tr.length - 1] == ':') {
+		isc_region_t r;
+		isc_buffer_usedregion(target, &r);
+		if (r.length > 0 && r.base[r.length - 1] == ':') {
 			if (isc_buffer_availablelength(target) == 0) {
 				return (ISC_R_NOSPACE);
 			}
@@ -1933,38 +2063,21 @@ mem_tobuffer(isc_buffer_t *target, void *base, unsigned int length) {
 
 static int
 hexvalue(char value) {
-	const char *s;
-	unsigned char c;
-
-	c = (unsigned char)value;
-
-	if (!isascii(c)) {
+	int hexval = isc_hex_char(value);
+	if (hexval == 0) {
 		return (-1);
+	} else {
+		return (value - hexval);
 	}
-	if (isupper(c)) {
-		c = tolower(c);
-	}
-	if ((s = strchr(hexdigits, c)) == NULL) {
-		return (-1);
-	}
-	return ((int)(s - hexdigits));
 }
 
 static int
 decvalue(char value) {
-	const char *s;
-
-	/*
-	 * isascii() is valid for full range of int values, no need to
-	 * mask or cast.
-	 */
-	if (!isascii(value)) {
+	if (isdigit((unsigned char)value)) {
+		return (value - '0');
+	} else {
 		return (-1);
 	}
-	if ((s = strchr(decdigits, value)) == NULL) {
-		return (-1);
-	}
-	return ((int)(s - decdigits));
 }
 
 static void
@@ -2004,7 +2117,7 @@ warn_badmx(isc_token_t *token, isc_lex_t *lexer,
 		line = isc_lex_getsourceline(lexer);
 		(*callbacks->warn)(callbacks, "%s:%u: warning: '%s': %s", file,
 				   line, DNS_AS_STR(*token),
-				   dns_result_totext(DNS_R_MXISADDRESS));
+				   isc_result_totext(DNS_R_MXISADDRESS));
 	}
 }
 
@@ -2021,7 +2134,7 @@ warn_badname(const dns_name_t *name, isc_lex_t *lexer,
 		dns_name_format(name, namebuf, sizeof(namebuf));
 		(*callbacks->warn)(callbacks, "%s:%u: warning: %s: %s", file,
 				   line, namebuf,
-				   dns_result_totext(DNS_R_BADNAME));
+				   isc_result_totext(DNS_R_BADNAME));
 	}
 }
 
@@ -2038,35 +2151,35 @@ fromtext_error(void (*callback)(dns_rdatacallbacks_t *, const char *, ...),
 		case isc_tokentype_eol:
 			(*callback)(callbacks, "%s: %s:%lu: near eol: %s",
 				    "dns_rdata_fromtext", name, line,
-				    dns_result_totext(result));
+				    isc_result_totext(result));
 			break;
 		case isc_tokentype_eof:
 			(*callback)(callbacks, "%s: %s:%lu: near eof: %s",
 				    "dns_rdata_fromtext", name, line,
-				    dns_result_totext(result));
+				    isc_result_totext(result));
 			break;
 		case isc_tokentype_number:
 			(*callback)(callbacks, "%s: %s:%lu: near %lu: %s",
 				    "dns_rdata_fromtext", name, line,
 				    token->value.as_ulong,
-				    dns_result_totext(result));
+				    isc_result_totext(result));
 			break;
 		case isc_tokentype_string:
 		case isc_tokentype_qstring:
 			(*callback)(callbacks, "%s: %s:%lu: near '%s': %s",
 				    "dns_rdata_fromtext", name, line,
 				    DNS_AS_STR(*token),
-				    dns_result_totext(result));
+				    isc_result_totext(result));
 			break;
 		default:
 			(*callback)(callbacks, "%s: %s:%lu: %s",
 				    "dns_rdata_fromtext", name, line,
-				    dns_result_totext(result));
+				    isc_result_totext(result));
 			break;
 		}
 	} else {
 		(*callback)(callbacks, "dns_rdata_fromtext: %s:%lu: %s", name,
-			    line, dns_result_totext(result));
+			    line, isc_result_totext(result));
 	}
 }
 
@@ -2098,7 +2211,8 @@ dns_rdatatype_issingleton(dns_rdatatype_t type) {
 bool
 dns_rdatatype_notquestion(dns_rdatatype_t type) {
 	if ((dns_rdatatype_attributes(type) & DNS_RDATATYPEATTR_NOTQUESTION) !=
-	    0) {
+	    0)
+	{
 		return (true);
 	}
 	return (false);
@@ -2107,7 +2221,8 @@ dns_rdatatype_notquestion(dns_rdatatype_t type) {
 bool
 dns_rdatatype_questiononly(dns_rdatatype_t type) {
 	if ((dns_rdatatype_attributes(type) & DNS_RDATATYPEATTR_QUESTIONONLY) !=
-	    0) {
+	    0)
+	{
 		return (true);
 	}
 	return (false);
@@ -2124,6 +2239,16 @@ dns_rdatatype_atcname(dns_rdatatype_t type) {
 bool
 dns_rdatatype_atparent(dns_rdatatype_t type) {
 	if ((dns_rdatatype_attributes(type) & DNS_RDATATYPEATTR_ATPARENT) != 0)
+	{
+		return (true);
+	}
+	return (false);
+}
+
+bool
+dns_rdatatype_followadditional(dns_rdatatype_t type) {
+	if ((dns_rdatatype_attributes(type) &
+	     DNS_RDATATYPEATTR_FOLLOWADDITIONAL) != 0)
 	{
 		return (true);
 	}
@@ -2150,9 +2275,16 @@ dns_rdatatype_isdnssec(dns_rdatatype_t type) {
 }
 
 bool
+dns_rdatatype_iskeymaterial(dns_rdatatype_t type) {
+	return (type == dns_rdatatype_dnskey || type == dns_rdatatype_cdnskey ||
+		type == dns_rdatatype_cds);
+}
+
+bool
 dns_rdatatype_iszonecutauth(dns_rdatatype_t type) {
 	if ((dns_rdatatype_attributes(type) & DNS_RDATATYPEATTR_ZONECUTAUTH) !=
-	    0) {
+	    0)
+	{
 		return (true);
 	}
 	return (false);
@@ -2250,4 +2382,118 @@ dns_rdata_updateop(dns_rdata_t *rdata, dns_section_t section) {
 		}
 	}
 	return ("invalid");
+}
+
+static bool
+svcb_ishttp(const char *s, size_t len) {
+	/*
+	 * HTTP entries from:
+	 *
+	 * https://www.iana.org/assignments/tls-extensiontype-values/\
+	 * tls-extensiontype-values.xhtml#alpn-protocol-ids
+	 */
+	struct {
+		size_t len;
+		const char *value;
+	} http[] = { { 8, "http/0.9" }, { 8, "http/1.0" }, { 8, "http/1.1" },
+		     { 2, "h2" },	{ 3, "h2c" },	   { 2, "h3" } };
+
+	for (size_t i = 0; i < ARRAY_SIZE(http); i++) {
+		if (len == http[i].len && memcmp(s, http[i].value, len) == 0) {
+			return (true);
+		}
+	}
+	return (false);
+}
+
+static bool
+svcb_hashttp(isc_textregion_t *alpn) {
+	while (alpn->length > 0) {
+		char c, *s;
+		unsigned char len = *alpn->base;
+
+		isc_textregion_consume(alpn, 1);
+
+		/*
+		 * This has to detect "http/1.1", "h2" and "h3", etc.
+		 * in a comma list.
+		 */
+		s = alpn->base;
+		while (len-- > 0) {
+			c = *alpn->base;
+			isc_textregion_consume(alpn, 1);
+			if (c == ',') {
+				if (svcb_ishttp(s, (alpn->base - s) - 1)) {
+					return (true);
+				}
+				s = alpn->base;
+			}
+		}
+		if (svcb_ishttp(s, (alpn->base - s))) {
+			return (true);
+		}
+	}
+	return (false);
+}
+
+isc_result_t
+dns_rdata_checksvcb(const dns_name_t *owner, const dns_rdata_t *rdata) {
+	dns_rdata_in_svcb_t svcb;
+	isc_result_t result;
+
+	REQUIRE(owner != NULL);
+	REQUIRE(rdata != NULL);
+	REQUIRE(rdata->type == dns_rdatatype_svcb);
+	REQUIRE(DNS_RDATA_VALIDFLAGS(rdata));
+
+	result = dns_rdata_tostruct(rdata, &svcb, NULL);
+	RUNTIME_CHECK(result == ISC_R_SUCCESS);
+
+	/*
+	 * Check that Alias Mode records don't have SvcParamKeys.
+	 */
+	if (svcb.priority == 0 && svcb.svclen != 0) {
+		return (DNS_R_HAVEPARMKEYS);
+	}
+
+	if (dns_name_isdnssvcb(owner)) {
+		isc_region_t r = { .base = svcb.svc, .length = svcb.svclen };
+		isc_textregion_t alpn;
+		uint16_t key = 0, len = 0;
+
+		/* Check for ALPN (key1) */
+		while (r.length > 0) {
+			key = uint16_fromregion(&r);
+			isc_region_consume(&r, 2);
+			len = uint16_fromregion(&r);
+			isc_region_consume(&r, 2);
+			if (key >= SVCB_ALPN_KEY) {
+				break;
+			}
+			isc_region_consume(&r, len);
+		}
+		if (key != SVCB_ALPN_KEY) {
+			return (DNS_R_NOALPN);
+		}
+		alpn = (isc_textregion_t){ .base = (char *)r.base,
+					   .length = len };
+		isc_region_consume(&r, len);
+		if (svcb_hashttp(&alpn)) {
+			/* Check for DOHPATH (key7) */
+			while (r.length > 0) {
+				key = uint16_fromregion(&r);
+				isc_region_consume(&r, 2);
+				len = uint16_fromregion(&r);
+				isc_region_consume(&r, 2);
+				if (key >= SVCB_DOHPATH_KEY) {
+					break;
+				}
+				isc_region_consume(&r, len);
+			}
+			if (key != SVCB_DOHPATH_KEY) {
+				return (DNS_R_NODOHPATH);
+			}
+		}
+	}
+	return (ISC_R_SUCCESS);
 }

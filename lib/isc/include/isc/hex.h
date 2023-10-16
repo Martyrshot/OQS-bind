@@ -1,6 +1,8 @@
 /*
  * Copyright (C) Internet Systems Consortium, Inc. ("ISC")
  *
+ * SPDX-License-Identifier: MPL-2.0
+ *
  * This Source Code Form is subject to the terms of the Mozilla Public
  * License, v. 2.0. If a copy of the MPL was not distributed with this
  * file, you can obtain one at https://mozilla.org/MPL/2.0/.
@@ -9,8 +11,7 @@
  * information regarding copyright ownership.
  */
 
-#ifndef ISC_HEX_H
-#define ISC_HEX_H 1
+#pragma once
 
 /*! \file isc/hex.h */
 
@@ -18,6 +19,19 @@
 #include <isc/types.h>
 
 ISC_LANG_BEGINDECLS
+
+/*
+ * An `isc__hex_char` table entry is non-zero if the character is a hex digit;
+ * You can subtract the table entry from the character to convert the hex digit
+ * to its value. e.g. 'a' - isc__hex_char['a'] == 10. Unlike <ctype.h>
+ * isxdigit(), this saves you from needing another case analysis.
+ */
+extern const uint8_t isc__hex_char[256];
+
+/*
+ * Wrapper so we don't have to cast all over the place like <ctype.h>
+ */
+#define isc_hex_char(c) isc__hex_char[(uint8_t)(c)]
 
 /***
  *** Functions
@@ -95,5 +109,3 @@ isc_hex_tobuffer(isc_lex_t *lexer, isc_buffer_t *target, int length);
  */
 
 ISC_LANG_ENDDECLS
-
-#endif /* ISC_HEX_H */

@@ -1,6 +1,8 @@
 /*
  * Copyright (C) Internet Systems Consortium, Inc. ("ISC")
  *
+ * SPDX-License-Identifier: MPL-2.0
+ *
  * This Source Code Form is subject to the terms of the Mozilla Public
  * License, v. 2.0. If a copy of the MPL was not distributed with this
  * file, you can obtain one at https://mozilla.org/MPL/2.0/.
@@ -9,8 +11,7 @@
  * information regarding copyright ownership.
  */
 
-#ifndef NAMED_ZONECONF_H
-#define NAMED_ZONECONF_H 1
+#pragma once
 
 /*! \file */
 
@@ -45,7 +46,7 @@ named_zone_configure(const cfg_obj_t *config, const cfg_obj_t *vconfig,
 bool
 named_zone_reusable(dns_zone_t *zone, const cfg_obj_t *zconfig,
 		    const cfg_obj_t *vconfig, const cfg_obj_t *config,
-		    cfg_aclconfctx_t *actx);
+		    dns_kasplist_t *kasplist);
 /*%<
  * If 'zone' can be safely reconfigured according to the configuration
  * data in 'zconfig', return true.  If the configuration data is so
@@ -54,12 +55,12 @@ named_zone_reusable(dns_zone_t *zone, const cfg_obj_t *zconfig,
  */
 
 bool
-named_zone_inlinesigning(dns_zone_t *zone, const cfg_obj_t *zconfig,
-			 const cfg_obj_t *vconfig, const cfg_obj_t *config,
-			 cfg_aclconfctx_t *actx);
+named_zone_inlinesigning(const cfg_obj_t *zconfig, const cfg_obj_t *vconfig,
+			 const cfg_obj_t *config, dns_kasplist_t *kasplist);
 /*%<
  * Determine if zone uses inline-signing. This is true if inline-signing
- * is set to yes, or if there is a dnssec-policy on a non-dynamic zone.
+ * is set to yes, in the zone clause or in the zone's dnssec-policy clause.
+ * By default, dnssec-policy uses inline-signing.
  */
 
 isc_result_t
@@ -77,5 +78,3 @@ named_zone_configure_writeable_dlz(dns_dlzdb_t *dlzdatabase, dns_zone_t *zone,
  */
 
 ISC_LANG_ENDDECLS
-
-#endif /* NAMED_ZONECONF_H */

@@ -1,6 +1,8 @@
 /*
  * Copyright (C) Internet Systems Consortium, Inc. ("ISC")
  *
+ * SPDX-License-Identifier: MPL-2.0
+ *
  * This Source Code Form is subject to the terms of the Mozilla Public
  * License, v. 2.0. If a copy of the MPL was not distributed with this
  * file, you can obtain one at https://mozilla.org/MPL/2.0/.
@@ -21,12 +23,13 @@
 #include <dns/rdatastruct.h>
 #include <dns/soa.h>
 
-static inline uint32_t
+static uint32_t
 decode_uint32(unsigned char *p) {
-	return ((p[0] << 24) + (p[1] << 16) + (p[2] << 8) + (p[3] << 0));
+	return (((uint32_t)p[0] << 24) + ((uint32_t)p[1] << 16) +
+		((uint32_t)p[2] << 8) + ((uint32_t)p[3] << 0));
 }
 
-static inline void
+static void
 encode_uint32(uint32_t val, unsigned char *p) {
 	p[0] = (uint8_t)(val >> 24);
 	p[1] = (uint8_t)(val >> 16);

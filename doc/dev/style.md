@@ -1,3 +1,16 @@
+<!--
+Copyright (C) Internet Systems Consortium, Inc. ("ISC")
+
+SPDX-License-Identifier: MPL-2.0
+
+This Source Code Form is subject to the terms of the Mozilla Public
+License, v. 2.0.  If a copy of the MPL was not distributed with this
+file, you can obtain one at https://mozilla.org/MPL/2.0/.
+
+See the COPYRIGHT file distributed with this work for additional
+information regarding copyright ownership.
+-->
+
 ## BIND 9 Coding Style
 
 BIND 9 is principally written in [C](#cstyle), with some additional code
@@ -11,8 +24,7 @@ below.
 
 A C11 compiler, library with C11 extensions and POSIX:2001 are assumed.  Feel
 free to use any C11 feature, but make sure to provide compatibility shims for
-all supported platforms, e.g. Windows MSVC that doesn't support all of the C11
-features.
+all supported platforms that don't support all of the C11 features.
 
 #### Warnings
 
@@ -21,8 +33,31 @@ is to compile with no warnings.
 
 #### Copyright Notices
 
-Source files with significant content should have a copyright.  The copyright
-year(s) should be kept current.
+The license described in the ``COPYING`` file applies to the BIND 9 source as a
+whole, though individual source files can have a different license which is
+required to be compatible with the MPL-2.0.
+
+Aside from that, individual files can be provided under a dual license,
+e.g. MPL-2.0 license and alternatively under a permissive license like BSD, MIT
+etc.
+
+The common way of expressing the license of a source file is to add the matching
+boilerplate text into the top comment of the file. Due to formatting, typos
+etc. these “boilerplates” are hard to validate for tools which are used in the
+context of license compliance.
+
+An alternative to boilerplate text is the use of Software Package Data Exchange
+(SPDX) license identifiers in each source file. SPDX license identifiers are
+machine parsable and precise shorthands for the license under which the content
+of the file is contributed. SPDX license identifiers are managed by the SPDX
+Workgroup at the Linux Foundation and have been agreed on by partners throughout
+the industry, tool vendors, and legal teams. For further information see
+https://spdx.org/
+
+The BIND 9 requires the precise SPDX identifier in all source files. The valid
+identifiers used in the BIND 9 are explained in the section License identifiers
+and have been retrieved from the official SPDX license list at
+https://spdx.org/licenses/ along with the license texts.
 
 #### Indentation
 
@@ -43,7 +78,7 @@ conform well to BIND 9 C style:
     	set showmode
     	set autoindent
     	set expandtab
-    
+
     	filetype plugin on
     	let c_syntax_for_h = 1
     	autocmd FileType c,cc,cpp set cindent
@@ -51,7 +86,7 @@ conform well to BIND 9 C style:
     	autocmd FileType c,cc,cpp set fo=rotcq
     	autocmd FileType c,cc,cpp set noexpandtab ts=8
     	autocmd FileType python set ts=4 sw=4
-    
+
     	filetype indent on
 
 #### Vertical Whitespace
@@ -101,18 +136,16 @@ Good:
     	/*
     	 * Private variables.
     	 */
-    
+
     	static int	a	       /* Description of 'a'. */
     	static int	b	       /* Description of 'b'. */
     	static char *	c	       /* Description of 'c'. */
 
 
-The following lint and lint-like comments should be used where appropriate:
+The following macros should be used where appropriate:
 
-    	/* ARGSUSED */
-    	/* FALLTHROUGH */
-    	/* NOTREACHED */
-    	/* VARARGS */
+    	FALLTHROUGH;
+    	UNREACHABLE();
 
 #### Header files
 
@@ -151,15 +184,15 @@ or for public files that do not declare any functions.
     	 *
     	 * This Source Code Form is subject to the terms of the Mozilla Public
     	 * License, v. 2.0. If a copy of the MPL was not distributed with this
-    	 * file, You can obtain one at http://mozilla.org/MPL/2.0/.
+    	 * file, you can obtain one at https://mozilla.org/MPL/2.0/.
     	 */
-    
+
     	#pragma once
-    
+
     	/*****
     	 ***** Module Info
     	 *****/
-    
+
     	/*
     	 * (Module name here.)
     	 *
@@ -183,20 +216,20 @@ or for public files that do not declare any functions.
     	 * Standards:
     	 *	(Any standards relevant to the module are listed here.)
     	 */
-    
+
     	/***
     	 *** Imports
     	 ***/
-    
+
     	/* #includes here. */
     	#include <isc/lang.h>
-    
+
     	/***
     	 *** Types
     	 ***/
-    
+
     	/* (Type definitions here.) */
-    
+
     	/***
     	 *** Functions
     	 ***/
@@ -236,11 +269,11 @@ specifying the implementation of the function.  The opening curly brace
 should occur on the same line as the argument list, unless the argument
 list is more than one line long:
 
-    	static inline void
+    	static void
     	func1(int i) {
     		/* whatever */
     	}
-    
+
     	int
     	func2(int first_argument, int next_argument,
     	      int last_argument)
@@ -338,7 +371,7 @@ Good:
 
     	os_result_t result;
     	os_descriptor_t	s;
-    
+
     	result = os_socket_create(AF_INET, SOCK_STREAM, 0, &s);
     	if (result != OS_R_SUCCESS) {
     		/* Do something about the error. */
@@ -348,7 +381,7 @@ Good:
 Not so good:
 
     	int s;
-    
+
     	/*
     	 * Obviously using interfaces like socket() (below) is allowed
     	 * since otherwise you couldn't call operating system routines; the
@@ -399,26 +432,26 @@ Good:
 
     	/* Test if flag set. */
     	if ((flags & FOO) != 0) {
-    
+
     	}
     	/* Test if flag clear. */
     	if ((flags & BAR) == 0) {
-    
+
     	}
     	/* Test if both flags set. */
     	if ((flags & (FOO|BAR)) == (FOO|BAR)) {
-    
+
     	}
 
 Bad:
 
     	/* Test if flag set. */
     	if (flags & FOO) {
-    
+
     	}
     	/* Test if flag clear. */
     	if (! (flags & BAR)) {
-    
+
     	}
 
 #### Testing for Zero or Non-zero
@@ -429,9 +462,9 @@ variables.
 Good:
 
     	int i = 10;
-    
+
     	/* ... */
-    
+
     	if (i != 0) {
     		/* Do something. */
     	}
@@ -439,9 +472,9 @@ Good:
 Bad:
 
     	int i = 10;
-    
+
     	/* ... */
-    
+
     	if (i) {
     		/* Do something. */
     	}
@@ -456,9 +489,9 @@ comparison; do not treat a pointer variable as if it were a boolean.
 Good:
 
     	char *c = NULL;
-    
+
     	/* ... */
-    
+
     	if (c != NULL) {
     		/* Do something. */
     	}
@@ -466,9 +499,9 @@ Good:
 Bad:
 
     	char *c = NULL;
-    
+
     	/* ... */
-    
+
     	if (c) {
     		/* Do something. */
     	}
@@ -529,9 +562,9 @@ structure which is itself going to be freed immediately.
 Good:
 
     	char *text;
-    
+
     	/* text is initialized here. */
-    
+
     	isc_mem_free(mctx, text);
     	text = NULL;
 
@@ -602,7 +635,7 @@ Good:
     		int bar;
     		int baz;
     	};
-    
+
     	struct example x = { .foo = -1 };
 
 Bad:
@@ -611,9 +644,9 @@ Bad:
     		int bar;
     		int baz;
     	};
-    
+
     	struct example x;
-    
+
     	x.foo = -1;
     	x.bar = 0;
     	x.baz = 0;
@@ -624,9 +657,9 @@ Good:
     		int bar;
     		int baz;
     	};
-    
+
     	struct example *x = isc_mem_get(mctx, sizeof(*x));
-    
+
     	*x = (struct example){ .foo = -1 };
 
 Bad:
@@ -635,9 +668,9 @@ Bad:
     		int bar;
     		int baz;
     	};
-    
+
     	struct example *x = isc_mem_get(mctx, sizeof(*x));
-    
+
     	x->foo = -1;
     	x->bar = 0;
     	x->baz = 0;
@@ -648,9 +681,14 @@ Declare variables as constant if they are not to be modified.
 
 #### Variable-Length Arrays
 
-Use VLAs where it is more appropriate to allocate the memory on the stack rather
-than allocate it using `isc_mem_get()` from the heap.  Usually, a short lived
-arrays local to that particular functions would be good fit for using VLAs.
+VLAs are unsafe when it is important to handle allocation failure in a
+controlled manner rather than an uncontrolled crash. They are safer if the
+array size is checked first, but then you lose a lot of their simplicity
+and readability.
+
+VLAs should not be used in most code in BIND. VLAs are OK in test code
+where the lack of safety doesn't matter. The default compiler flags enforce
+this rule.
 
 #### <a name="public_namespace"></a>Public Interface Namespace
 
@@ -710,7 +748,7 @@ value of the format parameter:
     	dns_zone_setfile(dns_zone_t *zone, const char *file) {
     		return (dns_zone_setfile2(zone, file, dns_masterformat_text);
     	}
-    
+
     	isc_result_t
     	dns_zone_setfile2(dns_zone_t *zone, const char *file,
     			  dns_masterformat_t format)
@@ -726,24 +764,18 @@ described for the public interfaces, except `{library}` and `{module}` are
 separated by a double-underscore.  This indicates that the name is
 internal, its API is not as formal as the public API, and thus it might
 change without any sort of notice.  Examples of this usage include
-`dns__zone_loadpending()` and `isc__taskmgr_ready()`.
+`dns__zone_loadpending()` and `isc__mem_printallactive()`.
 
-In many cases, a public interface is instantiated by a private back-end
-implementation.  The double-underscore naming style is sometimes used in
-that situation; for example, `isc_task_attach()` calls the `attach`
-function provided by a task API implementation; in BIND 9, this function
-is provided by `isc__task_attach()`.
-
-Other times, private interface implementations are static functions
-that are pointed to by "method" tables.  For example, the `dns_db`
-interface is implemented in several places, including `lib/dns/rbtdb.c`
-(the red-black tree database used for internal storage of zones and
-cache data) and `lib/dns/sdlz.c` (an interface to DLZ modules).
+In some cases, a public interface is instantiated by a private back-end
+implementation.  The private interface implementations are typically
+static functions that are pointed to by "method" tables.  For example,
+the `dns_db` interface is implemented in several places, including
+`lib/dns/rbtdb.c` (the red-black tree database used for internal storage of
+zones and cache data) and `lib/dns/sdlz.c` (an interface to DLZ modules).
 An object of type `dns_dbmethods_t` is created for each of these,
-containing function pointers to the local implementations of each
-of the `dns_db` API functions.  The `dns_db_findnode()` function
-is provided by static functions called `findnode()` in each file,
-and so on.
+containing function pointers to the local implementations of each of the
+`dns_db` API functions.  The `dns_db_findnode()` function is provided by
+static functions called `findnode()` in each file, and so on.
 
 #### Initialization
 
@@ -759,8 +791,7 @@ Source which becomes obsolete should be removed, not just disabled with
 
 When using a C library function, consider whether all operating systems
 support it.  Is it in the POSIX standard?  If so, how long has it been
-there? (BIND is still run on some operating systems released in the
-1990s.)  Is its behavior the same on all platforms?  Is its signature
+there?  Is its behavior the same on all platforms?  Is its signature
 the same?  Are integer parameters the same size and signedness?  Does it
 always return the same values on success, and set the same `errno` codes
 on failure?
@@ -813,9 +844,14 @@ program's inputs or operation.
 
 ### <a name="pystyle"></a>Python
 
-BIND 9 contains some optional tools written in Python, in the `bin/python` subdirectory.  Python scripts are stored in the git repository as `{toolname}.py.in`; and `{toolname}.py` will be generated by `configure` (which determines, among other things, the path to the Python interpreter).
+Python is NOT required for building, installing, or using the BIND 9
+name server. However, BIND 9 may use it for its system test
+environment, and in some cases for generating source or documentation
+files which are then committed to to the git repository.
 
-For Python coding, we abide by the Python style guidelines described [here](http://www.python.org/dev/peps/pep-0008/), with a few modifications:
+For Python coding, we enforce a common codestyle using the tool
+[black](https://black.readthedocs.io/en/stable/the_black_code_style/current_style.html)
+There are also a few other requirements:
 
 * The `__init__()` method should always be the first one declared in a
   class definition, like so:
@@ -840,11 +876,8 @@ For Python coding, we abide by the Python style guidelines described [here](http
 
 ### <a name="plstyle"></a>Perl
 
-Perl is NOT required for building, installing, or using the BIND 9 name
-server.  However, BIND 9 may use Perl for its system test environment, for
-certain optional server add-on components, and in some cases for generating
-source files (such as `bind9.xsl.h`, converted from `bind9.xsl`) which are
-then committed to to the git repository.
+Like Python, Perl is NOT required for building, installing, or using
+the BIND 9 name server.
 
 Perl 5 is assumed; Perl scripts do not need to work in Perl 4.
 

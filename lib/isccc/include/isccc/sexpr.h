@@ -1,5 +1,7 @@
 /*
- * Portions Copyright (C) Internet Systems Consortium, Inc. ("ISC")
+ * Copyright (C) Internet Systems Consortium, Inc. ("ISC")
+ *
+ * SPDX-License-Identifier: MPL-2.0 AND ISC
  *
  * This Source Code Form is subject to the terms of the Mozilla Public
  * License, v. 2.0. If a copy of the MPL was not distributed with this
@@ -7,8 +9,10 @@
  *
  * See the COPYRIGHT file distributed with this work for additional
  * information regarding copyright ownership.
- *
- * Portions Copyright (C) 2001 Nominum, Inc.
+ */
+
+/*
+ * Copyright (C) 2001 Nominum, Inc.
  *
  * Permission to use, copy, modify, and/or distribute this software for any
  * purpose with or without fee is hereby granted, provided that the above
@@ -23,8 +27,7 @@
  * OR IN CONNECTION WITH THE USE OR PERFORMANCE OF THIS SOFTWARE.
  */
 
-#ifndef ISCCC_SEXPR_H
-#define ISCCC_SEXPR_H 1
+#pragma once
 
 /*! \file isccc/sexpr.h */
 
@@ -47,7 +50,7 @@ struct isccc_dottedpair {
 struct isccc_sexpr {
 	unsigned int type;
 	union {
-		char *		   as_string;
+		char		  *as_string;
 		isccc_dottedpair_t as_dottedpair;
 		isccc_region_t	   as_region;
 	} value;
@@ -114,5 +117,3 @@ isccc_region_t *
 isccc_sexpr_tobinary(isccc_sexpr_t *sexpr);
 
 ISC_LANG_ENDDECLS
-
-#endif /* ISCCC_SEXPR_H */

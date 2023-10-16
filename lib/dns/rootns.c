@@ -1,6 +1,8 @@
 /*
  * Copyright (C) Internet Systems Consortium, Inc. ("ISC")
  *
+ * SPDX-License-Identifier: MPL-2.0
+ *
  * This Source Code Form is subject to the terms of the Mozilla Public
  * License, v. 2.0. If a copy of the MPL was not distributed with this
  * file, you can obtain one at https://mozilla.org/MPL/2.0/.
@@ -14,7 +16,8 @@
 #include <stdbool.h>
 
 #include <isc/buffer.h>
-#include <isc/string.h> /* Required for HP/UX (and others?) */
+#include <isc/result.h>
+#include <isc/string.h>
 #include <isc/util.h>
 
 #include <dns/callbacks.h>
@@ -28,7 +31,6 @@
 #include <dns/rdatasetiter.h>
 #include <dns/rdatastruct.h>
 #include <dns/rdatatype.h>
-#include <dns/result.h>
 #include <dns/rootns.h>
 #include <dns/view.h>
 
@@ -128,7 +130,7 @@ check_node(dns_rdataset_t *rootns, dns_name_t *name,
 			if (dns_name_compare(name, dns_rootname) == 0) {
 				break;
 			}
-		/* FALLTHROUGH */
+			FALLTHROUGH;
 		default:
 			result = ISC_R_FAILURE;
 			goto cleanup;
@@ -152,12 +154,10 @@ check_hints(dns_db_t *db) {
 	dns_rdataset_t rootns;
 	dns_dbiterator_t *dbiter = NULL;
 	dns_dbnode_t *node = NULL;
-	isc_stdtime_t now;
+	isc_stdtime_t now = isc_stdtime_now();
 	dns_fixedname_t fixname;
 	dns_name_t *name;
 	dns_rdatasetiter_t *rdsiter = NULL;
-
-	isc_stdtime_get(&now);
 
 	name = dns_fixedname_initname(&fixname);
 
@@ -174,7 +174,7 @@ check_hints(dns_db_t *db) {
 		if (result != ISC_R_SUCCESS) {
 			goto cleanup;
 		}
-		result = dns_db_allrdatasets(db, node, NULL, now, &rdsiter);
+		result = dns_db_allrdatasets(db, node, NULL, 0, now, &rdsiter);
 		if (result != ISC_R_SUCCESS) {
 			goto cleanup;
 		}
@@ -291,7 +291,8 @@ report(dns_view_t *view, dns_name_t *name, bool missing, dns_rdata_t *rdata) {
 	isc_result_t result;
 
 	if (strcmp(view->name, "_bind") != 0 &&
-	    strcmp(view->name, "_default") != 0) {
+	    strcmp(view->name, "_default") != 0)
+	{
 		viewname = view->name;
 		sep = ": view ";
 	}
@@ -457,7 +458,7 @@ dns_root_checkhints(dns_view_t *view, dns_db_t *hints, dns_db_t *db) {
 	dns_rdata_ns_t ns;
 	dns_rdataset_t hintns, rootns;
 	const char *viewname = "", *sep = "";
-	isc_stdtime_t now;
+	isc_stdtime_t now = isc_stdtime_now();
 	dns_name_t *name;
 	dns_fixedname_t fixed;
 
@@ -465,10 +466,9 @@ dns_root_checkhints(dns_view_t *view, dns_db_t *hints, dns_db_t *db) {
 	REQUIRE(db != NULL);
 	REQUIRE(view != NULL);
 
-	isc_stdtime_get(&now);
-
 	if (strcmp(view->name, "_bind") != 0 &&
-	    strcmp(view->name, "_default") != 0) {
+	    strcmp(view->name, "_default") != 0)
+	{
 		viewname = view->name;
 		sep = ": view ";
 	}
@@ -484,7 +484,7 @@ dns_root_checkhints(dns_view_t *view, dns_db_t *hints, dns_db_t *db) {
 			      DNS_LOGMODULE_HINTS, ISC_LOG_WARNING,
 			      "checkhints%s%s: unable to get root NS rrset "
 			      "from hints: %s",
-			      sep, viewname, dns_result_totext(result));
+			      sep, viewname, isc_result_totext(result));
 		goto cleanup;
 	}
 
@@ -495,7 +495,7 @@ dns_root_checkhints(dns_view_t *view, dns_db_t *hints, dns_db_t *db) {
 			      DNS_LOGMODULE_HINTS, ISC_LOG_WARNING,
 			      "checkhints%s%s: unable to get root NS rrset "
 			      "from cache: %s",
-			      sep, viewname, dns_result_totext(result));
+			      sep, viewname, isc_result_totext(result));
 		goto cleanup;
 	}
 

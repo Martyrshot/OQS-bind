@@ -1,13 +1,17 @@
 #!/bin/sh
-#
+
 # Copyright (C) Internet Systems Consortium, Inc. ("ISC")
 #
+# SPDX-License-Identifier: MPL-2.0
+#
 # This Source Code Form is subject to the terms of the Mozilla Public
-# License, v. 2.0. If a copy of the MPL was not distributed with this
+# License, v. 2.0.  If a copy of the MPL was not distributed with this
 # file, you can obtain one at https://mozilla.org/MPL/2.0/.
 #
 # See the COPYRIGHT file distributed with this work for additional
 # information regarding copyright ownership.
+
+set -e
 
 . ../conf.sh
 
@@ -25,20 +29,25 @@ sha512="jI/Pa4qRu96t76Pns5Z/Ndxbn3QCkwcxLOgt9vgvnJw5wqTRvNyk3FtD6yIMd1dWVlqZ+Y4f
 
 status=0
 
-echo_i "fetching using hmac-md5 (old form)"
-ret=0
-$DIG $DIGOPTS example.nil. -y "md5:$md5" @10.53.0.1 soa > dig.out.md5.old || ret=1
-grep -i "md5.*TSIG.*NOERROR" dig.out.md5.old > /dev/null || ret=1
-if [ $ret -eq 1 ] ; then
-	echo_i "failed"; status=1
-fi
+if $FEATURETEST --md5
+then
+	echo_i "fetching using hmac-md5 (old form)"
+	ret=0
+	$DIG $DIGOPTS example.nil. -y "md5:$md5" @10.53.0.1 soa > dig.out.md5.old || ret=1
+	grep -i "md5.*TSIG.*NOERROR" dig.out.md5.old > /dev/null || ret=1
+	if [ $ret -eq 1 ] ; then
+		echo_i "failed"; status=1
+	fi
 
-echo_i "fetching using hmac-md5 (new form)"
-ret=0
-$DIG $DIGOPTS example.nil. -y "hmac-md5:md5:$md5" @10.53.0.1 soa > dig.out.md5.new || ret=1
-grep -i "md5.*TSIG.*NOERROR" dig.out.md5.new > /dev/null || ret=1
-if [ $ret -eq 1 ] ; then
-	echo_i "failed"; status=1
+	echo_i "fetching using hmac-md5 (new form)"
+	ret=0
+	$DIG $DIGOPTS example.nil. -y "hmac-md5:md5:$md5" @10.53.0.1 soa > dig.out.md5.new || ret=1
+	grep -i "md5.*TSIG.*NOERROR" dig.out.md5.new > /dev/null || ret=1
+	if [ $ret -eq 1 ] ; then
+		echo_i "failed"; status=1
+	fi
+else
+	echo_i "skipping using hmac-md5"
 fi
 
 echo_i "fetching using hmac-sha1"
@@ -86,12 +95,17 @@ fi
 #	Truncated TSIG
 #
 #
-echo_i "fetching using hmac-md5 (trunc)"
-ret=0
-$DIG $DIGOPTS example.nil. -y "hmac-md5-80:md5-trunc:$md5" @10.53.0.1 soa > dig.out.md5.trunc || ret=1
-grep -i "md5-trunc.*TSIG.*NOERROR" dig.out.md5.trunc > /dev/null || ret=1
-if [ $ret -eq 1 ] ; then
-	echo_i "failed"; status=1
+if $FEATURETEST --md5
+then
+	echo_i "fetching using hmac-md5 (trunc)"
+	ret=0
+	$DIG $DIGOPTS example.nil. -y "hmac-md5-80:md5-trunc:$md5" @10.53.0.1 soa > dig.out.md5.trunc || ret=1
+	grep -i "md5-trunc.*TSIG.*NOERROR" dig.out.md5.trunc > /dev/null || ret=1
+	if [ $ret -eq 1 ] ; then
+		echo_i "failed"; status=1
+	fi
+else
+	echo_i "skipping using hmac-md5 (trunc)"
 fi
 
 echo_i "fetching using hmac-sha1 (trunc)"
@@ -140,12 +154,17 @@ fi
 #	Check for bad truncation.
 #
 #
-echo_i "fetching using hmac-md5-80 (BADTRUNC)"
-ret=0
-$DIG $DIGOPTS example.nil. -y "hmac-md5-80:md5:$md5" @10.53.0.1 soa > dig.out.md5-80 || ret=1
-grep -i "md5.*TSIG.*BADTRUNC" dig.out.md5-80 > /dev/null || ret=1
-if [ $ret -eq 1 ] ; then
-	echo_i "failed"; status=1
+if $FEATURETEST --md5
+then
+	echo_i "fetching using hmac-md5-80 (BADTRUNC)"
+	ret=0
+	$DIG $DIGOPTS example.nil. -y "hmac-md5-80:md5:$md5" @10.53.0.1 soa > dig.out.md5-80 || ret=1
+	grep -i "md5.*TSIG.*BADTRUNC" dig.out.md5-80 > /dev/null || ret=1
+	if [ $ret -eq 1 ] ; then
+		echo_i "failed"; status=1
+	fi
+else
+	echo_i "skipping using hmac-md5-80 (BADTRUNC)"
 fi
 
 echo_i "fetching using hmac-sha1-80 (BADTRUNC)"
@@ -238,6 +257,65 @@ $DIG -p $PORT @10.53.0.1 bad-tsig > dig.out.bad-tsig || ret=1
 grep "status: SERVFAIL" dig.out.bad-tsig > /dev/null || ret=1
 if [ $ret -eq 1 ] ; then
     echo_i "failed"; status=1
+fi
+
+if $FEATURETEST --md5
+then
+	echo_i "fetching using hmac-md5 (legacy)"
+	ret=0
+	$DIG $DIGOPTS example.nil. -k ns1/legacy/Khmac-md5-legacy.+*.key @10.53.0.1 soa > dig.out.md5.legacy 2>&1 || ret=1
+	grep -i "md5.*TSIG.*NOERROR" dig.out.md5.legacy > /dev/null || ret=1
+	grep "Use of K\* file pairs for HMAC is deprecated" dig.out.md5.legacy > /dev/null || ret=1
+	if [ $ret -eq 1 ] ; then
+		echo_i "failed"; status=1
+	fi
+else
+	echo_i "skipping using hmac-md5"
+fi
+
+echo_i "fetching using hmac-sha1 (legacy)"
+ret=0
+$DIG $DIGOPTS example.nil. -k ns1/legacy/Khmac-sha1-legacy.+*.key @10.53.0.1 soa > dig.out.sha1.legacy 2>&1 || ret=1
+grep -i "sha1.*TSIG.*NOERROR" dig.out.sha1.legacy > /dev/null || ret=1
+grep "Use of K\* file pairs for HMAC is deprecated" dig.out.sha1.legacy > /dev/null || ret=1
+if [ $ret -eq 1 ] ; then
+	echo_i "failed"; status=1
+fi
+
+echo_i "fetching using hmac-sha224 (legacy)"
+ret=0
+$DIG $DIGOPTS example.nil. -k ns1/legacy/Khmac-sha224-legacy.+*.key @10.53.0.1 soa > dig.out.sha224 2>&1 || ret=1
+grep -i "sha224.*TSIG.*NOERROR" dig.out.sha224 > /dev/null || ret=1
+grep "Use of K\* file pairs for HMAC is deprecated" dig.out.sha224 > /dev/null || ret=1
+if [ $ret -eq 1 ] ; then
+	echo_i "failed"; status=1
+fi
+
+echo_i "fetching using hmac-sha256 (legacy)"
+ret=0
+$DIG $DIGOPTS example.nil. -k ns1/legacy/Khmac-sha256-legacy.*.key @10.53.0.1 soa > dig.out.sha256 2>&1 || ret=1
+grep -i "sha256.*TSIG.*NOERROR" dig.out.sha256 > /dev/null || ret=1
+grep "Use of K\* file pairs for HMAC is deprecated" dig.out.sha256 > /dev/null || ret=1
+if [ $ret -eq 1 ] ; then
+	echo_i "failed"; status=1
+fi
+
+echo_i "fetching using hmac-sha384 (legacy)"
+ret=0
+$DIG $DIGOPTS example.nil. -k ns1/legacy/Khmac-sha384-legacy.*.key @10.53.0.1 soa > dig.out.sha384 2>&1 || ret=1
+grep -i "sha384.*TSIG.*NOERROR" dig.out.sha384 > /dev/null || ret=1
+grep "Use of K\* file pairs for HMAC is deprecated" dig.out.sha384 > /dev/null || ret=1
+if [ $ret -eq 1 ] ; then
+	echo_i "failed"; status=1
+fi
+
+echo_i "fetching using hmac-sha512 (legacy)"
+ret=0
+$DIG $DIGOPTS example.nil. -k ns1/legacy/Khmac-sha512-legacy.*.key @10.53.0.1 soa > dig.out.sha512 2>&1 || ret=1
+grep "Use of K\* file pairs for HMAC is deprecated" dig.out.sha512 > /dev/null || ret=1
+grep -i "sha512.*TSIG.*NOERROR" dig.out.sha512 > /dev/null || ret=1
+if [ $ret -eq 1 ] ; then
+	echo_i "failed"; status=1
 fi
 
 echo_i "exit status: $status"

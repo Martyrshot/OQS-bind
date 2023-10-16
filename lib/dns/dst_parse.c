@@ -1,5 +1,7 @@
 /*
- * Portions Copyright (C) Internet Systems Consortium, Inc. ("ISC")
+ * Copyright (C) Internet Systems Consortium, Inc. ("ISC")
+ *
+ * SPDX-License-Identifier: MPL-2.0 AND ISC
  *
  * This Source Code Form is subject to the terms of the Mozilla Public
  * License, v. 2.0. If a copy of the MPL was not distributed with this
@@ -7,8 +9,10 @@
  *
  * See the COPYRIGHT file distributed with this work for additional
  * information regarding copyright ownership.
- *
- * Portions Copyright (C) Network Associates, Inc.
+ */
+
+/*
+ * Copyright (C) Network Associates, Inc.
  *
  * Permission to use, copy, modify, and/or distribute this software for any
  * purpose with or without fee is hereby granted, provided that the above
@@ -26,25 +30,22 @@
 #include "dst_parse.h"
 #include <inttypes.h>
 #include <stdbool.h>
+#include <unistd.h>
 
 #include <isc/base64.h>
 #include <isc/dir.h>
 #include <isc/file.h>
-#include <isc/fsaccess.h>
 #include <isc/lex.h>
 #include <isc/mem.h>
-#include <isc/print.h>
 #include <isc/stdtime.h>
 #include <isc/string.h>
 #include <isc/util.h>
 
-#include <pk11/site.h>
-
 #include <dns/log.h>
 #include <dns/time.h>
 
-#include "dst/result.h"
 #include "dst_internal.h"
+#include "isc/result.h"
 
 #define DST_AS_STR(t) ((t).value.as_textregion.base)
 
@@ -61,7 +62,7 @@ static const char *timetags[TIMING_NTAGS] = {
 
 #define NUMERIC_NTAGS (DST_MAX_NUMERIC + 1)
 static const char *numerictags[NUMERIC_NTAGS] = {
-	"Predecessor:", "Successor:", "MaxTTL:", "RollPeriod:", NULL
+	"Predecessor:", "Successor:", "MaxTTL:", "RollPeriod:", NULL, NULL, NULL
 };
 
 struct parse_map {
@@ -80,11 +81,6 @@ static struct parse_map map[] = { { TAG_RSA_MODULUS, "Modulus:" },
 				  { TAG_RSA_COEFFICIENT, "Coefficient:" },
 				  { TAG_RSA_ENGINE, "Engine:" },
 				  { TAG_RSA_LABEL, "Label:" },
-
-				  { TAG_DH_PRIME, "Prime(p):" },
-				  { TAG_DH_GENERATOR, "Generator(g):" },
-				  { TAG_DH_PRIVATE, "Private_value(x):" },
-				  { TAG_DH_PUBLIC, "Public_value(y):" },
 
 				  { TAG_ECDSA_PRIVATEKEY, "PrivateKey:" },
 				  { TAG_ECDSA_ENGINE, "Engine:" },
@@ -133,7 +129,8 @@ find_value(const char *s, const unsigned int alg) {
 	int i;
 	for (i = 0; map[i].tag != NULL; i++) {
 		if (strcasecmp(s, map[i].tag) == 0 &&
-		    (TAG_ALG(map[i].value) == alg)) {
+		    (TAG_ALG(map[i].value) == alg))
+		{
 			return (map[i].value);
 		}
 	}
@@ -205,10 +202,9 @@ check_rsa(const dst_private_t *priv, bool external) {
 
 	mask = (1ULL << TAG_SHIFT) - 1;
 
-	if (have[TAG_RSA_ENGINE & mask]) {
+	if (have[TAG_RSA_LABEL & mask]) {
 		ok = have[TAG_RSA_MODULUS & mask] &&
-		     have[TAG_RSA_PUBLICEXPONENT & mask] &&
-		     have[TAG_RSA_LABEL & mask];
+		     have[TAG_RSA_PUBLICEXPONENT & mask];
 	} else {
 		ok = have[TAG_RSA_MODULUS & mask] &&
 		     have[TAG_RSA_PUBLICEXPONENT & mask] &&
@@ -220,25 +216,6 @@ check_rsa(const dst_private_t *priv, bool external) {
 		     have[TAG_RSA_COEFFICIENT & mask];
 	}
 	return (ok ? 0 : -1);
-}
-
-static int
-check_dh(const dst_private_t *priv) {
-	int i, j;
-	if (priv->nelements != DH_NTAGS) {
-		return (-1);
-	}
-	for (i = 0; i < DH_NTAGS; i++) {
-		for (j = 0; j < priv->nelements; j++) {
-			if (priv->elements[j].tag == TAG(DST_ALG_DH, i)) {
-				break;
-			}
-		}
-		if (j == priv->nelements) {
-			return (-1);
-		}
-	}
-	return (0);
 }
 
 static int
@@ -269,11 +246,8 @@ check_ecdsa(const dst_private_t *priv, bool external) {
 
 	mask = (1ULL << TAG_SHIFT) - 1;
 
-	if (have[TAG_ECDSA_ENGINE & mask]) {
-		ok = have[TAG_ECDSA_LABEL & mask];
-	} else {
-		ok = have[TAG_ECDSA_PRIVATEKEY & mask];
-	}
+	ok = have[TAG_ECDSA_LABEL & mask] || have[TAG_ECDSA_PRIVATEKEY & mask];
+
 	return (ok ? 0 : -1);
 }
 
@@ -305,11 +279,8 @@ check_eddsa(const dst_private_t *priv, bool external) {
 
 	mask = (1ULL << TAG_SHIFT) - 1;
 
-	if (have[TAG_EDDSA_ENGINE & mask]) {
-		ok = have[TAG_EDDSA_LABEL & mask];
-	} else {
-		ok = have[TAG_EDDSA_PRIVATEKEY & mask];
-	}
+	ok = have[TAG_EDDSA_LABEL & mask] || have[TAG_EDDSA_PRIVATEKEY & mask];
+
 	return (ok ? 0 : -1);
 }
 
@@ -476,7 +447,6 @@ check_sphincssha256128s(const dst_private_t *priv, bool external) {
 static int
 check_data(const dst_private_t *priv, const unsigned int alg, bool old,
 	   bool external) {
-	/* XXXVIX this switch statement is too sparse to gen a jump table. */
 	switch (alg) {
 	case DST_ALG_RSA:
 	case DST_ALG_RSASHA1:
@@ -484,8 +454,6 @@ check_data(const dst_private_t *priv, const unsigned int alg, bool old,
 	case DST_ALG_RSASHA256:
 	case DST_ALG_RSASHA512:
 		return (check_rsa(priv, external));
-	case DST_ALG_DH:
-		return (check_dh(priv));
 	case DST_ALG_ECDSA256:
 	case DST_ALG_ECDSA384:
 		return (check_ecdsa(priv, external));
@@ -745,11 +713,13 @@ dst__privstruct_writefile(const dst_key_t *key, const dst_private_t *priv,
 	FILE *fp;
 	isc_result_t result;
 	char filename[NAME_MAX];
+	char tmpname[NAME_MAX];
 	char buffer[MAXFIELDSIZE * 2];
-	isc_fsaccess_t access;
 	isc_stdtime_t when;
 	uint32_t value;
 	isc_buffer_t b;
+	isc_buffer_t fileb;
+	isc_buffer_t tmpb;
 	isc_region_t r;
 	int major, minor;
 	mode_t mode;
@@ -762,14 +732,15 @@ dst__privstruct_writefile(const dst_key_t *key, const dst_private_t *priv,
 		return (ret);
 	}
 
-	isc_buffer_init(&b, filename, sizeof(filename));
-	result = dst_key_buildfilename(key, DST_TYPE_PRIVATE, directory, &b);
+	isc_buffer_init(&fileb, filename, sizeof(filename));
+	result = dst_key_buildfilename(key, DST_TYPE_PRIVATE, directory,
+				       &fileb);
 	if (result != ISC_R_SUCCESS) {
 		return (result);
 	}
 
 	result = isc_file_mode(filename, &mode);
-	if (result == ISC_R_SUCCESS && mode != 0600) {
+	if (result == ISC_R_SUCCESS && mode != (S_IRUSR | S_IWUSR)) {
 		/* File exists; warn that we are changing its permissions */
 		int level;
 
@@ -782,14 +753,17 @@ dst__privstruct_writefile(const dst_key_t *key, const dst_private_t *priv,
 			      filename, (unsigned int)mode);
 	}
 
-	if ((fp = fopen(filename, "w")) == NULL) {
-		return (DST_R_WRITEERROR);
+	isc_buffer_init(&tmpb, tmpname, sizeof(tmpname));
+	result = dst_key_buildfilename(key, DST_TYPE_TEMPLATE, directory,
+				       &tmpb);
+	if (result != ISC_R_SUCCESS) {
+		return (result);
 	}
 
-	access = 0;
-	isc_fsaccess_add(ISC_FSACCESS_OWNER,
-			 ISC_FSACCESS_READ | ISC_FSACCESS_WRITE, &access);
-	(void)isc_fsaccess_set(filename, access);
+	fp = dst_key_open(tmpname, S_IRUSR | S_IWUSR);
+	if (fp == NULL) {
+		return (DST_R_WRITEERROR);
+	}
 
 	dst_key_getprivateformat(key, &major, &minor);
 	if (major == 0 && minor == 0) {
@@ -802,11 +776,7 @@ dst__privstruct_writefile(const dst_key_t *key, const dst_private_t *priv,
 
 	fprintf(fp, "%s %u ", ALGORITHM_STR, dst_key_alg(key));
 
-	/* XXXVIX this switch statement is too sparse to gen a jump table. */
 	switch (dst_key_alg(key)) {
-	case DST_ALG_DH:
-		fprintf(fp, "(DH)\n");
-		break;
 	case DST_ALG_RSASHA1:
 		fprintf(fp, "(RSASHA1)\n");
 		break;
@@ -872,8 +842,7 @@ dst__privstruct_writefile(const dst_key_t *key, const dst_private_t *priv,
 		isc_buffer_init(&b, buffer, sizeof(buffer));
 		result = isc_base64_totext(&r, sizeof(buffer), "", &b);
 		if (result != ISC_R_SUCCESS) {
-			fclose(fp);
-			return (DST_R_INVALIDPRIVATEKEY);
+			return (dst_key_cleanup(tmpname, fp));
 		}
 		isc_buffer_usedregion(&b, &r);
 
@@ -904,8 +873,7 @@ dst__privstruct_writefile(const dst_key_t *key, const dst_private_t *priv,
 			isc_buffer_init(&b, buffer, sizeof(buffer));
 			result = dns_time32_totext(when, &b);
 			if (result != ISC_R_SUCCESS) {
-				fclose(fp);
-				return (DST_R_INVALIDPRIVATEKEY);
+				return (dst_key_cleanup(tmpname, fp));
 			}
 
 			isc_buffer_usedregion(&b, &r);
@@ -917,9 +885,7 @@ dst__privstruct_writefile(const dst_key_t *key, const dst_private_t *priv,
 		}
 	}
 
-	fflush(fp);
-	result = ferror(fp) ? DST_R_WRITEERROR : ISC_R_SUCCESS;
-	fclose(fp);
+	result = dst_key_close(tmpname, fp, filename);
 	return (result);
 }
 

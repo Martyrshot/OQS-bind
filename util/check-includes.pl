@@ -1,9 +1,11 @@
 #! /usr/bin/perl -ws
-#
+
 # Copyright (C) Internet Systems Consortium, Inc. ("ISC")
 #
+# SPDX-License-Identifier: MPL-2.0
+#
 # This Source Code Form is subject to the terms of the Mozilla Public
-# License, v. 2.0. If a copy of the MPL was not distributed with this
+# License, v. 2.0.  If a copy of the MPL was not distributed with this
 # file, you can obtain one at https://mozilla.org/MPL/2.0/.
 #
 # See the COPYRIGHT file distributed with this work for additional
@@ -87,18 +89,6 @@ for (<>) {
   if (/$nocomment.*ISC_EVENTCLASS_/m && ! m%^#include <isc/eventclass\.h>%m) {
     print "$file has ISC_EVENTCLASS_ without <isc/eventclass.h>\n"
       unless $file =~ m%isc/eventclass.h%;
-  }
-
-  if (/$nocomment.*ISC_RESULTCLASS_/m &&
-      ! m%^#include <isc/resultclass\.h>%m) {
-    print "$file has ISC_RESULTCLASS_ without <isc/resultclass.h>\n"
-      unless $file =~ m%isc/resultclass.h%;
-  }
-
-  if (/$nocomment.*ISC_PLATFORM_/m &&
-      ! m%^#include <isc/platform.h>%m) {
-    print "$file has ISC_PLATFORM_ without <isc/platform.h>\n"
-      unless $file =~ m%isc/platform.h%;
   }
 
   if ($file !~ m%isc/magic\.h$%) {
@@ -231,13 +221,6 @@ for (<>) {
       # So skip the elision test in any event.
       # XXX would be good to test for files that need types.h but don't
       # include it.
-      next;
-    }
-
-    if ($elided eq "<isc/platform.h>") {
-      if (! /^$nocomment.*ISC_PLATFORM_/m) {
-        print "$file has <isc/platform.h> but no ISC_PLATFORM_\n";
-      }
       next;
     }
 

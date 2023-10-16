@@ -1,6 +1,8 @@
 /*
  * Copyright (C) Internet Systems Consortium, Inc. ("ISC")
  *
+ * SPDX-License-Identifier: MPL-2.0
+ *
  * This Source Code Form is subject to the terms of the Mozilla Public
  * License, v. 2.0. If a copy of the MPL was not distributed with this
  * file, you can obtain one at https://mozilla.org/MPL/2.0/.
@@ -19,11 +21,8 @@
 #include <isc/buffer.h>
 #include <isc/file.h>
 #include <isc/mem.h>
-#include <isc/print.h>
 #include <isc/result.h>
 #include <isc/string.h>
-
-#include <pk11/site.h>
 
 #include <dns/keyvalues.h>
 #include <dns/name.h>
@@ -33,29 +32,6 @@
 #include <confgen/os.h>
 
 #include "util.h"
-
-/*%
- * Convert algorithm type to string.
- */
-const char *
-alg_totext(dns_secalg_t alg) {
-	switch (alg) {
-	case DST_ALG_HMACMD5:
-		return ("hmac-md5");
-	case DST_ALG_HMACSHA1:
-		return ("hmac-sha1");
-	case DST_ALG_HMACSHA224:
-		return ("hmac-sha224");
-	case DST_ALG_HMACSHA256:
-		return ("hmac-sha256");
-	case DST_ALG_HMACSHA384:
-		return ("hmac-sha384");
-	case DST_ALG_HMACSHA512:
-		return ("hmac-sha512");
-	default:
-		return ("(unknown)");
-	}
-}
 
 /*%
  * Convert string to algorithm type.
@@ -175,7 +151,7 @@ void
 write_key_file(const char *keyfile, const char *user, const char *keyname,
 	       isc_buffer_t *secret, dns_secalg_t alg) {
 	isc_result_t result;
-	const char *algname = alg_totext(alg);
+	const char *algname = dst_hmac_algorithm_totext(alg);
 	FILE *fd = NULL;
 
 	DO("create keyfile", isc_file_safecreate(keyfile, &fd));

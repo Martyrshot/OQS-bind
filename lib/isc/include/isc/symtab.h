@@ -1,6 +1,8 @@
 /*
  * Copyright (C) Internet Systems Consortium, Inc. ("ISC")
  *
+ * SPDX-License-Identifier: MPL-2.0
+ *
  * This Source Code Form is subject to the terms of the Mozilla Public
  * License, v. 2.0. If a copy of the MPL was not distributed with this
  * file, you can obtain one at https://mozilla.org/MPL/2.0/.
@@ -9,8 +11,7 @@
  * information regarding copyright ownership.
  */
 
-#ifndef ISC_SYMTAB_H
-#define ISC_SYMTAB_H 1
+#pragma once
 
 /*****
 ***** Module Info
@@ -87,8 +88,8 @@
  ***/
 /*% Symbol table value. */
 typedef union isc_symvalue {
-	void *	     as_pointer;
-	const void * as_cpointer;
+	void	    *as_pointer;
+	const void  *as_cpointer;
 	int	     as_integer;
 	unsigned int as_uinteger;
 } isc_symvalue_t;
@@ -132,5 +133,3 @@ isc_symtab_undefine(isc_symtab_t *symtab, const char *key, unsigned int type);
 unsigned int
 isc_symtab_count(isc_symtab_t *symtab);
 ISC_LANG_ENDDECLS
-
-#endif /* ISC_SYMTAB_H */

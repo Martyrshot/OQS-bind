@@ -1,6 +1,8 @@
 /*
  * Copyright (C) Internet Systems Consortium, Inc. ("ISC")
  *
+ * SPDX-License-Identifier: MPL-2.0
+ *
  * This Source Code Form is subject to the terms of the Mozilla Public
  * License, v. 2.0. If a copy of the MPL was not distributed with this
  * file, you can obtain one at https://mozilla.org/MPL/2.0/.
@@ -9,8 +11,7 @@
  * information regarding copyright ownership.
  */
 
-#ifndef GENERIC_ISDN_20_H
-#define GENERIC_ISDN_20_H 1
+#pragma once
 
 /*!
  * \brief Per RFC1183 */
@@ -23,5 +24,3 @@ typedef struct dns_rdata_isdn {
 	uint8_t isdn_len;
 	uint8_t subaddress_len;
 } dns_rdata_isdn_t;
-
-#endif /* GENERIC_ISDN_20_H */

@@ -1,6 +1,8 @@
 /*
  * Copyright (C) Internet Systems Consortium, Inc. ("ISC")
  *
+ * SPDX-License-Identifier: MPL-2.0
+ *
  * This Source Code Form is subject to the terms of the Mozilla Public
  * License, v. 2.0. If a copy of the MPL was not distributed with this
  * file, you can obtain one at https://mozilla.org/MPL/2.0/.
@@ -9,8 +11,7 @@
  * information regarding copyright ownership.
  */
 
-#ifndef ISC_MUTEXBLOCK_H
-#define ISC_MUTEXBLOCK_H 1
+#pragma once
 
 /*! \file isc/mutexblock.h */
 
@@ -51,5 +52,3 @@ isc_mutexblock_destroy(isc_mutex_t *block, unsigned int count);
  */
 
 ISC_LANG_ENDDECLS
-
-#endif /* ISC_MUTEXBLOCK_H */

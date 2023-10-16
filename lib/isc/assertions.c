@@ -1,6 +1,8 @@
 /*
  * Copyright (C) Internet Systems Consortium, Inc. ("ISC")
  *
+ * SPDX-License-Identifier: MPL-2.0
+ *
  * This Source Code Form is subject to the terms of the Mozilla Public
  * License, v. 2.0. If a copy of the MPL was not distributed with this
  * file, you can obtain one at https://mozilla.org/MPL/2.0/.
@@ -16,8 +18,6 @@
 
 #include <isc/assertions.h>
 #include <isc/backtrace.h>
-#include <isc/platform.h>
-#include <isc/print.h>
 #include <isc/result.h>
 #include <isc/strerr.h>
 
@@ -47,7 +47,6 @@ isc_assertion_failed(const char *file, int line, isc_assertiontype_t type,
 		     const char *cond) {
 	isc_assertion_failed_cb(file, line, type, cond);
 	abort();
-	/* NOTREACHED */
 }
 
 /*% Set callback. */
@@ -96,8 +95,8 @@ isc_assertion_typetotext(isc_assertiontype_t type) {
 static void
 default_callback(const char *file, int line, isc_assertiontype_t type,
 		 const char *cond) {
-	void *tracebuf[BACKTRACE_MAXFRAME];
-	int nframes = isc_backtrace(tracebuf, BACKTRACE_MAXFRAME);
+	void *tracebuf[ISC_BACKTRACE_MAXFRAME];
+	int nframes = isc_backtrace(tracebuf, ISC_BACKTRACE_MAXFRAME);
 
 	fprintf(stderr, "%s:%d: %s(%s) failed%s\n", file, line,
 		isc_assertion_typetotext(type), cond,

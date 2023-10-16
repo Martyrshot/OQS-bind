@@ -1,6 +1,8 @@
 /*
  * Copyright (C) Internet Systems Consortium, Inc. ("ISC")
  *
+ * SPDX-License-Identifier: MPL-2.0
+ *
  * This Source Code Form is subject to the terms of the Mozilla Public
  * License, v. 2.0. If a copy of the MPL was not distributed with this
  * file, you can obtain one at https://mozilla.org/MPL/2.0/.
@@ -11,7 +13,6 @@
 
 /*! \file */
 
-#include <ctype.h>
 #include <stdbool.h>
 
 #include <isc/buffer.h>
@@ -19,6 +20,23 @@
 #include <isc/lex.h>
 #include <isc/string.h>
 #include <isc/util.h>
+
+#define D ('0' - 0x0) /* ascii '0' to hex */
+#define U ('A' - 0xA) /* ascii 'A' to hex */
+#define L ('a' - 0xa) /* ascii 'a' to hex */
+
+const uint8_t isc__hex_char[256] = {
+	0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
+	0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
+	0, 0, 0, 0, D, D, D, D, D, D, D, D, D, D, 0, 0, 0, 0, 0, 0, 0, U,
+	U, U, U, U, U, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
+	0, 0, 0, 0, 0, 0, 0, 0, 0, L, L, L, L, L, L, 0, 0, 0, 0, 0, 0, 0,
+	0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0
+};
+
+#undef D
+#undef U
+#undef L
 
 #define RETERR(x)                        \
 	do {                             \
@@ -75,21 +93,22 @@ typedef struct {
 	int val[2];
 } hex_decode_ctx_t;
 
-static inline void
+static void
 hex_decode_init(hex_decode_ctx_t *ctx, int length, isc_buffer_t *target) {
 	ctx->digits = 0;
 	ctx->length = length;
 	ctx->target = target;
 }
 
-static inline isc_result_t
+static isc_result_t
 hex_decode_char(hex_decode_ctx_t *ctx, int c) {
-	const char *s;
+	uint8_t hexval;
 
-	if ((s = strchr(hex, toupper(c))) == NULL) {
+	hexval = isc_hex_char(c);
+	if (hexval == 0) {
 		return (ISC_R_BADHEX);
 	}
-	ctx->val[ctx->digits++] = (int)(s - hex);
+	ctx->val[ctx->digits++] = c - hexval;
 	if (ctx->digits == 2) {
 		unsigned char num;
 
@@ -107,7 +126,7 @@ hex_decode_char(hex_decode_ctx_t *ctx, int c) {
 	return (ISC_R_SUCCESS);
 }
 
-static inline isc_result_t
+static isc_result_t
 hex_decode_finish(hex_decode_ctx_t *ctx) {
 	if (ctx->length > 0) {
 		return (ISC_R_UNEXPECTEDEND);

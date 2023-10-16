@@ -1,6 +1,8 @@
 /*
  * Copyright (C) Internet Systems Consortium, Inc. ("ISC")
  *
+ * SPDX-License-Identifier: MPL-2.0
+ *
  * This Source Code Form is subject to the terms of the Mozilla Public
  * License, v. 2.0. If a copy of the MPL was not distributed with this
  * file, you can obtain one at https://mozilla.org/MPL/2.0/.
@@ -14,7 +16,6 @@
 #include "errno2result.h"
 #include <stdbool.h>
 
-#include <isc/platform.h>
 #include <isc/result.h>
 #include <isc/strerr.h>
 #include <isc/string.h>
@@ -38,10 +39,13 @@ isc___errno2result(int posixerrno, bool dolog, const char *file,
 	case ENAMETOOLONG:
 	case EBADF:
 		return (ISC_R_INVALIDFILE);
+	case EISDIR:
+		return (ISC_R_NOTFILE);
 	case ENOENT:
 		return (ISC_R_FILENOTFOUND);
 	case EACCES:
 	case EPERM:
+	case EROFS:
 		return (ISC_R_NOPERM);
 	case EEXIST:
 		return (ISC_R_FILEEXISTS);

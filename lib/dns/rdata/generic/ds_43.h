@@ -1,6 +1,8 @@
 /*
  * Copyright (C) Internet Systems Consortium, Inc. ("ISC")
  *
+ * SPDX-License-Identifier: MPL-2.0
+ *
  * This Source Code Form is subject to the terms of the Mozilla Public
  * License, v. 2.0. If a copy of the MPL was not distributed with this
  * file, you can obtain one at https://mozilla.org/MPL/2.0/.
@@ -9,8 +11,7 @@
  * information regarding copyright ownership.
  */
 
-#ifndef GENERIC_DS_43_H
-#define GENERIC_DS_43_H 1
+#pragma once
 
 /*!
  *  \brief per draft-ietf-dnsext-delegation-signer-05.txt */
@@ -23,5 +24,3 @@ typedef struct dns_rdata_ds {
 	uint16_t length;
 	unsigned char *digest;
 } dns_rdata_ds_t;
-
-#endif /* GENERIC_DS_43_H */
