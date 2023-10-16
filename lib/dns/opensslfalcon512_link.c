@@ -80,7 +80,7 @@ raw_key_to_ossl(const falcon512_alginfo_t *alginfo, int private,
 		}
 		*pkey = EVP_PKEY_new_raw_private_key(pkey_type, NULL, key, alginfo->priv_key_size);
 	} else {
-		if (*key_len < alginfo->priv_key_len) {
+		if (*key_len < alginfo->priv_key_size) {
 			return (ret);
 		}
 		*pkey = EVP_PKEY_new_raw_public_key(pkey_type, NULL, key, alginfo->key_size);
@@ -226,7 +226,7 @@ opensslfalcon512_verify(dst_context_t *dctx, const isc_region_t *sig) {
 	// TODO update to latest version of liboqs to remove this hack
 	unsigned char *_sig = sig->base;
 	int ending_key = -1;
-	size_t siglen = sig->length();
+	size_t siglen = sig->length;
         if (siglen == DNS_SIG_FALCON512SIZE) {
                 for (unsigned int i = 0; i < siglen; i++) {
                         if (_sig[i] == 0 && ending_key == -1) ending_key = i;
