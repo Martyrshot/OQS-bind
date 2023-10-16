@@ -443,7 +443,6 @@ opensslfalcon512_parse(dst_key_t *key, isc_lex_t *lexer, dst_key_t *pub) {
 	int i, privkey_index, pubkey_index = -1;
 	const char *engine = NULL, *label = NULL;
 	EVP_PKEY *pkey = NULL, *pubpkey = NULL;
-	size_t len;
 	isc_mem_t *mctx = key->mctx;
 	UNUSED(engine);
 	UNUSED(label);
@@ -494,7 +493,7 @@ opensslfalcon512_parse(dst_key_t *key, isc_lex_t *lexer, dst_key_t *pub) {
 	if (pubkey_index < 0) {
 		DST_RET(DST_R_INVALIDPUBLICKEY);
 	}
-
+	len = priv.elements[privkey_index].length;
 	pkey = EVP_PKEY_new_raw_private_key(EVP_PKEY_FALCON512, NULL, priv.elements[privkey_index].data, len);
 	if (pkey == NULL) {
 		return (dst__openssl_toresult(ret));
