@@ -51,9 +51,9 @@
 typedef struct falcon512_alginfo {
 	int pkey_type;
 	unsigned int key_size, priv_key_size, sig_size;
-} falcon512_alginfo_t;
+} falcon512_alg_info_t;
 
-static const falcon512_alg_info_t *
+static const falcon512_alginfo_t *
 opensslfalcon512_alg_info(unsigned int key_alg) {
 	if (key_alg == DST_ALG_FALCON512) {
 		static const falcon512_alginfo_t falcon512_alginfo = {
@@ -75,20 +75,20 @@ raw_key_to_ossl(const falcon512_alginfo_t *alginfo, int private,
 
 	ret = (private ? DST_R_INVALIDPRIVATEKEY : DST_R_INVALIDPUBLICKEY);
 	if (private) {
-		if (*key_len < alginfo->priv_key_len) {
+		if (*key_len < alginfo->priv_key_size) {
 			return (ret);
 		}
-		*pkey = EVP_PKEY_new_raw_private_key(pkey_type, NULL, key, alginfo->priv_key_len);
+		*pkey = EVP_PKEY_new_raw_private_key(pkey_type, NULL, key, alginfo->priv_key_size);
 	} else {
 		if (*key_len < alginfo->priv_key_len) {
 			return (ret);
 		}
-		*pkey = EVP_PKEY_new_raw_public_key(pkey_type, NULL, key, alginfo->key_len);
+		*pkey = EVP_PKEY_new_raw_public_key(pkey_type, NULL, key, alginfo->key_size);
 	}
 	if (*pkey == NULL) {
 		return (dst__openssl_toresult(ret));
 	}
-	*key_len = (private ? alginfo->priv_key_len : alginfo->key_len);
+	*key_len = (private ? alginfo->priv_key_size : alginfo->key_size);
 	return (ISC_R_SUCCESS);
 }
 
@@ -166,7 +166,7 @@ opensslfalcon512_sign(dst_context_t *dctx, isc_buffer_t *sig) {
 		return (ISC_R_NOMEMORY);
 	}
 
-	siglen = alginfo->size_size;
+	siglen = alginfo->sig_size;
 	isc_buffer_availableregion(sig, &sigreg);
 	if (sigreg.length < (unsigned int)siglen) {
 		DST_RET(ISC_R_NOSPACE);
@@ -226,6 +226,7 @@ opensslfalcon512_verify(dst_context_t *dctx, const isc_region_t *sig) {
 	// TODO update to latest version of liboqs to remove this hack
 	unsigned char *_sig = sig->base;
 	int ending_key = -1;
+	size_t siglen = sig->length();
         if (siglen == DNS_SIG_FALCON512SIZE) {
                 for (unsigned int i = 0; i < siglen; i++) {
                         if (_sig[i] == 0 && ending_key == -1) ending_key = i;
@@ -362,7 +363,7 @@ opensslfalcon512_fromdns(dst_key_t *key, isc_buffer_t *data) {
 
 static isc_result_t
 opensslfalcon512_tofile(const dst_key_t *key, const char *directory) {
-	const falcon512_alginfo *alginfo = opensslfalcon512_alg_info(key->key_alg);
+	const falcon512_alginfo_t *alginfo = opensslfalcon512_alg_info(key->key_alg);
 	isc_result_t ret;
 	dst_private_t priv;
 	unsigned char *pubbuf = NULL;
@@ -386,7 +387,7 @@ opensslfalcon512_tofile(const dst_key_t *key, const char *directory) {
 
 	i = 0;
 
-	if (opensslfalcon512_isprivate(key)) {
+	if (dst__openssl_keypair_isprivate(key)) {
 		privbuf = isc_mem_get(key->mctx, privlen);
 		if (EVP_PKEY_get_raw_private_key(key->keydata.pkeypair.priv, privbuf,
 						 &privlen) != 1)
@@ -462,8 +463,8 @@ opensslfalcon512_parse(dst_key_t *key, isc_lex_t *lexer, dst_key_t *pub) {
 		if (pub == NULL) {
 			DST_RET(DST_R_INVALIDPRIVATEKEY);
 		}
-		key->keydata.pkeypair.priv = pub->keydata.pkey.priv;
-		key->keydata.pkeypair.pub = pub->keydata.pkey.pub;
+		key->keydata.pkeypair.priv = pub->keydata.pkeypair.priv;
+		key->keydata.pkeypair.pub = pub->keydata.pkeypair.pub;
 		pub->keydata.pkeypair.priv = NULL;
 		pub->keydata.pkeypair.pub = NULL;
 		DST_RET(ISC_R_SUCCESS);
@@ -494,22 +495,6 @@ opensslfalcon512_parse(dst_key_t *key, isc_lex_t *lexer, dst_key_t *pub) {
 		DST_RET(DST_R_INVALIDPUBLICKEY);
 	}
 
-	if (label != NULL) {
-		ret = opensslfalcon512_fromlabel(key, engine, label, NULL);
-		if (ret != ISC_R_SUCCESS) {
-			goto err;
-		}
-		/* Check that the public component matches if given */
-		if (pub != NULL && EVP_PKEY_eq(key->keydata.pkeypair.pub,
-					       key->keydata.pkeypair.pub) != 1)
-		{
-			DST_RET(DST_R_INVALIDPRIVATEKEY);
-		}
-		DST_RET(ISC_R_SUCCESS);
-	}
-	if (privkey_index < 0 || pubkey_index < 0) {
-		DST_RET(DST_R_INVALIDPRIVATEKEY);
-	}
 	pkey = EVP_PKEY_new_raw_private_key(EVP_PKEY_FALCON512, NULL, priv.elements[privkey_index].data, len);
 	if (pkey == NULL) {
 		return (dst__openssl_toresult(ret));
@@ -552,7 +537,7 @@ static dst_func_t opensslfalcon512_functions = {
 	opensslfalcon512_tofile,
 	opensslfalcon512_parse,
 	NULL,			    /*%< cleanup */
-	opensslfalcon512_fromlabel, /*%< fromlabel */
+	NULL, 			    /*%< fromlabel */
 	NULL,			    /*%< dump */
 	NULL,			    /*%< restore */
 };
