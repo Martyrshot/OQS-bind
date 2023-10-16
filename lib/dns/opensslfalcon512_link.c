@@ -51,7 +51,7 @@
 typedef struct falcon512_alginfo {
 	int pkey_type;
 	unsigned int key_size, priv_key_size, sig_size;
-} falcon512_alg_info_t;
+} falcon512_alginfo_t;
 
 static const falcon512_alginfo_t *
 opensslfalcon512_alg_info(unsigned int key_alg) {
