@@ -280,7 +280,7 @@ opensslfalcon512_generate(dst_key_t *key, int unused, void (*callback)(int)) {
 	REQUIRE(alginfo != NULL);
 	UNUSED(unused);
 	UNUSED(callback);
-	key->key_size = DNS_KEY_FALCON512SIZE;
+	key->key_size = alginfo->key_size;
 
 	ctx = EVP_PKEY_CTX_new_id(EVP_PKEY_FALCON512, NULL);
 	if (ctx == NULL) {
@@ -376,7 +376,7 @@ opensslfalcon512_tofile(const dst_key_t *key, const char *directory) {
 
 	publen = alginfo->key_size;
 	privlen = alginfo->priv_key_size;
-	if (key->keydata.pkeypair.pub) {
+	if (key->keydata.pkeypair.pub == NULL || key->keydata.pkeypair.priv == NULL) {
 		return (DST_R_NULLKEY);
 	}
 
