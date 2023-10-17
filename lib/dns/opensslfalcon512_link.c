@@ -80,7 +80,7 @@ raw_key_to_ossl(const falcon512_alginfo_t *alginfo, int private,
 		}
 		*pkey = EVP_PKEY_new_raw_private_key(pkey_type, NULL, key, alginfo->priv_key_size);
 	} else {
-		if (*key_len < alginfo->priv_key_size) {
+		if (*key_len < alginfo->key_size) {
 			return (ret);
 		}
 		*pkey = EVP_PKEY_new_raw_public_key(pkey_type, NULL, key, alginfo->key_size);
