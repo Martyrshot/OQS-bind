@@ -1,9 +1,11 @@
 #!/bin/sh
-#
+
 # Copyright (C) Internet Systems Consortium, Inc. ("ISC")
 #
+# SPDX-License-Identifier: MPL-2.0
+#
 # This Source Code Form is subject to the terms of the Mozilla Public
-# License, v. 2.0. If a copy of the MPL was not distributed with this
+# License, v. 2.0.  If a copy of the MPL was not distributed with this
 # file, you can obtain one at https://mozilla.org/MPL/2.0/.
 #
 # See the COPYRIGHT file distributed with this work for additional
@@ -21,7 +23,7 @@ $SHELL ${TOP_SRCDIR}/bin/tests/system/genzone.sh 7 >ns7/primary2.db
 cp -f ns4/root.db.in ns4/root.db
 $PERL -e 'for ($i=0;$i<10000;$i++){ printf("x%u 0 in a 10.53.0.1\n", $i);}' >> ns4/root.db
 
-copy_setports ns1/named.conf.in ns1/named.conf
+copy_setports ns1/named1.conf.in ns1/named.conf
 copy_setports ns2/named.conf.in ns2/named.conf
 copy_setports ns3/named.conf.in ns3/named.conf
 copy_setports ns6/named.conf.in ns6/named.conf
@@ -29,6 +31,8 @@ copy_setports ns7/named.conf.in ns7/named.conf
 copy_setports ns8/named.conf.in ns8/named.conf
 
 copy_setports ns4/named.conf.base ns4/named.conf
+
+cp ns1/dot-fallback.db.in ns1/dot-fallback.db
 
 cp ns2/sec.db.in ns2/sec.db
 touch -t 200101010000 ns2/sec.db

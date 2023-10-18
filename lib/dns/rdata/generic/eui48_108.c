@@ -1,6 +1,8 @@
 /*
  * Copyright (C) Internet Systems Consortium, Inc. ("ISC")
  *
+ * SPDX-License-Identifier: MPL-2.0
+ *
  * This Source Code Form is subject to the terms of the Mozilla Public
  * License, v. 2.0. If a copy of the MPL was not distributed with this
  * file, you can obtain one at https://mozilla.org/MPL/2.0/.
@@ -16,7 +18,7 @@
 
 #define RRTYPE_EUI48_ATTRIBUTES (0)
 
-static inline isc_result_t
+static isc_result_t
 fromtext_eui48(ARGS_FROMTEXT) {
 	isc_token_t token;
 	unsigned char eui48[6];
@@ -50,7 +52,7 @@ fromtext_eui48(ARGS_FROMTEXT) {
 	return (mem_tobuffer(target, eui48, sizeof(eui48)));
 }
 
-static inline isc_result_t
+static isc_result_t
 totext_eui48(ARGS_TOTEXT) {
 	char buf[sizeof("xx-xx-xx-xx-xx-xx")];
 
@@ -65,14 +67,13 @@ totext_eui48(ARGS_TOTEXT) {
 	return (str_totext(buf, target));
 }
 
-static inline isc_result_t
+static isc_result_t
 fromwire_eui48(ARGS_FROMWIRE) {
 	isc_region_t sregion;
 
 	REQUIRE(type == dns_rdatatype_eui48);
 
 	UNUSED(type);
-	UNUSED(options);
 	UNUSED(rdclass);
 	UNUSED(dctx);
 
@@ -84,7 +85,7 @@ fromwire_eui48(ARGS_FROMWIRE) {
 	return (mem_tobuffer(target, sregion.base, sregion.length));
 }
 
-static inline isc_result_t
+static isc_result_t
 towire_eui48(ARGS_TOWIRE) {
 	REQUIRE(rdata->type == dns_rdatatype_eui48);
 	REQUIRE(rdata->length == 6);
@@ -94,7 +95,7 @@ towire_eui48(ARGS_TOWIRE) {
 	return (mem_tobuffer(target, rdata->data, rdata->length));
 }
 
-static inline int
+static int
 compare_eui48(ARGS_COMPARE) {
 	isc_region_t region1;
 	isc_region_t region2;
@@ -110,7 +111,7 @@ compare_eui48(ARGS_COMPARE) {
 	return (isc_region_compare(&region1, &region2));
 }
 
-static inline isc_result_t
+static isc_result_t
 fromstruct_eui48(ARGS_FROMSTRUCT) {
 	dns_rdata_eui48_t *eui48 = source;
 
@@ -125,7 +126,7 @@ fromstruct_eui48(ARGS_FROMSTRUCT) {
 	return (mem_tobuffer(target, eui48->eui48, sizeof(eui48->eui48)));
 }
 
-static inline isc_result_t
+static isc_result_t
 tostruct_eui48(ARGS_TOSTRUCT) {
 	dns_rdata_eui48_t *eui48 = target;
 
@@ -143,7 +144,7 @@ tostruct_eui48(ARGS_TOSTRUCT) {
 	return (ISC_R_SUCCESS);
 }
 
-static inline void
+static void
 freestruct_eui48(ARGS_FREESTRUCT) {
 	dns_rdata_eui48_t *eui48 = source;
 
@@ -153,19 +154,20 @@ freestruct_eui48(ARGS_FREESTRUCT) {
 	return;
 }
 
-static inline isc_result_t
+static isc_result_t
 additionaldata_eui48(ARGS_ADDLDATA) {
 	REQUIRE(rdata->type == dns_rdatatype_eui48);
 	REQUIRE(rdata->length == 6);
 
 	UNUSED(rdata);
+	UNUSED(owner);
 	UNUSED(add);
 	UNUSED(arg);
 
 	return (ISC_R_SUCCESS);
 }
 
-static inline isc_result_t
+static isc_result_t
 digest_eui48(ARGS_DIGEST) {
 	isc_region_t r;
 
@@ -177,7 +179,7 @@ digest_eui48(ARGS_DIGEST) {
 	return ((digest)(arg, &r));
 }
 
-static inline bool
+static bool
 checkowner_eui48(ARGS_CHECKOWNER) {
 	REQUIRE(type == dns_rdatatype_eui48);
 
@@ -189,7 +191,7 @@ checkowner_eui48(ARGS_CHECKOWNER) {
 	return (true);
 }
 
-static inline bool
+static bool
 checknames_eui48(ARGS_CHECKNAMES) {
 	REQUIRE(rdata->type == dns_rdatatype_eui48);
 	REQUIRE(rdata->length == 6);
@@ -201,7 +203,7 @@ checknames_eui48(ARGS_CHECKNAMES) {
 	return (true);
 }
 
-static inline int
+static int
 casecompare_eui48(ARGS_COMPARE) {
 	return (compare_eui48(rdata1, rdata2));
 }

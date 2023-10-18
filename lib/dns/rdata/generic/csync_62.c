@@ -1,6 +1,8 @@
 /*
  * Copyright (C) Internet Systems Consortium, Inc. ("ISC")
  *
+ * SPDX-License-Identifier: MPL-2.0
+ *
  * This Source Code Form is subject to the terms of the Mozilla Public
  * License, v. 2.0. If a copy of the MPL was not distributed with this
  * file, you can obtain one at https://mozilla.org/MPL/2.0/.
@@ -16,7 +18,7 @@
 
 #define RRTYPE_CSYNC_ATTRIBUTES 0
 
-static inline isc_result_t
+static isc_result_t
 fromtext_csync(ARGS_FROMTEXT) {
 	isc_token_t token;
 
@@ -45,7 +47,7 @@ fromtext_csync(ARGS_FROMTEXT) {
 	return (typemap_fromtext(lexer, target, true));
 }
 
-static inline isc_result_t
+static isc_result_t
 totext_csync(ARGS_TOTEXT) {
 	unsigned long num;
 	char buf[sizeof("0123456789")]; /* Also TYPE65535 */
@@ -79,7 +81,7 @@ totext_csync(ARGS_TOTEXT) {
 	return (typemap_totext(&sr, NULL, target));
 }
 
-static /* inline */ isc_result_t
+static isc_result_t
 fromwire_csync(ARGS_FROMWIRE) {
 	isc_region_t sr;
 
@@ -87,7 +89,6 @@ fromwire_csync(ARGS_FROMWIRE) {
 
 	UNUSED(type);
 	UNUSED(rdclass);
-	UNUSED(options);
 	UNUSED(dctx);
 
 	/*
@@ -109,7 +110,7 @@ fromwire_csync(ARGS_FROMWIRE) {
 	return (ISC_R_SUCCESS);
 }
 
-static inline isc_result_t
+static isc_result_t
 towire_csync(ARGS_TOWIRE) {
 	REQUIRE(rdata->type == dns_rdatatype_csync);
 	REQUIRE(rdata->length >= 6);
@@ -119,7 +120,7 @@ towire_csync(ARGS_TOWIRE) {
 	return (mem_tobuffer(target, rdata->data, rdata->length));
 }
 
-static inline int
+static int
 compare_csync(ARGS_COMPARE) {
 	isc_region_t r1;
 	isc_region_t r2;
@@ -135,7 +136,7 @@ compare_csync(ARGS_COMPARE) {
 	return (isc_region_compare(&r1, &r2));
 }
 
-static inline isc_result_t
+static isc_result_t
 fromstruct_csync(ARGS_FROMSTRUCT) {
 	dns_rdata_csync_t *csync = source;
 	isc_region_t region;
@@ -158,7 +159,7 @@ fromstruct_csync(ARGS_FROMSTRUCT) {
 	return (mem_tobuffer(target, csync->typebits, csync->len));
 }
 
-static inline isc_result_t
+static isc_result_t
 tostruct_csync(ARGS_TOSTRUCT) {
 	isc_region_t region;
 	dns_rdata_csync_t *csync = target;
@@ -181,18 +182,11 @@ tostruct_csync(ARGS_TOSTRUCT) {
 
 	csync->len = region.length;
 	csync->typebits = mem_maybedup(mctx, region.base, region.length);
-	if (csync->typebits == NULL) {
-		goto cleanup;
-	}
-
 	csync->mctx = mctx;
 	return (ISC_R_SUCCESS);
-
-cleanup:
-	return (ISC_R_NOMEMORY);
 }
 
-static inline void
+static void
 freestruct_csync(ARGS_FREESTRUCT) {
 	dns_rdata_csync_t *csync = source;
 
@@ -209,18 +203,19 @@ freestruct_csync(ARGS_FREESTRUCT) {
 	csync->mctx = NULL;
 }
 
-static inline isc_result_t
+static isc_result_t
 additionaldata_csync(ARGS_ADDLDATA) {
 	REQUIRE(rdata->type == dns_rdatatype_csync);
 
 	UNUSED(rdata);
+	UNUSED(owner);
 	UNUSED(add);
 	UNUSED(arg);
 
 	return (ISC_R_SUCCESS);
 }
 
-static inline isc_result_t
+static isc_result_t
 digest_csync(ARGS_DIGEST) {
 	isc_region_t r;
 
@@ -230,7 +225,7 @@ digest_csync(ARGS_DIGEST) {
 	return ((digest)(arg, &r));
 }
 
-static inline bool
+static bool
 checkowner_csync(ARGS_CHECKOWNER) {
 	REQUIRE(type == dns_rdatatype_csync);
 
@@ -242,7 +237,7 @@ checkowner_csync(ARGS_CHECKOWNER) {
 	return (true);
 }
 
-static inline bool
+static bool
 checknames_csync(ARGS_CHECKNAMES) {
 	REQUIRE(rdata->type == dns_rdatatype_csync);
 
@@ -253,7 +248,7 @@ checknames_csync(ARGS_CHECKNAMES) {
 	return (true);
 }
 
-static inline int
+static int
 casecompare_csync(ARGS_COMPARE) {
 	isc_region_t region1;
 	isc_region_t region2;

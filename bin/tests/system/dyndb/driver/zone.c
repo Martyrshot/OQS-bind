@@ -1,7 +1,34 @@
 /*
- * Zone management.
+ * Copyright (C) Internet Systems Consortium, Inc. ("ISC")
  *
- * Copyright (C) 2009-2015  Red Hat ; see COPYRIGHT for license
+ * SPDX-License-Identifier: MPL-2.0 AND ISC
+ *
+ * This Source Code Form is subject to the terms of the Mozilla Public
+ * License, v. 2.0. If a copy of the MPL was not distributed with this
+ * file, you can obtain one at https://mozilla.org/MPL/2.0/.
+ *
+ * See the COPYRIGHT file distributed with this work for additional
+ * information regarding copyright ownership.
+ */
+
+/*
+ * Copyright (C) Red Hat
+ *
+ * Permission to use, copy, modify, and/or distribute this software for any
+ * purpose with or without fee is hereby granted, provided that the above
+ * copyright notice and this permission notice appear in all copies.
+ *
+ * THE SOFTWARE IS PROVIDED "AS IS" AND AUTHORS DISCLAIMS ALL WARRANTIES WITH
+ * REGARD TO THIS SOFTWARE INCLUDING ALL IMPLIED WARRANTIES OF MERCHANTABILITY
+ * AND FITNESS.  IN NO EVENT SHALL ISC BE LIABLE FOR ANY SPECIAL, DIRECT,
+ * INDIRECT, OR CONSEQUENTIAL DAMAGES OR ANY DAMAGES WHATSOEVER RESULTING FROM
+ * LOSS OF USE, DATA OR PROFITS, WHETHER IN AN ACTION OF CONTRACT, NEGLIGENCE
+ * OR OTHER TORTIOUS ACTION, ARISING OUT OF OR IN CONNECTION WITH THE USE OR
+ * PERFORMANCE OF THIS SOFTWARE.
+ */
+
+/*
+ * Zone management.
  */
 
 #include "zone.h"
@@ -15,7 +42,6 @@
 #include <dns/zone.h>
 
 #include "instance.h"
-#include "lock.h"
 #include "log.h"
 #include "util.h"
 
@@ -40,12 +66,8 @@ create_zone(sample_instance_t *const inst, dns_name_t *const name,
 
 	zone_argv[0] = inst->db_name;
 
-	result = dns_zone_create(&raw, inst->mctx);
-	if (result != ISC_R_SUCCESS) {
-		log_write(ISC_LOG_ERROR, "create_zone: dns_zone_create -> %s\n",
-			  isc_result_totext(result));
-		goto cleanup;
-	}
+	dns_zone_create(&raw, inst->mctx, 0); /* FIXME: all zones are assigned
+						 to loop 0 */
 	result = dns_zone_setorigin(raw, name);
 	if (result != ISC_R_SUCCESS) {
 		log_write(ISC_LOG_ERROR,
@@ -54,7 +76,7 @@ create_zone(sample_instance_t *const inst, dns_name_t *const name,
 		goto cleanup;
 	}
 	dns_zone_setclass(raw, dns_rdataclass_in);
-	dns_zone_settype(raw, dns_zone_master);
+	dns_zone_settype(raw, dns_zone_primary);
 	dns_zone_setdbtype(raw, 1, zone_argv);
 
 	result = dns_zonemgr_managezone(inst->zmgr, raw);
@@ -107,14 +129,13 @@ publish_zone(sample_instance_t *inst, dns_zone_t *zone) {
 	bool freeze = false;
 	dns_zone_t *zone_in_view = NULL;
 	dns_view_t *view_in_zone = NULL;
-	isc_result_t lock_state = ISC_R_IGNORE;
 
 	REQUIRE(inst != NULL);
 	REQUIRE(zone != NULL);
 
 	/* Return success if the zone is already in the view as expected. */
 	result = dns_view_findzone(inst->view, dns_zone_getorigin(zone),
-				   &zone_in_view);
+				   DNS_ZTFIND_EXACT, &zone_in_view);
 	if (result != ISC_R_SUCCESS && result != ISC_R_NOTFOUND) {
 		goto cleanup;
 	}
@@ -145,7 +166,6 @@ publish_zone(sample_instance_t *inst, dns_zone_t *zone) {
 		CLEANUP_WITH(ISC_R_UNEXPECTED);
 	}
 
-	run_exclusive_enter(inst, &lock_state);
 	if (inst->view->frozen) {
 		freeze = true;
 		dns_view_thaw(inst->view);
@@ -167,7 +187,6 @@ cleanup:
 	if (freeze) {
 		dns_view_freeze(inst->view);
 	}
-	run_exclusive_exit(inst, lock_state);
 
 	return (result);
 }
@@ -222,7 +241,7 @@ activate_zone(sample_instance_t *inst, dns_zone_t *raw) {
 	result = publish_zone(inst, raw);
 	if (result != ISC_R_SUCCESS) {
 		dns_zone_log(raw, ISC_LOG_ERROR, "cannot add zone to view: %s",
-			     dns_result_totext(result));
+			     isc_result_totext(result));
 		goto cleanup;
 	}
 

@@ -1,6 +1,8 @@
 /*
  * Copyright (C) Internet Systems Consortium, Inc. ("ISC")
  *
+ * SPDX-License-Identifier: MPL-2.0
+ *
  * This Source Code Form is subject to the terms of the Mozilla Public
  * License, v. 2.0. If a copy of the MPL was not distributed with this
  * file, you can obtain one at https://mozilla.org/MPL/2.0/.
@@ -16,7 +18,6 @@
 #include <stdlib.h>
 
 #include <isc/mem.h>
-#include <isc/print.h>
 #include <isc/string.h>
 #include <isc/util.h>
 
@@ -108,11 +109,13 @@ main(int argc, char **argv) {
 				usage();
 			}
 			if (strcmp(argv[1], "master") == 0 ||
-			    strcmp(argv[1], "primary") == 0) {
-				zonetype = CFG_ZONE_MASTER;
+			    strcmp(argv[1], "primary") == 0)
+			{
+				zonetype = CFG_ZONE_PRIMARY;
 			} else if (strcmp(argv[1], "slave") == 0 ||
-				   strcmp(argv[1], "seconary") == 0) {
-				zonetype = CFG_ZONE_SLAVE;
+				   strcmp(argv[1], "secondary") == 0)
+			{
+				zonetype = CFG_ZONE_SECONDARY;
 			} else if (strcmp(argv[1], "mirror") == 0) {
 				zonetype = CFG_ZONE_MIRROR;
 			} else if (strcmp(argv[1], "stub") == 0) {
@@ -125,8 +128,6 @@ main(int argc, char **argv) {
 				zonetype = CFG_ZONE_FORWARD;
 			} else if (strcmp(argv[1], "redirect") == 0) {
 				zonetype = CFG_ZONE_REDIRECT;
-			} else if (strcmp(argv[1], "delegation-only") == 0) {
-				zonetype = CFG_ZONE_DELEGATION;
 			} else if (strcmp(argv[1], "in-view") == 0) {
 				zonetype = CFG_ZONE_INVIEW;
 			} else {

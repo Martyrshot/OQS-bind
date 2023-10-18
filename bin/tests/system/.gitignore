@@ -1,4 +1,6 @@
 .cache
+.hypothesis
+.mypy_cache
 __pycache__
 dig.out*
 rndc.out*
@@ -7,16 +9,20 @@ named.lock
 named.pid
 named.run
 /feature-test
-/test.output.*
 /makejournal
-/systests.output
 /random.data
-parallel.mk
 /*.log
 /*.trs
 /resolve
-/run.sh
+/legacy.run.sh
 /run.log
 /start.sh
 /stop.sh
 /ifconfig.sh
+
+# Ignore file names with underscore in their name except python or shell files.
+# This is done to ignore the temporary directories and symlinks created by the
+# pytest runner, which contain underscore in their file names.
+/*_*
+!/*_*.py
+!/*_*.sh

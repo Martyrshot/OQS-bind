@@ -1,6 +1,8 @@
 /*
  * Copyright (C) Internet Systems Consortium, Inc. ("ISC")
  *
+ * SPDX-License-Identifier: MPL-2.0
+ *
  * This Source Code Form is subject to the terms of the Mozilla Public
  * License, v. 2.0. If a copy of the MPL was not distributed with this
  * file, you can obtain one at https://mozilla.org/MPL/2.0/.
@@ -9,8 +11,7 @@
  * information regarding copyright ownership.
  */
 
-#ifndef ISC_NET_H
-#define ISC_NET_H 1
+#pragma once
 
 /*****
 ***** Module Info
@@ -64,17 +65,15 @@
 /***
  *** Imports.
  ***/
-#include <inttypes.h>
-
-#include <isc/lang.h>
-#include <isc/platform.h>
-#include <isc/types.h>
-
 #include <arpa/inet.h> /* Contractual promise. */
+#include <inttypes.h>
 #include <net/if.h>
 #include <netinet/in.h> /* Contractual promise. */
 #include <sys/socket.h> /* Contractual promise. */
 #include <sys/types.h>
+
+#include <isc/lang.h>
+#include <isc/types.h>
 
 #ifndef IN6ADDR_LOOPBACK_INIT
 #ifdef s6_addr
@@ -272,20 +271,6 @@ isc_net_probeunix(void);
  * Returns whether UNIX domain sockets are supported.
  */
 
-#define ISC_NET_DSCPRECVV4 0x01 /* Can receive sent DSCP value IPv4 */
-#define ISC_NET_DSCPRECVV6 0x02 /* Can receive sent DSCP value IPv6 */
-#define ISC_NET_DSCPSETV4  0x04 /* Can set DSCP on socket IPv4 */
-#define ISC_NET_DSCPSETV6  0x08 /* Can set DSCP on socket IPv6 */
-#define ISC_NET_DSCPPKTV4  0x10 /* Can set DSCP on per packet IPv4 */
-#define ISC_NET_DSCPPKTV6  0x20 /* Can set DSCP on per packet IPv6 */
-#define ISC_NET_DSCPALL	   0x3f /* All valid flags */
-
-unsigned int
-isc_net_probedscp(void);
-/*%<
- * Probe the level of DSCP support.
- */
-
 isc_result_t
 isc_net_getudpportrange(int af, in_port_t *low, in_port_t *high);
 /*%<
@@ -304,5 +289,3 @@ isc_net_getudpportrange(int af, in_port_t *low, in_port_t *high);
  */
 
 ISC_LANG_ENDDECLS
-
-#endif /* ISC_NET_H */

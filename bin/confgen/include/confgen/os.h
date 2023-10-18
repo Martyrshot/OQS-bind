@@ -1,6 +1,8 @@
 /*
  * Copyright (C) Internet Systems Consortium, Inc. ("ISC")
  *
+ * SPDX-License-Identifier: MPL-2.0
+ *
  * This Source Code Form is subject to the terms of the Mozilla Public
  * License, v. 2.0. If a copy of the MPL was not distributed with this
  * file, you can obtain one at https://mozilla.org/MPL/2.0/.
@@ -11,8 +13,7 @@
 
 /*! \file */
 
-#ifndef RNDC_OS_H
-#define RNDC_OS_H 1
+#pragma once
 
 #include <stdio.h>
 
@@ -30,5 +31,3 @@ set_user(FILE *fd, const char *user);
  */
 
 ISC_LANG_ENDDECLS
-
-#endif /* ifndef RNDC_OS_H */

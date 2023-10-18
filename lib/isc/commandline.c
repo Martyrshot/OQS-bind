@@ -1,17 +1,15 @@
 /*
- * Portions Copyright (C) Internet Systems Consortium, Inc. ("ISC")
+ * Copyright (C) Internet Systems Consortium, Inc. ("ISC")
  *
+ * SPDX-License-Identifier: MPL-2.0 AND BSD-3-Clause
+
  * This Source Code Form is subject to the terms of the Mozilla Public
  * License, v. 2.0. If a copy of the MPL was not distributed with this
  * file, you can obtain one at https://mozilla.org/MPL/2.0/.
- *
- * See the COPYRIGHT file distributed with this work for additional
- * information regarding copyright ownership.
  */
 
 /*
- * Copyright (c) 1987, 1993, 1994
- *	The Regents of the University of California.  All rights reserved.
+ * Copyright (C) 1987, 1993, 1994 The Regents of the University of California.
  *
  * Redistribution and use in source and binary forms, with or without
  * modification, are permitted provided that the following conditions
@@ -36,6 +34,9 @@
  * LIABILITY, OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY
  * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
+ *
+ * See the COPYRIGHT file distributed with this work for additional
+ * information regarding copyright ownership.
  */
 
 /*! \file
@@ -51,22 +52,21 @@
 
 #include <isc/commandline.h>
 #include <isc/mem.h>
-#include <isc/print.h>
 #include <isc/string.h>
 #include <isc/util.h>
 
 /*% Index into parent argv vector. */
-LIBISC_EXTERNAL_DATA int isc_commandline_index = 1;
+int isc_commandline_index = 1;
 /*% Character checked for validity. */
-LIBISC_EXTERNAL_DATA int isc_commandline_option;
+int isc_commandline_option;
 /*% Argument associated with option. */
-LIBISC_EXTERNAL_DATA char *isc_commandline_argument;
+char *isc_commandline_argument;
 /*% For printing error messages. */
-LIBISC_EXTERNAL_DATA char *isc_commandline_progname;
+char *isc_commandline_progname;
 /*% Print error messages. */
-LIBISC_EXTERNAL_DATA bool isc_commandline_errprint = true;
+bool isc_commandline_errprint = true;
 /*% Reset processing. */
-LIBISC_EXTERNAL_DATA bool isc_commandline_reset = true;
+bool isc_commandline_reset = true;
 
 static char endopt = '\0';
 
@@ -218,7 +218,7 @@ restart:
 	if (*s == '\0') {
 		/* We have reached the end of the string. */
 		*argcp = n;
-		*argvp = isc_mem_get(mctx, n * sizeof(char *));
+		*argvp = isc_mem_cget(mctx, n, sizeof(char *));
 	} else {
 		char *p = s;
 		while (*p != ' ' && *p != '\t' && *p != '\0' && *p != '{') {

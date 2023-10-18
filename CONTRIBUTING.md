@@ -1,12 +1,14 @@
 <!--
- - Copyright (C) Internet Systems Consortium, Inc. ("ISC")
- -
- - This Source Code Form is subject to the terms of the Mozilla Public
- - License, v. 2.0. If a copy of the MPL was not distributed with this
- - file, You can obtain one at http://mozilla.org/MPL/2.0/.
- -
- - See the COPYRIGHT file distributed with this work for additional
- - information regarding copyright ownership.
+Copyright (C) Internet Systems Consortium, Inc. ("ISC")
+
+SPDX-License-Identifier: MPL-2.0
+
+This Source Code Form is subject to the terms of the Mozilla Public
+License, v. 2.0.  If a copy of the MPL was not distributed with this
+file, you can obtain one at https://mozilla.org/MPL/2.0/.
+
+See the COPYRIGHT file distributed with this work for additional
+information regarding copyright ownership.
 -->
 ## BIND 9 Source Access and Contributor Guidelines
 *May 28, 2020*
@@ -69,14 +71,14 @@ To clone the repository, use:
 
 >       $ git clone https://gitlab.isc.org/isc-projects/bind9.git
 
-Release branch names are of the form `v9_X`, where X represents the second
-number in the BIND 9 version number.  So, to check out the BIND 9.12
+Release branch names are of the form `bind-9.X`, where X represents the second
+number in the BIND 9 version number.  So, to check out the BIND 9.18
 branch, use:
 
->       $ git checkout v9_12
+>       $ git checkout bind-9.18
 
 Whenever a branch is ready for publication, a tag is placed of the
-form `v9_X_Y`.  The 9.12.0 release, for instance, is tagged as `v9_12_0`.
+form `v9.X.Y`.  The 9.18.0 release, for instance, is tagged as `v9.18.0`.
 
 The branch in which the next major release is being developed is called
 `main`.
@@ -100,22 +102,7 @@ Twitter, or Facebook.
 
 ### Reporting possible security issues
 
-If you think you may be seeing a potential security vulnerability in BIND
-(for example, a crash with REQUIRE, INSIST, or ASSERT failure), please
-report it immediately by emailing to security-officer@isc.org. Plain-text
-e-mail is not a secure choice for communications concerning undisclosed
-security issues so please encrypt your communications to us if possible,
-using the [ISC Security Officer public key](https://www.isc.org/pgpkey/).
-
-Do not discuss undisclosed security vulnerabilities on any public mailing list.
-ISC has a long history of handling reported vulnerabilities promptly and
-effectively and we respect and acknowledge responsible reporters.
-
-ISC's Security Vulnerability Disclosure Policy is documented at
-[https://kb.isc.org/docs/aa-00861](https://kb.isc.org/docs/aa-00861).
-
-If you have a crash, you may want to consult
-["What to do if your BIND or DHCP server has crashed."](https://kb.isc.org/docs/aa-00340)
+See `SECURITY.md`.
 
 ### <a name="contrib"></a>Contributing code
 

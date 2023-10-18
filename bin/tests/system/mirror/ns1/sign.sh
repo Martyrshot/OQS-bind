@@ -1,9 +1,11 @@
 #!/bin/sh -e
-#
+
 # Copyright (C) Internet Systems Consortium, Inc. ("ISC")
 #
+# SPDX-License-Identifier: MPL-2.0
+#
 # This Source Code Form is subject to the terms of the Mozilla Public
-# License, v. 2.0. If a copy of the MPL was not distributed with this
+# License, v. 2.0.  If a copy of the MPL was not distributed with this
 # file, you can obtain one at https://mozilla.org/MPL/2.0/.
 #
 # See the COPYRIGHT file distributed with this work for additional
@@ -19,8 +21,8 @@ zone=.
 infile=root.db.in
 zonefile=root.db
 
-keyname1=`$KEYGEN -a RSASHA256 -f KSK $zone 2> /dev/null`
-keyname2=`$KEYGEN -a RSASHA256 $zone 2> /dev/null`
+keyname1=$($KEYGEN -a ${DEFAULT_ALGORITHM} -f KSK $zone 2> /dev/null)
+keyname2=$($KEYGEN -a ${DEFAULT_ALGORITHM} $zone 2> /dev/null)
 
 cat $infile $keyname1.key $keyname2.key > $zonefile
 

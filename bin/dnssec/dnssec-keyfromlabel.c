@@ -1,6 +1,8 @@
 /*
  * Copyright (C) Internet Systems Consortium, Inc. ("ISC")
  *
+ * SPDX-License-Identifier: MPL-2.0
+ *
  * This Source Code Form is subject to the terms of the Mozilla Public
  * License, v. 2.0. If a copy of the MPL was not distributed with this
  * file, you can obtain one at https://mozilla.org/MPL/2.0/.
@@ -20,12 +22,10 @@
 #include <isc/buffer.h>
 #include <isc/commandline.h>
 #include <isc/mem.h>
-#include <isc/print.h>
 #include <isc/region.h>
+#include <isc/result.h>
 #include <isc/string.h>
 #include <isc/util.h>
-
-#include <pk11/site.h>
 
 #include <dns/dnssec.h>
 #include <dns/fixedname.h>
@@ -33,14 +33,9 @@
 #include <dns/log.h>
 #include <dns/name.h>
 #include <dns/rdataclass.h>
-#include <dns/result.h>
 #include <dns/secalg.h>
 
 #include <dst/dst.h>
-
-#if USE_PKCS11
-#include <pk11/result.h>
-#endif /* if USE_PKCS11 */
 
 #include "dnssectool.h"
 
@@ -48,7 +43,7 @@
 
 const char *program = "dnssec-keyfromlabel";
 
-ISC_NORETURN static void
+noreturn static void
 usage(void);
 
 static void
@@ -61,7 +56,7 @@ usage(void) {
 	fprintf(stderr, "    name: owner of the key\n");
 	fprintf(stderr, "Other options:\n");
 	fprintf(stderr, "    -a algorithm: \n"
-			"        DH | RSASHA1 |\n"
+			"        RSASHA1 |\n"
 			"        NSEC3RSASHA1 |\n"
 			"        RSASHA256 | RSASHA512 |\n"
 			"        ECDSAP256SHA256 | ECDSAP384SHA384 |\n"
@@ -69,14 +64,7 @@ usage(void) {
 	fprintf(stderr, "    -3: use NSEC3-capable algorithm\n");
 	fprintf(stderr, "    -c class (default: IN)\n");
 	fprintf(stderr, "    -E <engine>:\n");
-#if USE_PKCS11
-	fprintf(stderr,
-		"        path to PKCS#11 provider library "
-		"(default is %s)\n",
-		PK11_LIB_LOCATION);
-#else  /* if USE_PKCS11 */
 	fprintf(stderr, "        name of an OpenSSL engine to use\n");
-#endif /* if USE_PKCS11 */
 	fprintf(stderr, "    -f keyflag: KSK | REVOKE\n");
 	fprintf(stderr, "    -K directory: directory in which to place "
 			"key files\n");
@@ -147,7 +135,6 @@ main(int argc, char **argv) {
 	dns_ttl_t ttl = 0;
 	isc_stdtime_t publish = 0, activate = 0, revoke = 0;
 	isc_stdtime_t inactive = 0, deltime = 0;
-	isc_stdtime_t now;
 	int prepub = -1;
 	bool setpub = false, setact = false;
 	bool setrev = false, setinact = false;
@@ -163,6 +150,7 @@ main(int argc, char **argv) {
 	isc_stdtime_t syncadd = 0, syncdel = 0;
 	bool unsetsyncadd = false, setsyncadd = false;
 	bool unsetsyncdel = false, setsyncdel = false;
+	isc_stdtime_t now = isc_stdtime_now();
 
 	if (argc == 1) {
 		usage();
@@ -170,14 +158,7 @@ main(int argc, char **argv) {
 
 	isc_mem_create(&mctx);
 
-#if USE_PKCS11
-	pk11_result_register();
-#endif /* if USE_PKCS11 */
-	dns_result_register();
-
 	isc_commandline_errprint = false;
-
-	isc_stdtime_get(&now);
 
 #define CMDLINE_FLAGS "3A:a:Cc:D:E:Ff:GhI:i:kK:L:l:n:P:p:R:S:t:v:Vy"
 	while ((ch = isc_commandline_parse(argc, argv, CMDLINE_FLAGS)) != -1) {
@@ -331,14 +312,14 @@ main(int argc, char **argv) {
 			prepub = strtottl(isc_commandline_argument);
 			break;
 		case 'F':
-		/* Reserved for FIPS mode */
-		/* FALLTHROUGH */
+			/* Reserved for FIPS mode */
+			FALLTHROUGH;
 		case '?':
 			if (isc_commandline_option != '?') {
 				fprintf(stderr, "%s: invalid argument -%c\n",
 					program, isc_commandline_option);
 			}
-		/* FALLTHROUGH */
+			FALLTHROUGH;
 		case 'h':
 			/* Does not return. */
 			usage();
@@ -403,9 +384,6 @@ main(int argc, char **argv) {
 		ret = dns_secalg_fromtext(&alg, &r);
 		if (ret != ISC_R_SUCCESS) {
 			fatal("unknown algorithm %s", algname);
-		}
-		if (alg == DST_ALG_DH) {
-			options |= DST_TYPE_KEY;
 		}
 
 		if (use_nsec3) {
@@ -575,7 +553,8 @@ main(int argc, char **argv) {
 		flags |= DNS_KEYOWNER_ZONE;
 	} else if ((options & DST_TYPE_KEY) != 0) { /* KEY */
 		if (strcasecmp(nametype, "host") == 0 ||
-		    strcasecmp(nametype, "entity") == 0) {
+		    strcasecmp(nametype, "entity") == 0)
+		{
 			flags |= DNS_KEYOWNER_ENTITY;
 		} else if (strcasecmp(nametype, "user") == 0) {
 			flags |= DNS_KEYOWNER_USER;
@@ -602,7 +581,8 @@ main(int argc, char **argv) {
 	if (protocol == -1) {
 		protocol = DNS_KEYPROTO_DNSSEC;
 	} else if ((options & DST_TYPE_KEY) == 0 &&
-		   protocol != DNS_KEYPROTO_DNSSEC) {
+		   protocol != DNS_KEYPROTO_DNSSEC)
+	{
 		fatal("invalid DNSKEY protocol: %d", protocol);
 	}
 
@@ -612,22 +592,10 @@ main(int argc, char **argv) {
 		}
 	}
 
-	if ((flags & DNS_KEYFLAG_OWNERMASK) == DNS_KEYOWNER_ZONE &&
-	    alg == DNS_KEYALG_DH)
-	{
-		fatal("a key with algorithm '%s' cannot be a zone key",
-		      algname);
-	}
-
 	isc_buffer_init(&buf, filename, sizeof(filename) - 1);
 
 	/* associate the key */
-	ret = dst_key_fromlabel(name, alg, flags, protocol, rdclass,
-#if USE_PKCS11
-				"pkcs11",
-#else  /* if USE_PKCS11 */
-				engine,
-#endif /* if USE_PKCS11 */
+	ret = dst_key_fromlabel(name, alg, flags, protocol, rdclass, engine,
 				label, NULL, mctx, &key);
 
 	if (ret != ISC_R_SUCCESS) {
@@ -637,7 +605,7 @@ main(int argc, char **argv) {
 		dns_secalg_format(alg, algstr, sizeof(algstr));
 		fatal("failed to get key %s/%s: %s", namestr, algstr,
 		      isc_result_totext(ret));
-		/* NOTREACHED */
+		UNREACHABLE();
 		exit(-1);
 	}
 

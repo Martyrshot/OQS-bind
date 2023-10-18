@@ -1,6 +1,8 @@
 /*
  * Copyright (C) Internet Systems Consortium, Inc. ("ISC")
  *
+ * SPDX-License-Identifier: MPL-2.0
+ *
  * This Source Code Form is subject to the terms of the Mozilla Public
  * License, v. 2.0. If a copy of the MPL was not distributed with this
  * file, you can obtain one at https://mozilla.org/MPL/2.0/.
@@ -9,8 +11,7 @@
  * information regarding copyright ownership.
  */
 
-#ifndef ISC_STDTIME_H
-#define ISC_STDTIME_H 1
+#pragma once
 
 /*! \file */
 
@@ -18,6 +19,7 @@
 #include <stdlib.h>
 
 #include <isc/lang.h>
+#include <isc/time.h>
 
 /*%
  * It's public information that 'isc_stdtime_t' is an unsigned integral type.
@@ -27,15 +29,11 @@
 typedef uint32_t isc_stdtime_t;
 
 ISC_LANG_BEGINDECLS
-/* */
-void
-isc_stdtime_get(isc_stdtime_t *t);
+
+isc_stdtime_t
+isc_stdtime_now(void);
 /*%<
- * Set 't' to the number of seconds since 00:00:00 UTC, January 1, 1970.
- *
- * Requires:
- *
- *\li	't' is a valid pointer.
+ * Return the number of seconds since 00:00:00 UTC, January 1, 1970.
  */
 
 void
@@ -52,11 +50,4 @@ isc_stdtime_tostring(isc_stdtime_t t, char *out, size_t outlen);
  *	'outlen' is at least 26.
  */
 
-#define isc_stdtime_convert32(t, t32p) (*(t32p) = t)
-/*
- * Convert the standard time to its 32-bit version.
- */
-
 ISC_LANG_ENDDECLS
-
-#endif /* ISC_STDTIME_H */

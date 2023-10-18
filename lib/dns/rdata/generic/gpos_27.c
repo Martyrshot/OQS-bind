@@ -1,6 +1,8 @@
 /*
  * Copyright (C) Internet Systems Consortium, Inc. ("ISC")
  *
+ * SPDX-License-Identifier: MPL-2.0
+ *
  * This Source Code Form is subject to the terms of the Mozilla Public
  * License, v. 2.0. If a copy of the MPL was not distributed with this
  * file, you can obtain one at https://mozilla.org/MPL/2.0/.
@@ -16,7 +18,7 @@
 
 #define RRTYPE_GPOS_ATTRIBUTES (0)
 
-static inline isc_result_t
+static isc_result_t
 fromtext_gpos(ARGS_FROMTEXT) {
 	isc_token_t token;
 	int i;
@@ -37,7 +39,7 @@ fromtext_gpos(ARGS_FROMTEXT) {
 	return (ISC_R_SUCCESS);
 }
 
-static inline isc_result_t
+static isc_result_t
 totext_gpos(ARGS_TOTEXT) {
 	isc_region_t region;
 	int i;
@@ -59,7 +61,7 @@ totext_gpos(ARGS_TOTEXT) {
 	return (ISC_R_SUCCESS);
 }
 
-static inline isc_result_t
+static isc_result_t
 fromwire_gpos(ARGS_FROMWIRE) {
 	int i;
 
@@ -68,14 +70,14 @@ fromwire_gpos(ARGS_FROMWIRE) {
 	UNUSED(type);
 	UNUSED(dctx);
 	UNUSED(rdclass);
-	UNUSED(options);
 
-	for (i = 0; i < 3; i++)
+	for (i = 0; i < 3; i++) {
 		RETERR(txt_fromwire(source, target));
+	}
 	return (ISC_R_SUCCESS);
 }
 
-static inline isc_result_t
+static isc_result_t
 towire_gpos(ARGS_TOWIRE) {
 	REQUIRE(rdata->type == dns_rdatatype_gpos);
 	REQUIRE(rdata->length != 0);
@@ -85,7 +87,7 @@ towire_gpos(ARGS_TOWIRE) {
 	return (mem_tobuffer(target, rdata->data, rdata->length));
 }
 
-static inline int
+static int
 compare_gpos(ARGS_COMPARE) {
 	isc_region_t r1;
 	isc_region_t r2;
@@ -101,7 +103,7 @@ compare_gpos(ARGS_COMPARE) {
 	return (isc_region_compare(&r1, &r2));
 }
 
-static inline isc_result_t
+static isc_result_t
 fromstruct_gpos(ARGS_FROMSTRUCT) {
 	dns_rdata_gpos_t *gpos = source;
 
@@ -121,7 +123,7 @@ fromstruct_gpos(ARGS_FROMSTRUCT) {
 	return (mem_tobuffer(target, gpos->altitude, gpos->alt_len));
 }
 
-static inline isc_result_t
+static isc_result_t
 tostruct_gpos(ARGS_TOSTRUCT) {
 	dns_rdata_gpos_t *gpos = target;
 	isc_region_t region;
@@ -138,46 +140,26 @@ tostruct_gpos(ARGS_TOSTRUCT) {
 	gpos->long_len = uint8_fromregion(&region);
 	isc_region_consume(&region, 1);
 	gpos->longitude = mem_maybedup(mctx, region.base, gpos->long_len);
-	if (gpos->longitude == NULL) {
-		return (ISC_R_NOMEMORY);
-	}
 	isc_region_consume(&region, gpos->long_len);
 
 	gpos->lat_len = uint8_fromregion(&region);
 	isc_region_consume(&region, 1);
 	gpos->latitude = mem_maybedup(mctx, region.base, gpos->lat_len);
-	if (gpos->latitude == NULL) {
-		goto cleanup_longitude;
-	}
 	isc_region_consume(&region, gpos->lat_len);
 
 	gpos->alt_len = uint8_fromregion(&region);
 	isc_region_consume(&region, 1);
 	if (gpos->lat_len > 0) {
 		gpos->altitude = mem_maybedup(mctx, region.base, gpos->alt_len);
-		if (gpos->altitude == NULL) {
-			goto cleanup_latitude;
-		}
 	} else {
 		gpos->altitude = NULL;
 	}
 
 	gpos->mctx = mctx;
 	return (ISC_R_SUCCESS);
-
-cleanup_latitude:
-	if (mctx != NULL && gpos->longitude != NULL) {
-		isc_mem_free(mctx, gpos->longitude);
-	}
-
-cleanup_longitude:
-	if (mctx != NULL && gpos->latitude != NULL) {
-		isc_mem_free(mctx, gpos->latitude);
-	}
-	return (ISC_R_NOMEMORY);
 }
 
-static inline void
+static void
 freestruct_gpos(ARGS_FREESTRUCT) {
 	dns_rdata_gpos_t *gpos = source;
 
@@ -200,18 +182,19 @@ freestruct_gpos(ARGS_FREESTRUCT) {
 	gpos->mctx = NULL;
 }
 
-static inline isc_result_t
+static isc_result_t
 additionaldata_gpos(ARGS_ADDLDATA) {
 	REQUIRE(rdata->type == dns_rdatatype_gpos);
 
 	UNUSED(rdata);
+	UNUSED(owner);
 	UNUSED(add);
 	UNUSED(arg);
 
 	return (ISC_R_SUCCESS);
 }
 
-static inline isc_result_t
+static isc_result_t
 digest_gpos(ARGS_DIGEST) {
 	isc_region_t r;
 
@@ -222,7 +205,7 @@ digest_gpos(ARGS_DIGEST) {
 	return ((digest)(arg, &r));
 }
 
-static inline bool
+static bool
 checkowner_gpos(ARGS_CHECKOWNER) {
 	REQUIRE(type == dns_rdatatype_gpos);
 
@@ -234,7 +217,7 @@ checkowner_gpos(ARGS_CHECKOWNER) {
 	return (true);
 }
 
-static inline bool
+static bool
 checknames_gpos(ARGS_CHECKNAMES) {
 	REQUIRE(rdata->type == dns_rdatatype_gpos);
 
@@ -245,7 +228,7 @@ checknames_gpos(ARGS_CHECKNAMES) {
 	return (true);
 }
 
-static inline int
+static int
 casecompare_gpos(ARGS_COMPARE) {
 	return (compare_gpos(rdata1, rdata2));
 }

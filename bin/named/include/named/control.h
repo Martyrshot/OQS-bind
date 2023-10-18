@@ -1,6 +1,8 @@
 /*
  * Copyright (C) Internet Systems Consortium, Inc. ("ISC")
  *
+ * SPDX-License-Identifier: MPL-2.0
+ *
  * This Source Code Form is subject to the terms of the Mozilla Public
  * License, v. 2.0. If a copy of the MPL was not distributed with this
  * file, you can obtain one at https://mozilla.org/MPL/2.0/.
@@ -9,8 +11,7 @@
  * information regarding copyright ownership.
  */
 
-#ifndef NAMED_CONTROL_H
-#define NAMED_CONTROL_H 1
+#pragma once
 
 /*! \file
  * \brief
@@ -19,9 +20,10 @@
 
 #include <stdbool.h>
 
+#include <isccc/types.h>
+
 #include <isccfg/aclconf.h>
 
-#include <isccc/types.h>
 #include <named/types.h>
 
 #define NAMED_CONTROL_PORT 953
@@ -42,12 +44,9 @@
 #define NAMED_COMMAND_FLUSHNAME	   "flushname"
 #define NAMED_COMMAND_FLUSHTREE	   "flushtree"
 #define NAMED_COMMAND_STATUS	   "status"
-#define NAMED_COMMAND_TSIGLIST	   "tsig-list"
-#define NAMED_COMMAND_TSIGDELETE   "tsig-delete"
 #define NAMED_COMMAND_FREEZE	   "freeze"
 #define NAMED_COMMAND_UNFREEZE	   "unfreeze"
 #define NAMED_COMMAND_THAW	   "thaw"
-#define NAMED_COMMAND_TIMERPOKE	   "timerpoke"
 #define NAMED_COMMAND_RECURSING	   "recursing"
 #define NAMED_COMMAND_NULL	   "null"
 #define NAMED_COMMAND_NOTIFY	   "notify"
@@ -70,6 +69,7 @@
 #define NAMED_COMMAND_DNSTAP	   "dnstap"
 #define NAMED_COMMAND_TCPTIMEOUTS  "tcp-timeouts"
 #define NAMED_COMMAND_SERVESTALE   "serve-stale"
+#define NAMED_COMMAND_FETCHLIMIT   "fetchlimit"
 
 isc_result_t
 named_controls_create(named_server_t *server, named_controls_t **ctrlsp);
@@ -105,5 +105,3 @@ named_controls_shutdown(named_controls_t *controls);
 isc_result_t
 named_control_docommand(isccc_sexpr_t *message, bool readonly,
 			isc_buffer_t **text);
-
-#endif /* NAMED_CONTROL_H */

@@ -1,6 +1,8 @@
 /*
  * Copyright (C) Internet Systems Consortium, Inc. ("ISC")
  *
+ * SPDX-License-Identifier: MPL-2.0
+ *
  * This Source Code Form is subject to the terms of the Mozilla Public
  * License, v. 2.0. If a copy of the MPL was not distributed with this
  * file, you can obtain one at https://mozilla.org/MPL/2.0/.
@@ -9,8 +11,7 @@
  * information regarding copyright ownership.
  */
 
-#ifndef DNS_CLIENTINFO_H
-#define DNS_CLIENTINFO_H 1
+#pragma once
 
 /*****
 ***** Module Info
@@ -41,25 +42,36 @@
 #include <isc/sockaddr.h>
 #include <isc/types.h>
 
+#include <dns/ecs.h>
+
 ISC_LANG_BEGINDECLS
 
 /*****
 ***** Types
 *****/
 
-#define DNS_CLIENTINFO_VERSION 2
+#define DNS_CLIENTINFO_VERSION 3
+/*
+ * Any updates to this structure should also be applied in
+ * contrib/modules/dlz/dlz_minmal.h.
+ */
 typedef struct dns_clientinfo {
-	uint16_t version;
-	void *	 data;
-	void *	 dbversion;
+	uint16_t  version;
+	void	 *data;
+	void	 *dbversion;
+	dns_ecs_t ecs;
 } dns_clientinfo_t;
 
 typedef isc_result_t (*dns_clientinfo_sourceip_t)(dns_clientinfo_t *client,
-						  isc_sockaddr_t ** addrp);
+						  isc_sockaddr_t  **addrp);
 
 #define DNS_CLIENTINFOMETHODS_VERSION 2
 #define DNS_CLIENTINFOMETHODS_AGE     1
 
+/*
+ * Any updates to this structure should also be applied in
+ * contrib/modules/dlz/dlz_minmal.h.
+ */
 typedef struct dns_clientinfomethods {
 	uint16_t		  version;
 	uint16_t		  age;
@@ -70,12 +82,21 @@ typedef struct dns_clientinfomethods {
 ***** Methods
 *****/
 void
-dns_clientinfomethods_init(dns_clientinfomethods_t * methods,
+dns_clientinfomethods_init(dns_clientinfomethods_t  *methods,
 			   dns_clientinfo_sourceip_t sourceip);
 
 void
 dns_clientinfo_init(dns_clientinfo_t *ci, void *data, void *versionp);
+/*%<
+ * Initialize a clientinfo object, setting the data to 'data' and the
+ * database version to 'versionp'. ECS data is initialized to 0/0/0.
+ */
+
+void
+dns_clientinfo_setecs(dns_clientinfo_t *ci, dns_ecs_t *ecs);
+/*%<
+ * Set the ECS client data associated with a clientinfo object 'ci'.
+ * If 'ecs' is NULL, initialize ci->ecs to 0/0/0; otherwise copy it.
+ */
 
 ISC_LANG_ENDDECLS
-
-#endif /* DNS_CLIENTINFO_H */

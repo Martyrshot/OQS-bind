@@ -1,6 +1,8 @@
 /*
  * Copyright (C) Internet Systems Consortium, Inc. ("ISC")
  *
+ * SPDX-License-Identifier: MPL-2.0
+ *
  * This Source Code Form is subject to the terms of the Mozilla Public
  * License, v. 2.0. If a copy of the MPL was not distributed with this
  * file, you can obtain one at https://mozilla.org/MPL/2.0/.
@@ -15,7 +17,6 @@
 #include <stdbool.h>
 #include <stdlib.h>
 
-#include <isc/app.h>
 #include <isc/attributes.h>
 #include <isc/commandline.h>
 #include <isc/dir.h>
@@ -23,10 +24,8 @@
 #include <isc/hash.h>
 #include <isc/log.h>
 #include <isc/mem.h>
-#include <isc/print.h>
-#include <isc/socket.h>
+#include <isc/result.h>
 #include <isc/string.h>
-#include <isc/task.h>
 #include <isc/timer.h>
 #include <isc/util.h>
 
@@ -38,7 +37,6 @@
 #include <dns/name.h>
 #include <dns/rdataclass.h>
 #include <dns/rdataset.h>
-#include <dns/result.h>
 #include <dns/types.h>
 #include <dns/zone.h>
 
@@ -47,7 +45,7 @@
 static int quiet = 0;
 static isc_mem_t *mctx = NULL;
 dns_zone_t *zone = NULL;
-dns_zonetype_t zonetype = dns_zone_master;
+dns_zonetype_t zonetype = dns_zone_primary;
 static int dumpzone = 0;
 static const char *output_filename;
 static const char *prog_name = NULL;
@@ -59,12 +57,12 @@ static enum { progmode_check, progmode_compile } progmode;
 		if (result != ISC_R_SUCCESS) {                                \
 			if (!quiet)                                           \
 				fprintf(stderr, "%s() returned %s\n",         \
-					function, dns_result_totext(result)); \
+					function, isc_result_totext(result)); \
 			return (result);                                      \
 		}                                                             \
 	} while (0)
 
-ISC_NORETURN static void
+noreturn static void
 usage(void);
 
 static void
@@ -146,8 +144,7 @@ main(int argc, char **argv) {
 	} else if (PROGCMP("named-compilezone")) {
 		progmode = progmode_compile;
 	} else {
-		INSIST(0);
-		ISC_UNREACHABLE();
+		UNREACHABLE();
 	}
 
 	/* Compilation specific defaults */
@@ -166,8 +163,8 @@ main(int argc, char **argv) {
 	isc_commandline_errprint = false;
 
 	while ((c = isc_commandline_parse(argc, argv,
-					  "c:df:hi:jJ:k:L:l:m:n:qr:s:t:o:vw:DF:"
-					  "M:S:T:W:")) != EOF)
+					  "c:df:hi:jJ:k:L:l:m:n:qr:s:t:o:vw:C:"
+					  "DF:M:S:T:W:")) != EOF)
 	{
 		switch (c) {
 		case 'c':
@@ -362,6 +359,18 @@ main(int argc, char **argv) {
 			workdir = isc_commandline_argument;
 			break;
 
+		case 'C':
+			if (ARGCMP("check-svcb:fail")) {
+				zone_options |= DNS_ZONEOPT_CHECKSVCB;
+			} else if (ARGCMP("check-svcb:ignore")) {
+				zone_options &= ~DNS_ZONEOPT_CHECKSVCB;
+			} else {
+				fprintf(stderr, "invalid argument to -C: %s\n",
+					isc_commandline_argument);
+				exit(1);
+			}
+			break;
+
 		case 'D':
 			dumpzone++;
 			break;
@@ -425,7 +434,7 @@ main(int argc, char **argv) {
 				fprintf(stderr, "%s: invalid argument -%c\n",
 					prog_name, isc_commandline_option);
 			}
-		/* FALLTHROUGH */
+			FALLTHROUGH;
 		case 'h':
 			usage();
 
@@ -454,8 +463,6 @@ main(int argc, char **argv) {
 			inputformat = dns_masterformat_raw;
 			fprintf(stderr, "WARNING: input format raw, version "
 					"ignored\n");
-		} else if (strcasecmp(inputformatstr, "map") == 0) {
-			inputformat = dns_masterformat_map;
 		} else {
 			fprintf(stderr, "unknown file format: %s\n",
 				inputformatstr);
@@ -474,12 +481,11 @@ main(int argc, char **argv) {
 			outputformat = dns_masterformat_raw;
 			rawversion = strtol(outputformatstr + 4, &end, 10);
 			if (end == outputformatstr + 4 || *end != '\0' ||
-			    rawversion > 1U) {
+			    rawversion > 1U)
+			{
 				fprintf(stderr, "unknown raw format version\n");
 				exit(1);
 			}
-		} else if (strcasecmp(outputformatstr, "map") == 0) {
-			outputformat = dns_masterformat_map;
 		} else {
 			fprintf(stderr, "unknown file format: %s\n",
 				outputformatstr);
@@ -515,7 +521,8 @@ main(int argc, char **argv) {
 	}
 
 	if (argc - isc_commandline_index < 1 ||
-	    argc - isc_commandline_index > 2) {
+	    argc - isc_commandline_index > 2)
+	{
 		usage();
 	}
 
@@ -524,8 +531,6 @@ main(int argc, char **argv) {
 		RUNTIME_CHECK(setup_logging(mctx, errout, &lctx) ==
 			      ISC_R_SUCCESS);
 	}
-
-	dns_result_register();
 
 	origin = argv[isc_commandline_index++];
 

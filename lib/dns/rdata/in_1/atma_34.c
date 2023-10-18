@@ -1,6 +1,8 @@
 /*
  * Copyright (C) Internet Systems Consortium, Inc. ("ISC")
  *
+ * SPDX-License-Identifier: MPL-2.0
+ *
  * This Source Code Form is subject to the terms of the Mozilla Public
  * License, v. 2.0. If a copy of the MPL was not distributed with this
  * file, you can obtain one at https://mozilla.org/MPL/2.0/.
@@ -16,7 +18,7 @@
 
 #define RRTYPE_ATMA_ATTRIBUTES (0)
 
-static inline isc_result_t
+static isc_result_t
 fromtext_in_atma(ARGS_FROMTEXT) {
 	isc_token_t token;
 	isc_textregion_t *sr;
@@ -105,7 +107,7 @@ fromtext_in_atma(ARGS_FROMTEXT) {
 	return (ISC_R_SUCCESS);
 }
 
-static inline isc_result_t
+static isc_result_t
 totext_in_atma(ARGS_TOTEXT) {
 	isc_region_t region;
 	char buf[sizeof("xx")];
@@ -138,7 +140,7 @@ totext_in_atma(ARGS_TOTEXT) {
 	return (ISC_R_SUCCESS);
 }
 
-static inline isc_result_t
+static isc_result_t
 fromwire_in_atma(ARGS_FROMWIRE) {
 	isc_region_t region;
 
@@ -147,7 +149,6 @@ fromwire_in_atma(ARGS_FROMWIRE) {
 
 	UNUSED(type);
 	UNUSED(dctx);
-	UNUSED(options);
 	UNUSED(rdclass);
 
 	isc_buffer_activeregion(source, &region);
@@ -167,7 +168,7 @@ fromwire_in_atma(ARGS_FROMWIRE) {
 	return (ISC_R_SUCCESS);
 }
 
-static inline isc_result_t
+static isc_result_t
 towire_in_atma(ARGS_TOWIRE) {
 	REQUIRE(rdata->type == dns_rdatatype_atma);
 	REQUIRE(rdata->rdclass == dns_rdataclass_in);
@@ -178,7 +179,7 @@ towire_in_atma(ARGS_TOWIRE) {
 	return (mem_tobuffer(target, rdata->data, rdata->length));
 }
 
-static inline int
+static int
 compare_in_atma(ARGS_COMPARE) {
 	isc_region_t r1;
 	isc_region_t r2;
@@ -195,7 +196,7 @@ compare_in_atma(ARGS_COMPARE) {
 	return (isc_region_compare(&r1, &r2));
 }
 
-static inline isc_result_t
+static isc_result_t
 fromstruct_in_atma(ARGS_FROMSTRUCT) {
 	dns_rdata_in_atma_t *atma = source;
 
@@ -213,7 +214,7 @@ fromstruct_in_atma(ARGS_FROMSTRUCT) {
 	return (mem_tobuffer(target, atma->atma, atma->atma_len));
 }
 
-static inline isc_result_t
+static isc_result_t
 tostruct_in_atma(ARGS_TOSTRUCT) {
 	dns_rdata_in_atma_t *atma = target;
 	isc_region_t r;
@@ -232,15 +233,11 @@ tostruct_in_atma(ARGS_TOSTRUCT) {
 	isc_region_consume(&r, 1);
 	atma->atma_len = r.length;
 	atma->atma = mem_maybedup(mctx, r.base, r.length);
-	if (atma->atma == NULL) {
-		return (ISC_R_NOMEMORY);
-	}
-
 	atma->mctx = mctx;
 	return (ISC_R_SUCCESS);
 }
 
-static inline void
+static void
 freestruct_in_atma(ARGS_FREESTRUCT) {
 	dns_rdata_in_atma_t *atma = source;
 
@@ -258,19 +255,20 @@ freestruct_in_atma(ARGS_FREESTRUCT) {
 	atma->mctx = NULL;
 }
 
-static inline isc_result_t
+static isc_result_t
 additionaldata_in_atma(ARGS_ADDLDATA) {
 	REQUIRE(rdata->type == dns_rdatatype_atma);
 	REQUIRE(rdata->rdclass == dns_rdataclass_in);
 
 	UNUSED(rdata);
+	UNUSED(owner);
 	UNUSED(add);
 	UNUSED(arg);
 
 	return (ISC_R_SUCCESS);
 }
 
-static inline isc_result_t
+static isc_result_t
 digest_in_atma(ARGS_DIGEST) {
 	isc_region_t r;
 
@@ -282,7 +280,7 @@ digest_in_atma(ARGS_DIGEST) {
 	return ((digest)(arg, &r));
 }
 
-static inline bool
+static bool
 checkowner_in_atma(ARGS_CHECKOWNER) {
 	REQUIRE(type == dns_rdatatype_atma);
 	REQUIRE(rdclass == dns_rdataclass_in);
@@ -295,7 +293,7 @@ checkowner_in_atma(ARGS_CHECKOWNER) {
 	return (true);
 }
 
-static inline bool
+static bool
 checknames_in_atma(ARGS_CHECKNAMES) {
 	REQUIRE(rdata->type == dns_rdatatype_atma);
 	REQUIRE(rdata->rdclass == dns_rdataclass_in);
@@ -307,7 +305,7 @@ checknames_in_atma(ARGS_CHECKNAMES) {
 	return (true);
 }
 
-static inline int
+static int
 casecompare_in_atma(ARGS_COMPARE) {
 	return (compare_in_atma(rdata1, rdata2));
 }

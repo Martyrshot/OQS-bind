@@ -1,6 +1,8 @@
 /*
  * Copyright (C) Internet Systems Consortium, Inc. ("ISC")
  *
+ * SPDX-License-Identifier: MPL-2.0
+ *
  * This Source Code Form is subject to the terms of the Mozilla Public
  * License, v. 2.0. If a copy of the MPL was not distributed with this
  * file, you can obtain one at https://mozilla.org/MPL/2.0/.
@@ -9,8 +11,7 @@
  * information regarding copyright ownership.
  */
 
-#ifndef DNS_NTA_H
-#define DNS_NTA_H 1
+#pragma once
 
 /*****
 ***** Module Info
@@ -32,7 +33,6 @@
 #include <isc/refcount.h>
 #include <isc/rwlock.h>
 #include <isc/stdtime.h>
-#include <isc/task.h>
 #include <isc/timer.h>
 
 #include <dns/rdataset.h>
@@ -40,81 +40,46 @@
 #include <dns/types.h>
 #include <dns/view.h>
 
-ISC_LANG_BEGINDECLS
+/* Define to 1 for detailed reference tracing */
+#undef DNS_NTA_TRACE
 
-struct dns_ntatable {
-	/* Unlocked. */
-	unsigned int	magic;
-	dns_view_t *	view;
-	isc_rwlock_t	rwlock;
-	isc_taskmgr_t * taskmgr;
-	isc_timermgr_t *timermgr;
-	isc_task_t *	task;
-	/* Protected by atomics */
-	isc_refcount_t references;
-	/* Locked by rwlock. */
-	dns_rbt_t *table;
-	bool	   shuttingdown;
-};
+ISC_LANG_BEGINDECLS
 
 #define NTATABLE_MAGIC	   ISC_MAGIC('N', 'T', 'A', 't')
 #define VALID_NTATABLE(nt) ISC_MAGIC_VALID(nt, NTATABLE_MAGIC)
 
-isc_result_t
-dns_ntatable_create(dns_view_t *view, isc_taskmgr_t *taskmgr,
-		    isc_timermgr_t *timermgr, dns_ntatable_t **ntatablep);
+void
+dns_ntatable_create(dns_view_t *view, isc_loopmgr_t *loopmgr,
+		    dns_ntatable_t **ntatablep);
 /*%<
  * Create an NTA table in view 'view'.
  *
  * Requires:
  *
  *\li	'view' is a valid view.
- *
- *\li	'tmgr' is a valid timer manager.
- *
+ *\li	'loopmgr' is a valid loopmgr.
  *\li	ntatablep != NULL && *ntatablep == NULL
  *
  * Ensures:
  *
- *\li	On success, *ntatablep is a valid, empty NTA table.
- *
- * Returns:
- *
- *\li	ISC_R_SUCCESS
- *\li	Any other result indicates failure.
+ *\li	*ntatablep is a valid, empty NTA table.
  */
 
-void
-dns_ntatable_attach(dns_ntatable_t *source, dns_ntatable_t **targetp);
-/*%<
- * Attach *targetp to source.
- *
- * Requires:
- *
- *\li	'source' is a valid ntatable.
- *
- *\li	'targetp' points to a NULL dns_ntatable_t *.
- *
- * Ensures:
- *
- *\li	*targetp is attached to source.
- */
-
-void
-dns_ntatable_detach(dns_ntatable_t **ntatablep);
-/*%<
- * Detach *ntatablep from its ntatable.
- *
- * Requires:
- *
- *\li	'ntatablep' points to a valid ntatable.
- *
- * Ensures:
- *
- *\li	*ntatablep is NULL.
- *
- *\li	If '*ntatablep' is the last reference to the ntatable,
- *		all resources used by the ntatable will be freed
+#if DNS_NTA_TRACE
+#define dns_ntatable_ref(ptr) \
+	dns_ntatable__ref(ptr, __func__, __FILE__, __LINE__)
+#define dns_ntatable_unref(ptr) \
+	dns_ntatable__unref(ptr, __func__, __FILE__, __LINE__)
+#define dns_ntatable_attach(ptr, ptrp) \
+	dns_ntatable__attach(ptr, ptrp, __func__, __FILE__, __LINE__)
+#define dns_ntatable_detach(ptrp) \
+	dns_ntatable__detach(ptrp, __func__, __FILE__, __LINE__)
+ISC_REFCOUNT_TRACE_DECL(dns_ntatable);
+#else
+ISC_REFCOUNT_DECL(dns_ntatable);
+#endif
+/*%
+ * Reference counting for dns_ntatable
  */
 
 isc_result_t
@@ -172,11 +137,9 @@ dns_ntatable_covered(dns_ntatable_t *ntatable, isc_stdtime_t now,
  * Return true if 'name' is below a non-expired negative trust
  * anchor which in turn is at or below 'anchor'.
  *
- * If 'ntatable' has not been initialized, return false.
- *
  * Requires:
  *
- *\li	'ntatable' is NULL or is a valid ntatable.
+ *\li	'ntatable' is a valid ntatable.
  *
  *\li	'name' is a valid absolute name.
  */
@@ -205,6 +168,18 @@ dns_ntatable_shutdown(dns_ntatable_t *ntatable);
  * Cancel future checks to see if NTAs can be removed.
  */
 
-ISC_LANG_ENDDECLS
+/* Internal */
+typedef struct dns__nta dns__nta_t;
+#if DNS_NTA_TRACE
+#define dns__nta_ref(ptr)   dns__nta__ref(ptr, __func__, __FILE__, __LINE__)
+#define dns__nta_unref(ptr) dns__nta__unref(ptr, __func__, __FILE__, __LINE__)
+#define dns__nta_attach(ptr, ptrp) \
+	dns__nta__attach(ptr, ptrp, __func__, __FILE__, __LINE__)
+#define dns__nta_detach(ptrp) \
+	dns__nta__detach(ptrp, __func__, __FILE__, __LINE__)
+ISC_REFCOUNT_TRACE_DECL(dns__nta);
+#else
+ISC_REFCOUNT_DECL(dns__nta);
+#endif
 
-#endif /* DNS_NTA_H */
+ISC_LANG_ENDDECLS

@@ -1,16 +1,42 @@
 /*
+ * Copyright (C) Internet Systems Consortium, Inc. ("ISC")
+ *
+ * SPDX-License-Identifier: MPL-2.0 AND ISC
+ *
+ * This Source Code Form is subject to the terms of the Mozilla Public
+ * License, v. 2.0. If a copy of the MPL was not distributed with this
+ * file, you can obtain one at https://mozilla.org/MPL/2.0/.
+ *
+ * See the COPYRIGHT file distributed with this work for additional
+ * information regarding copyright ownership.
+ */
+
+/*
+ * Copyright (C) 2009-2015 Red Hat
+ *
+ * Permission to use, copy, modify, and/or distribute this software for any
+ * purpose with or without fee is hereby granted, provided that the above
+ * copyright notice and this permission notice appear in all copies.
+ *
+ * THE SOFTWARE IS PROVIDED "AS IS" AND AUTHORS DISCLAIMS ALL WARRANTIES WITH
+ * REGARD TO THIS SOFTWARE INCLUDING ALL IMPLIED WARRANTIES OF MERCHANTABILITY
+ * AND FITNESS.  IN NO EVENT SHALL ISC BE LIABLE FOR ANY SPECIAL, DIRECT,
+ * INDIRECT, OR CONSEQUENTIAL DAMAGES OR ANY DAMAGES WHATSOEVER RESULTING FROM
+ * LOSS OF USE, DATA OR PROFITS, WHETHER IN AN ACTION OF CONTRACT, NEGLIGENCE
+ * OR OTHER TORTIOUS ACTION, ARISING OUT OF OR IN CONNECTION WITH THE USE OR
+ * PERFORMANCE OF THIS SOFTWARE.
+ */
+
+/*
  * Driver instance object.
  *
  * One instance is equivalent to dynamic-db section in named.conf.
  * This module parses arguments and provide high-level operations
  * instance init/zone load/instance destroy.
- *
- * Copyright (C) 2008-2015  Red Hat ; see COPYRIGHT for license
  */
 
 #include "instance.h"
 
-#include <isc/task.h>
 #include <isc/util.h>
 
 #include <dns/db.h>
@@ -55,14 +81,14 @@ parse_params(isc_mem_t *mctx, int argc, char **argv, dns_name_t *z1,
 		result = ISC_R_FAILURE;
 		goto cleanup;
 	}
-	result = dns_name_fromstring2(z1, argv[0], dns_rootname, 0, mctx);
+	result = dns_name_fromstring(z1, argv[0], dns_rootname, 0, mctx);
 	if (result != ISC_R_SUCCESS) {
 		log_write(ISC_LOG_ERROR,
 			  "parse_params: dns_name_fromstring2 -> %s",
 			  isc_result_totext(result));
 		goto cleanup;
 	}
-	result = dns_name_fromstring2(z2, argv[1], dns_rootname, 0, mctx);
+	result = dns_name_fromstring(z2, argv[1], dns_rootname, 0, mctx);
 	if (result != ISC_R_SUCCESS) {
 		log_write(ISC_LOG_ERROR,
 			  "parse_params: dns_name_fromstring2 -> %s",
@@ -85,16 +111,15 @@ new_sample_instance(isc_mem_t *mctx, const char *db_name, int argc, char **argv,
 		    const dns_dyndbctx_t *dctx,
 		    sample_instance_t **sample_instp) {
 	isc_result_t result;
-	sample_instance_t *inst = NULL;
 
 	REQUIRE(sample_instp != NULL && *sample_instp == NULL);
 
-	CHECKED_MEM_GET_PTR(mctx, inst);
-	ZERO_PTR(inst);
+	sample_instance_t *inst = isc_mem_get(mctx, sizeof(*inst));
+	*inst = (sample_instance_t){ 0 };
+
 	isc_mem_attach(mctx, &inst->mctx);
 
 	inst->db_name = isc_mem_strdup(mctx, db_name);
-
 	inst->zone1_name = dns_fixedname_initname(&inst->zone1_fn);
 	inst->zone2_name = dns_fixedname_initname(&inst->zone2_fn);
 
@@ -109,7 +134,7 @@ new_sample_instance(isc_mem_t *mctx, const char *db_name, int argc, char **argv,
 
 	dns_view_attach(dctx->view, &inst->view);
 	dns_zonemgr_attach(dctx->zmgr, &inst->zmgr);
-	isc_task_attach(dctx->task, &inst->task);
+	inst->loopmgr = dctx->loopmgr;
 
 	/* Register new DNS DB implementation. */
 	result = dns_db_register(db_name, create_db, inst, mctx, &inst->db_imp);
@@ -198,7 +223,6 @@ destroy_sample_instance(sample_instance_t **instp) {
 
 	dns_view_detach(&inst->view);
 	dns_zonemgr_detach(&inst->zmgr);
-	isc_task_detach(&inst->task);
 
-	MEM_PUT_AND_DETACH(inst);
+	isc_mem_putanddetach(&inst->mctx, inst, sizeof(*inst));
 }

@@ -1,6 +1,8 @@
 /*
  * Copyright (C) Internet Systems Consortium, Inc. ("ISC")
  *
+ * SPDX-License-Identifier: MPL-2.0
+ *
  * This Source Code Form is subject to the terms of the Mozilla Public
  * License, v. 2.0. If a copy of the MPL was not distributed with this
  * file, you can obtain one at https://mozilla.org/MPL/2.0/.
@@ -9,8 +11,7 @@
  * information regarding copyright ownership.
  */
 
-#ifndef ISC_LOG_H
-#define ISC_LOG_H 1
+#pragma once
 
 /*! \file isc/log.h */
 
@@ -21,7 +22,6 @@
 
 #include <isc/formatcheck.h>
 #include <isc/lang.h>
-#include <isc/platform.h>
 #include <isc/types.h>
 
 /*@{*/
@@ -101,7 +101,7 @@ typedef enum {
  * isc_log_registercategories.
  */
 struct isc_logcategory {
-	const char * name;
+	const char  *name;
 	unsigned int id;
 };
 
@@ -109,7 +109,7 @@ struct isc_logcategory {
  * Similar to isc_logcategory, but for all the modules a library defines.
  */
 struct isc_logmodule {
-	const char * name;
+	const char  *name;
 	unsigned int id;
 };
 
@@ -138,8 +138,8 @@ typedef struct isc_logfile {
 	 * anyone would want).  st_size returned by fstat should be typedef'd
 	 * to a size large enough for the largest possible file on a system.
 	 */
-	isc_offset_t maximum_size;
-	bool	     maximum_reached; /*%< Private. */
+	off_t maximum_size;
+	bool  maximum_reached; /*%< Private. */
 } isc_logfile_t;
 
 /*%
@@ -159,9 +159,9 @@ typedef union isc_logdestination {
  * definitions with indexes into its isc_logcategory structure corresponding to
  * the order of the names.
  */
-LIBISC_EXTERNAL_DATA extern isc_logcategory_t isc_categories[];
-LIBISC_EXTERNAL_DATA extern isc_log_t *	      isc_lctx;
-LIBISC_EXTERNAL_DATA extern isc_logmodule_t   isc_modules[];
+extern isc_logcategory_t isc_categories[];
+extern isc_log_t	*isc_lctx;
+extern isc_logmodule_t	 isc_modules[];
 /*@}*/
 
 /*@{*/
@@ -169,8 +169,9 @@ LIBISC_EXTERNAL_DATA extern isc_logmodule_t   isc_modules[];
  * Do not log directly to DEFAULT.  Use another category.  When in doubt,
  * use GENERAL.
  */
-#define ISC_LOGCATEGORY_DEFAULT (&isc_categories[0])
-#define ISC_LOGCATEGORY_GENERAL (&isc_categories[1])
+#define ISC_LOGCATEGORY_DEFAULT	  (&isc_categories[0])
+#define ISC_LOGCATEGORY_GENERAL	  (&isc_categories[1])
+#define ISC_LOGCATEGORY_SSLKEYLOG (&isc_categories[2])
 /*@}*/
 
 #define ISC_LOGMODULE_SOCKET	(&isc_modules[0])
@@ -442,7 +443,7 @@ isc_log_createchannel(isc_logconfig_t *lcfg, const char *name,
 isc_result_t
 isc_log_usechannel(isc_logconfig_t *lcfg, const char *name,
 		   const isc_logcategory_t *category,
-		   const isc_logmodule_t *  module);
+		   const isc_logmodule_t   *module);
 /*%<
  * Associate a named logging channel with a category and module that
  * will use it.
@@ -850,5 +851,3 @@ isc_log_setforcelog(bool v);
  */
 
 ISC_LANG_ENDDECLS
-
-#endif /* ISC_LOG_H */

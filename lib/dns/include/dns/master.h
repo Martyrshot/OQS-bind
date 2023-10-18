@@ -1,6 +1,8 @@
 /*
  * Copyright (C) Internet Systems Consortium, Inc. ("ISC")
  *
+ * SPDX-License-Identifier: MPL-2.0
+ *
  * This Source Code Form is subject to the terms of the Mozilla Public
  * License, v. 2.0. If a copy of the MPL was not distributed with this
  * file, you can obtain one at https://mozilla.org/MPL/2.0/.
@@ -9,8 +11,7 @@
  * information regarding copyright ownership.
  */
 
-#ifndef DNS_MASTER_H
-#define DNS_MASTER_H 1
+#pragma once
 
 /*! \file dns/master.h */
 
@@ -35,7 +36,7 @@
 #define DNS_MASTER_NOINCLUDE 0x00000004 /*%< Disallow $INCLUDE directives. */
 #define DNS_MASTER_ZONE	     0x00000008 /*%< Loading a zone master file. */
 #define DNS_MASTER_HINT	     0x00000010 /*%< Loading a hint master file. */
-#define DNS_MASTER_SLAVE     0x00000020 /*%< Loading a slave master file. */
+#define DNS_MASTER_SECONDARY 0x00000020 /*%< Secondary master file. */
 #define DNS_MASTER_CHECKNS                    \
 	0x00000040 /*%<                       \
 		    * Check NS records to see \
@@ -54,10 +55,11 @@
 #define DNS_MASTER_CHECKMX     0x00000800
 #define DNS_MASTER_CHECKMXFAIL 0x00001000
 
-#define DNS_MASTER_RESIGN   0x00002000
-#define DNS_MASTER_KEY	    0x00004000 /*%< Loading a key zone master file. */
-#define DNS_MASTER_NOTTL    0x00008000 /*%< Don't require ttl. */
-#define DNS_MASTER_CHECKTTL 0x00010000 /*%< Check max-zone-ttl */
+#define DNS_MASTER_RESIGN    0x00002000
+#define DNS_MASTER_KEY	     0x00004000 /*%< Loading a key zone master file. */
+#define DNS_MASTER_NOTTL     0x00008000 /*%< Don't require ttl. */
+#define DNS_MASTER_CHECKTTL  0x00010000 /*%< Check max-zone-ttl */
+#define DNS_MASTER_CHECKSVCB 0x00020000 /*%< Check SVBC records */
 
 ISC_LANG_BEGINDECLS
 
@@ -79,9 +81,7 @@ ISC_LANG_BEGINDECLS
 /* Common header */
 struct dns_masterrawheader {
 	uint32_t format;       /* must be
-				* dns_masterformat_raw
-				* or
-				* dns_masterformat_map */
+				* dns_masterformat_raw */
 	uint32_t version;      /* compatibility for future
 				* extensions */
 	uint32_t dumptime;     /* timestamp on creation
@@ -90,7 +90,7 @@ struct dns_masterrawheader {
 	uint32_t sourceserial; /* Source serial number (used
 				* by inline-signing zones) */
 	uint32_t lastxfrin;    /* timestamp of last transfer
-				* (used by slave zones) */
+				* (used by secondary zones) */
 };
 
 /* The structure for each RRset */
@@ -136,44 +136,18 @@ dns_master_loadbuffer(isc_buffer_t *buffer, dns_name_t *top, dns_name_t *origin,
 		      dns_rdatacallbacks_t *callbacks, isc_mem_t *mctx);
 
 isc_result_t
-dns_master_loadlexer(isc_lex_t *lex, dns_name_t *top, dns_name_t *origin,
-		     dns_rdataclass_t zclass, unsigned int options,
-		     dns_rdatacallbacks_t *callbacks, isc_mem_t *mctx);
-
-isc_result_t
-dns_master_loadfileinc(const char *master_file, dns_name_t *top,
-		       dns_name_t *origin, dns_rdataclass_t zclass,
-		       unsigned int options, uint32_t resign,
-		       dns_rdatacallbacks_t *callbacks, isc_task_t *task,
-		       dns_loaddonefunc_t done, void *done_arg,
-		       dns_loadctx_t **ctxp, dns_masterincludecb_t include_cb,
-		       void *include_arg, isc_mem_t *mctx,
-		       dns_masterformat_t format, uint32_t maxttl);
-
-isc_result_t
-dns_master_loadstreaminc(FILE *stream, dns_name_t *top, dns_name_t *origin,
-			 dns_rdataclass_t zclass, unsigned int options,
-			 dns_rdatacallbacks_t *callbacks, isc_task_t *task,
-			 dns_loaddonefunc_t done, void *done_arg,
-			 dns_loadctx_t **ctxp, isc_mem_t *mctx);
-
-isc_result_t
-dns_master_loadbufferinc(isc_buffer_t *buffer, dns_name_t *top,
+dns_master_loadfileasync(const char *master_file, dns_name_t *top,
 			 dns_name_t *origin, dns_rdataclass_t zclass,
-			 unsigned int options, dns_rdatacallbacks_t *callbacks,
-			 isc_task_t *task, dns_loaddonefunc_t done,
-			 void *done_arg, dns_loadctx_t **ctxp, isc_mem_t *mctx);
-
-isc_result_t
-dns_master_loadlexerinc(isc_lex_t *lex, dns_name_t *top, dns_name_t *origin,
-			dns_rdataclass_t zclass, unsigned int options,
-			dns_rdatacallbacks_t *callbacks, isc_task_t *task,
-			dns_loaddonefunc_t done, void *done_arg,
-			dns_loadctx_t **ctxp, isc_mem_t *mctx);
+			 unsigned int options, uint32_t resign,
+			 dns_rdatacallbacks_t *callbacks, isc_loop_t *loop,
+			 dns_loaddonefunc_t done, void *done_arg,
+			 dns_loadctx_t **ctxp, dns_masterincludecb_t include_cb,
+			 void *include_arg, isc_mem_t *mctx,
+			 dns_masterformat_t format, uint32_t maxttl);
 
 /*%<
- * Loads a RFC1305 master file from a file, stream, buffer, or existing
- * lexer into rdatasets and then calls 'callbacks->commit' to commit the
+ * Loads a RFC1035 master file from a file, stream, or buffer
+ * into rdatasets and then calls 'callbacks->commit' to commit the
  * rdatasets.  Rdata memory belongs to dns_master_load and will be
  * reused / released when the callback completes.  dns_load_master will
  * abort if callbacks->commit returns any value other than ISC_R_SUCCESS.
@@ -193,14 +167,13 @@ dns_master_loadlexerinc(isc_lex_t *lex, dns_name_t *top, dns_name_t *origin,
  *
  * Requires:
  *\li	'master_file' points to a valid string.
- *\li	'lexer' points to a valid lexer.
  *\li	'top' points to a valid name.
  *\li	'origin' points to a valid name.
  *\li	'callbacks->commit' points to a valid function.
  *\li	'callbacks->error' points to a valid function.
  *\li	'callbacks->warn' points to a valid function.
  *\li	'mctx' points to a valid memory context.
- *\li	'task' and 'done' to be valid.
+ *\li	'loop' and 'done' to be valid.
  *\li	'lmgr' to be valid.
  *\li	'ctxp != NULL && ctxp == NULL'.
  *
@@ -215,7 +188,6 @@ dns_master_loadlexerinc(isc_lex_t *lex, dns_name_t *top, dns_name_t *origin,
  *\li	DNS_R_NOOWNER failed to specify a ownername.
  *\li	DNS_R_NOTTL failed to specify a ttl.
  *\li	DNS_R_BADCLASS record class did not match zone class.
- *\li	DNS_R_CONTINUE load still in progress (dns_master_load*inc() only).
  *\li	Any dns_rdata_fromtext() error code.
  *\li	Any error code from callbacks->commit().
  */
@@ -258,5 +230,3 @@ dns_master_initrawheader(dns_masterrawheader_t *header);
  * values to zero.
  */
 ISC_LANG_ENDDECLS
-
-#endif /* DNS_MASTER_H */

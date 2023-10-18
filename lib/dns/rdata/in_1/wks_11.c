@@ -1,6 +1,8 @@
 /*
  * Copyright (C) Internet Systems Consortium, Inc. ("ISC")
  *
+ * SPDX-License-Identifier: MPL-2.0
+ *
  * This Source Code Form is subject to the terms of the Mozilla Public
  * License, v. 2.0. If a copy of the MPL was not distributed with this
  * file, you can obtain one at https://mozilla.org/MPL/2.0/.
@@ -13,23 +15,11 @@
 #define RDATA_IN_1_WKS_11_C
 
 #include <limits.h>
-#include <stdlib.h>
+#include <netdb.h>
 
+#include <isc/ascii.h>
 #include <isc/net.h>
-#include <isc/netdb.h>
 #include <isc/once.h>
-
-/*
- * Redefine CHECK here so cppcheck "sees" the define.
- */
-#ifndef CHECK
-#define CHECK(op)                            \
-	do {                                 \
-		result = (op);               \
-		if (result != ISC_R_SUCCESS) \
-			goto cleanup;        \
-	} while (0)
-#endif /* ifndef CHECK */
 
 #define RRTYPE_WKS_ATTRIBUTES (0)
 
@@ -66,7 +56,7 @@ mygetservbyname(const char *name, const char *proto, long *port) {
 	return (se != NULL);
 }
 
-static inline isc_result_t
+static isc_result_t
 fromtext_in_wks(ARGS_FROMTEXT) {
 	static isc_once_t once = ISC_ONCE_INIT;
 	isc_token_t token;
@@ -80,7 +70,6 @@ fromtext_in_wks(ARGS_FROMTEXT) {
 	const char *ps = NULL;
 	unsigned int n;
 	char service[32];
-	int i;
 	isc_result_t result;
 
 	REQUIRE(type == dns_rdatatype_wks);
@@ -92,7 +81,7 @@ fromtext_in_wks(ARGS_FROMTEXT) {
 	UNUSED(rdclass);
 	UNUSED(callbacks);
 
-	RUNTIME_CHECK(isc_once_do(&once, init_lock) == ISC_R_SUCCESS);
+	isc_once_do(&once, init_lock);
 
 	/*
 	 * IPv4 dotted quad.
@@ -146,11 +135,7 @@ fromtext_in_wks(ARGS_FROMTEXT) {
 		 * case sensitive and the database is usually in lowercase.
 		 */
 		strlcpy(service, DNS_AS_STR(token), sizeof(service));
-		for (i = strlen(service) - 1; i >= 0; i--) {
-			if (isupper(service[i] & 0xff)) {
-				service[i] = tolower(service[i] & 0xff);
-			}
-		}
+		isc_ascii_strtolower(service);
 
 		port = strtol(DNS_AS_STR(token), &e, 10);
 		if (*e != 0 && !mygetservbyname(service, ps, &port) &&
@@ -179,7 +164,7 @@ cleanup:
 	return (result);
 }
 
-static inline isc_result_t
+static isc_result_t
 totext_in_wks(ARGS_TOTEXT) {
 	isc_region_t sr;
 	unsigned short proto;
@@ -221,7 +206,7 @@ totext_in_wks(ARGS_TOTEXT) {
 	return (ISC_R_SUCCESS);
 }
 
-static inline isc_result_t
+static isc_result_t
 fromwire_in_wks(ARGS_FROMWIRE) {
 	isc_region_t sr;
 	isc_region_t tr;
@@ -231,7 +216,6 @@ fromwire_in_wks(ARGS_FROMWIRE) {
 
 	UNUSED(type);
 	UNUSED(dctx);
-	UNUSED(options);
 	UNUSED(rdclass);
 
 	isc_buffer_activeregion(source, &sr);
@@ -257,7 +241,7 @@ fromwire_in_wks(ARGS_FROMWIRE) {
 	return (ISC_R_SUCCESS);
 }
 
-static inline isc_result_t
+static isc_result_t
 towire_in_wks(ARGS_TOWIRE) {
 	isc_region_t sr;
 
@@ -271,7 +255,7 @@ towire_in_wks(ARGS_TOWIRE) {
 	return (mem_tobuffer(target, sr.base, sr.length));
 }
 
-static inline int
+static int
 compare_in_wks(ARGS_COMPARE) {
 	isc_region_t r1;
 	isc_region_t r2;
@@ -288,7 +272,7 @@ compare_in_wks(ARGS_COMPARE) {
 	return (isc_region_compare(&r1, &r2));
 }
 
-static inline isc_result_t
+static isc_result_t
 fromstruct_in_wks(ARGS_FROMSTRUCT) {
 	dns_rdata_in_wks_t *wks = source;
 	uint32_t a;
@@ -310,7 +294,7 @@ fromstruct_in_wks(ARGS_FROMSTRUCT) {
 	return (mem_tobuffer(target, wks->map, wks->map_len));
 }
 
-static inline isc_result_t
+static isc_result_t
 tostruct_in_wks(ARGS_TOSTRUCT) {
 	dns_rdata_in_wks_t *wks = target;
 	uint32_t n;
@@ -333,14 +317,11 @@ tostruct_in_wks(ARGS_TOSTRUCT) {
 	isc_region_consume(&region, 1);
 	wks->map_len = region.length;
 	wks->map = mem_maybedup(mctx, region.base, region.length);
-	if (wks->map == NULL) {
-		return (ISC_R_NOMEMORY);
-	}
 	wks->mctx = mctx;
 	return (ISC_R_SUCCESS);
 }
 
-static inline void
+static void
 freestruct_in_wks(ARGS_FREESTRUCT) {
 	dns_rdata_in_wks_t *wks = source;
 
@@ -358,19 +339,20 @@ freestruct_in_wks(ARGS_FREESTRUCT) {
 	wks->mctx = NULL;
 }
 
-static inline isc_result_t
+static isc_result_t
 additionaldata_in_wks(ARGS_ADDLDATA) {
-	UNUSED(rdata);
-	UNUSED(add);
-	UNUSED(arg);
-
 	REQUIRE(rdata->type == dns_rdatatype_wks);
 	REQUIRE(rdata->rdclass == dns_rdataclass_in);
+
+	UNUSED(rdata);
+	UNUSED(owner);
+	UNUSED(add);
+	UNUSED(arg);
 
 	return (ISC_R_SUCCESS);
 }
 
-static inline isc_result_t
+static isc_result_t
 digest_in_wks(ARGS_DIGEST) {
 	isc_region_t r;
 
@@ -382,7 +364,7 @@ digest_in_wks(ARGS_DIGEST) {
 	return ((digest)(arg, &r));
 }
 
-static inline bool
+static bool
 checkowner_in_wks(ARGS_CHECKOWNER) {
 	REQUIRE(type == dns_rdatatype_wks);
 	REQUIRE(rdclass == dns_rdataclass_in);
@@ -393,7 +375,7 @@ checkowner_in_wks(ARGS_CHECKOWNER) {
 	return (dns_name_ishostname(name, wildcard));
 }
 
-static inline bool
+static bool
 checknames_in_wks(ARGS_CHECKNAMES) {
 	REQUIRE(rdata->type == dns_rdatatype_wks);
 	REQUIRE(rdata->rdclass == dns_rdataclass_in);
@@ -405,7 +387,7 @@ checknames_in_wks(ARGS_CHECKNAMES) {
 	return (true);
 }
 
-static inline int
+static int
 casecompare_in_wks(ARGS_COMPARE) {
 	return (compare_in_wks(rdata1, rdata2));
 }

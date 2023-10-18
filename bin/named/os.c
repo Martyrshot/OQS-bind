@@ -1,6 +1,8 @@
 /*
  * Copyright (C) Internet Systems Consortium, Inc. ("ISC")
  *
+ * SPDX-License-Identifier: MPL-2.0
+ *
  * This Source Code Form is subject to the terms of the Mozilla Public
  * License, v. 2.0. If a copy of the MPL was not distributed with this
  * file, you can obtain one at https://mozilla.org/MPL/2.0/.
@@ -12,6 +14,7 @@
 /*! \file */
 #include <stdarg.h>
 #include <stdbool.h>
+#include <sys/resource.h>
 #include <sys/stat.h>
 #include <sys/types.h> /* dev_t FreeBSD 2.1 */
 #ifdef HAVE_UNAME
@@ -34,14 +37,13 @@
 
 #include <isc/buffer.h>
 #include <isc/file.h>
-#include <isc/print.h>
-#include <isc/resource.h>
 #include <isc/result.h>
 #include <isc/strerr.h>
 #include <isc/string.h>
 #include <isc/util.h>
 
 #include <named/globals.h>
+#include <named/log.h>
 #include <named/main.h>
 #include <named/os.h>
 #ifdef HAVE_LIBSCF
@@ -61,7 +63,7 @@ static struct passwd *runas_pw = NULL;
 static bool done_setuid = false;
 static int dfd[2] = { -1, -1 };
 
-#ifdef HAVE_SYS_CAPABILITY_H
+#if HAVE_LIBCAP
 
 static bool non_root = false;
 static bool non_root_caps = false;
@@ -247,7 +249,137 @@ linux_keepcaps(void) {
 	}
 }
 
-#endif /* HAVE_SYS_CAPABILITY_H */
+#endif /* HAVE_LIBCAP */
+
+/*
+ * First define compatibility shims if {set,get}res{uid,gid} are not available
+ */
+
+#if !HAVE_GETRESGID
+static int
+getresgid(gid_t *rgid, gid_t *egid, gid_t *sgid) {
+	*rgid = -1;
+	*egid = getegid();
+	*sgid = -1;
+
+	return (0);
+}
+#endif /* !HAVE_GETRESGID */
+
+#if !HAVE_SETRESGID
+static int
+setresgid(gid_t rgid, gid_t egid, gid_t sgid) {
+	REQUIRE(rgid == (gid_t)-1);
+	REQUIRE(sgid == (gid_t)-1);
+
+#if HAVE_SETREGID
+	return (setregid(rgid, egid));
+#else  /* HAVE_SETREGID */
+	return (setegid(egid));
+#endif /* HAVE_SETREGID */
+}
+#endif /* !HAVE_SETRESGID */
+
+#if !HAVE_GETRESUID
+static int
+getresuid(uid_t *ruid, uid_t *euid, uid_t *suid) {
+	*ruid = -1;
+	*euid = geteuid();
+	*suid = -1;
+
+	return (0);
+}
+#endif /* !HAVE_GETRESUID */
+
+#if !HAVE_SETRESUID
+static int
+setresuid(uid_t ruid, uid_t euid, uid_t suid) {
+	REQUIRE(ruid == (uid_t)-1);
+	REQUIRE(suid == (uid_t)-1);
+
+#if HAVE_SETREGID
+	return (setregid(ruid, euid));
+#else  /* HAVE_SETREGID */
+	return (setegid(euid));
+#endif /* HAVE_SETREGID */
+}
+#endif /* !HAVE_SETRESUID */
+
+static int
+set_effective_gid(gid_t gid) {
+	gid_t oldgid;
+
+	if (getresgid(&(gid_t){ 0 }, &oldgid, &(gid_t){ 0 }) == -1) {
+		return (-1);
+	}
+
+	if (oldgid == gid) {
+		return (0);
+	}
+
+	if (setresgid(-1, gid, -1) == -1) {
+		return (-1);
+	}
+
+	if (getresgid(&(gid_t){ 0 }, &oldgid, &(gid_t){ 0 }) == -1) {
+		return (-1);
+	}
+
+	if (oldgid != gid) {
+		return (-1);
+	}
+
+	return (0);
+}
+
+static int
+set_effective_uid(uid_t uid) {
+	uid_t olduid;
+
+	if (getresuid(&(uid_t){ 0 }, &olduid, &(uid_t){ 0 }) == -1) {
+		return (-1);
+	}
+
+	if (olduid == uid) {
+		return (0);
+	}
+
+	if (setresuid(-1, uid, -1) == -1) {
+		return (-1);
+	}
+
+	if (getresuid(&(uid_t){ 0 }, &olduid, &(uid_t){ 0 }) == -1) {
+		return (-1);
+	}
+
+	if (olduid != uid) {
+		return (-1);
+	}
+
+	/* Success */
+	return (0);
+}
+
+static void
+setperms(uid_t uid, gid_t gid) {
+	char strbuf[ISC_STRERRORSIZE];
+
+	/*
+	 * Drop the gid privilege first, because in some cases the gid privilege
+	 * cannot be dropped after the uid privilege has been dropped.
+	 */
+	if (set_effective_gid(gid) == -1) {
+		strerror_r(errno, strbuf, sizeof(strbuf));
+		named_main_earlywarning("unable to set effective gid to %d: %s",
+					gid, strbuf);
+	}
+
+	if (set_effective_uid(uid) == -1) {
+		strerror_r(errno, strbuf, sizeof(strbuf));
+		named_main_earlywarning("unable to set effective uid to %d: %s",
+					uid, strbuf);
+	}
+}
 
 static void
 setup_syslog(const char *progname) {
@@ -263,9 +395,9 @@ setup_syslog(const char *progname) {
 void
 named_os_init(const char *progname) {
 	setup_syslog(progname);
-#ifdef HAVE_SYS_CAPABILITY_H
+#if HAVE_LIBCAP
 	linux_initialprivs();
-#endif /* ifdef HAVE_SYS_CAPABILITY_H */
+#endif /* HAVE_LIBCAP */
 #ifdef SIGXFSZ
 	signal(SIGXFSZ, SIG_IGN);
 #endif /* ifdef SIGXFSZ */
@@ -458,7 +590,7 @@ named_os_changeuser(void) {
 		named_main_earlyfatal("setuid(): %s", strbuf);
 	}
 
-#if defined(HAVE_SYS_CAPABILITY_H)
+#if HAVE_LIBCAP
 	/*
 	 * Restore the ability of named to drop core after the setuid()
 	 * call has disabled it.
@@ -470,7 +602,7 @@ named_os_changeuser(void) {
 	}
 
 	linux_minprivs();
-#endif /* if defined(HAVE_SYS_CAPABILITY_H) */
+#endif /* HAVE_LIBCAP */
 }
 
 uid_t
@@ -483,30 +615,56 @@ ns_os_uid(void) {
 
 void
 named_os_adjustnofile(void) {
-#if defined(__linux__)
-	isc_result_t result;
-	isc_resourcevalue_t newvalue;
+	int r;
+	struct rlimit rl;
+	rlim_t rlim_old;
+	char strbuf[ISC_STRERRORSIZE];
 
-	/*
-	 * Linux: max number of open files specified by one thread doesn't seem
-	 * to apply to other threads on Linux.
-	 */
-	newvalue = ISC_RESOURCE_UNLIMITED;
-
-	result = isc_resource_setlimit(isc_resource_openfiles, newvalue);
-	if (result != ISC_R_SUCCESS) {
-		named_main_earlywarning("couldn't adjust limit on open files");
+	r = getrlimit(RLIMIT_NOFILE, &rl);
+	if (r != 0) {
+		goto fail;
 	}
-#endif /* if defined(__linux__) */
+
+	rlim_old = rl.rlim_cur;
+
+	if (rl.rlim_cur == rl.rlim_max) {
+		isc_log_write(named_g_lctx, NAMED_LOGCATEGORY_GENERAL,
+			      NAMED_LOGMODULE_MAIN, ISC_LOG_NOTICE,
+			      "the limit on open files is already at the "
+			      "maximum allowed value: "
+			      "%" PRIu64,
+			      (uint64_t)rl.rlim_max);
+		return;
+	}
+
+	rl.rlim_cur = rl.rlim_max;
+	r = setrlimit(RLIMIT_NOFILE, &rl);
+	if (r != 0) {
+		goto fail;
+	}
+
+	isc_log_write(named_g_lctx, NAMED_LOGCATEGORY_GENERAL,
+		      NAMED_LOGMODULE_MAIN, ISC_LOG_NOTICE,
+		      "adjusted limit on open files from "
+		      "%" PRIu64 " to "
+		      "%" PRIu64,
+		      (uint64_t)rlim_old, (uint64_t)rl.rlim_cur);
+	return;
+
+fail:
+	strerror_r(errno, strbuf, sizeof(strbuf));
+	named_main_earlywarning("adjusting limit on open files failed: %s",
+				strbuf);
+	return;
 }
 
 void
 named_os_minprivs(void) {
-#if defined(HAVE_SYS_CAPABILITY_H)
+#if HAVE_LIBCAP
 	linux_keepcaps();
 	named_os_changeuser();
 	linux_minprivs();
-#endif /* if defined(HAVE_SYS_CAPABILITY_H) */
+#endif /* HAVE_LIBCAP */
 }
 
 static int
@@ -626,56 +784,6 @@ error:
 	return (-1);
 }
 
-#if !HAVE_SYS_CAPABILITY_H
-static void
-setperms(uid_t uid, gid_t gid) {
-#if defined(HAVE_SETEGID) || defined(HAVE_SETRESGID)
-	char strbuf[ISC_STRERRORSIZE];
-#endif /* if defined(HAVE_SETEGID) || defined(HAVE_SETRESGID) */
-#if !defined(HAVE_SETEGID) && defined(HAVE_SETRESGID)
-	gid_t oldgid, tmpg;
-#endif /* if !defined(HAVE_SETEGID) && defined(HAVE_SETRESGID) */
-#if !defined(HAVE_SETEUID) && defined(HAVE_SETRESUID)
-	uid_t olduid, tmpu;
-#endif /* if !defined(HAVE_SETEUID) && defined(HAVE_SETRESUID) */
-#if defined(HAVE_SETEGID)
-	if (getegid() != gid && setegid(gid) == -1) {
-		strerror_r(errno, strbuf, sizeof(strbuf));
-		named_main_earlywarning("unable to set effective "
-					"gid to %ld: %s",
-					(long)gid, strbuf);
-	}
-#elif defined(HAVE_SETRESGID)
-	if (getresgid(&tmpg, &oldgid, &tmpg) == -1 || oldgid != gid) {
-		if (setresgid(-1, gid, -1) == -1) {
-			strerror_r(errno, strbuf, sizeof(strbuf));
-			named_main_earlywarning("unable to set effective "
-						"gid to %d: %s",
-						gid, strbuf);
-		}
-	}
-#endif /* if defined(HAVE_SETEGID) */
-
-#if defined(HAVE_SETEUID)
-	if (geteuid() != uid && seteuid(uid) == -1) {
-		strerror_r(errno, strbuf, sizeof(strbuf));
-		named_main_earlywarning("unable to set effective "
-					"uid to %ld: %s",
-					(long)uid, strbuf);
-	}
-#elif defined(HAVE_SETRESUID)
-	if (getresuid(&tmpu, &olduid, &tmpu) == -1 || olduid != uid) {
-		if (setresuid(-1, uid, -1) == -1) {
-			strerror_r(errno, strbuf, sizeof(strbuf));
-			named_main_earlywarning("unable to set effective "
-						"uid to %d: %s",
-						uid, strbuf);
-		}
-	}
-#endif /* if defined(HAVE_SETEUID) */
-}
-#endif /* !HAVE_SYS_CAPABILITY_H */
-
 FILE *
 named_os_openfile(const char *filename, mode_t mode, bool switch_user) {
 	char strbuf[ISC_STRERRORSIZE], *f;
@@ -701,19 +809,17 @@ named_os_openfile(const char *filename, mode_t mode, bool switch_user) {
 	if (switch_user && runas_pw != NULL) {
 		uid_t olduid = getuid();
 		gid_t oldgid = getgid();
-#if HAVE_SYS_CAPABILITY_H
-		REQUIRE(olduid == runas_pw->pw_uid);
-		REQUIRE(oldgid == runas_pw->pw_gid);
-#else /* HAVE_SYS_CAPABILITY_H */
-		/* Set UID/GID to the one we'll be running with eventually */
+
+		/*
+		 * Set UID/GID to the one we'll be running with
+		 * eventually.
+		 */
 		setperms(runas_pw->pw_uid, runas_pw->pw_gid);
-#endif
+
 		fd = safe_open(filename, mode, false);
 
-#if !HAVE_SYS_CAPABILITY_H
 		/* Restore UID/GID to previous uid/gid */
 		setperms(olduid, oldgid);
-#endif
 
 		if (fd == -1) {
 			fd = safe_open(filename, mode, false);
@@ -863,14 +969,6 @@ named_os_shutdown(void) {
 	closelog();
 	cleanup_pidfile();
 	cleanup_lockfile();
-}
-
-isc_result_t
-named_os_gethostname(char *buf, size_t len) {
-	int n;
-
-	n = gethostname(buf, len);
-	return ((n == 0) ? ISC_R_SUCCESS : ISC_R_FAILURE);
 }
 
 void

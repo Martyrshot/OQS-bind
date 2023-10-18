@@ -1,6 +1,8 @@
 /*
  * Copyright (C) Internet Systems Consortium, Inc. ("ISC")
  *
+ * SPDX-License-Identifier: MPL-2.0
+ *
  * This Source Code Form is subject to the terms of the Mozilla Public
  * License, v. 2.0. If a copy of the MPL was not distributed with this
  * file, you can obtain one at https://mozilla.org/MPL/2.0/.
@@ -15,8 +17,6 @@
 #include <stdbool.h>
 
 #include <isc/file.h>
-#include <isc/offset.h>
-#include <isc/print.h>
 #include <isc/result.h>
 #include <isc/stdio.h>
 #include <isc/string.h>
@@ -144,14 +144,14 @@ channel_fromconf(const cfg_obj_t *channel, isc_logconfig_t *logconfig) {
 		const cfg_obj_t *suffixobj = cfg_tuple_get(fileobj, "suffix");
 		int32_t versions = ISC_LOG_ROLLNEVER;
 		isc_log_rollsuffix_t suffix = isc_log_rollsuffix_increment;
-		isc_offset_t size = 0;
+		off_t size = 0;
 		uint64_t maxoffset;
 
 		/*
-		 * isc_offset_t is a signed integer type, so the maximum
+		 * off_t is a signed integer type, so the maximum
 		 * value is all 1s except for the MSB.
 		 */
-		switch (sizeof(isc_offset_t)) {
+		switch (sizeof(off_t)) {
 		case 4:
 			maxoffset = 0x7fffffffULL;
 			break;
@@ -159,8 +159,7 @@ channel_fromconf(const cfg_obj_t *channel, isc_logconfig_t *logconfig) {
 			maxoffset = 0x7fffffffffffffffULL;
 			break;
 		default:
-			INSIST(0);
-			ISC_UNREACHABLE();
+			UNREACHABLE();
 		}
 
 		type = ISC_LOG_TOFILE;
@@ -177,7 +176,7 @@ channel_fromconf(const cfg_obj_t *channel, isc_logconfig_t *logconfig) {
 		if (sizeobj != NULL && cfg_obj_isuint64(sizeobj) &&
 		    cfg_obj_asuint64(sizeobj) < maxoffset)
 		{
-			size = (isc_offset_t)cfg_obj_asuint64(sizeobj);
+			size = (off_t)cfg_obj_asuint64(sizeobj);
 		}
 		if (suffixobj != NULL && cfg_obj_isstring(suffixobj) &&
 		    strcasecmp(cfg_obj_asstring(suffixobj), "timestamp") == 0)
@@ -299,10 +298,6 @@ channel_fromconf(const cfg_obj_t *channel, isc_logconfig_t *logconfig) {
 					       dest.file.name,
 					       isc_result_totext(result));
 				}
-				fprintf(stderr,
-					"isc_stdio_open '%s' failed: %s\n",
-					dest.file.name,
-					isc_result_totext(result));
 			} else {
 				(void)isc_stdio_close(fp);
 			}
@@ -312,8 +307,6 @@ channel_fromconf(const cfg_obj_t *channel, isc_logconfig_t *logconfig) {
 			syslog(LOG_ERR, "isc_file_isplainfile '%s' failed: %s",
 			       dest.file.name, isc_result_totext(result));
 		}
-		fprintf(stderr, "isc_file_isplainfile '%s' failed: %s\n",
-			dest.file.name, isc_result_totext(result));
 	}
 
 done:
@@ -332,6 +325,7 @@ named_logconfig(isc_logconfig_t *logconfig, const cfg_obj_t *logstmt) {
 
 	if (logconfig != NULL) {
 		named_log_setdefaultchannels(logconfig);
+		named_log_setdefaultsslkeylogfile(logconfig);
 	}
 
 	(void)cfg_map_get(logstmt, "channel", &channels);

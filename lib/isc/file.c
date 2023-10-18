@@ -1,6 +1,8 @@
 /*
  * Copyright (C) Internet Systems Consortium, Inc. ("ISC")
  *
+ * SPDX-License-Identifier: MPL-2.0
+ *
  * This Source Code Form is subject to the terms of the Mozilla Public
  * License, v. 2.0. If a copy of the MPL was not distributed with this
  * file, you can obtain one at https://mozilla.org/MPL/2.0/.
@@ -60,8 +62,6 @@
 #include <isc/log.h>
 #include <isc/md.h>
 #include <isc/mem.h>
-#include <isc/platform.h>
-#include <isc/print.h>
 #include <isc/random.h>
 #include <isc/string.h>
 #include <isc/time.h>
@@ -195,7 +195,8 @@ isc_file_settime(const char *file, isc_time_t *when) {
 	 * Here is the real check for the high bit being set.
 	 */
 	if ((times[0].tv_sec &
-	     (1ULL << (sizeof(times[0].tv_sec) * CHAR_BIT - 1))) != 0) {
+	     (1ULL << (sizeof(times[0].tv_sec) * CHAR_BIT - 1))) != 0)
+	{
 		return (ISC_R_RANGE);
 	}
 
@@ -379,23 +380,6 @@ isc_file_openuniquemode(char *templet, int mode, FILE **fp) {
 	}
 
 	return (result);
-}
-
-isc_result_t
-isc_file_bopenunique(char *templet, FILE **fp) {
-	int mode = S_IWUSR | S_IRUSR | S_IRGRP | S_IWGRP | S_IROTH | S_IWOTH;
-	return (isc_file_openuniquemode(templet, mode, fp));
-}
-
-isc_result_t
-isc_file_bopenuniqueprivate(char *templet, FILE **fp) {
-	int mode = S_IWUSR | S_IRUSR;
-	return (isc_file_openuniquemode(templet, mode, fp));
-}
-
-isc_result_t
-isc_file_bopenuniquemode(char *templet, int mode, FILE **fp) {
-	return (isc_file_openuniquemode(templet, mode, fp));
 }
 
 isc_result_t
@@ -599,7 +583,7 @@ isc_file_absolutepath(const char *filename, char *path, size_t pathlen) {
 }
 
 isc_result_t
-isc_file_truncate(const char *filename, isc_offset_t size) {
+isc_file_truncate(const char *filename, off_t size) {
 	isc_result_t result = ISC_R_SUCCESS;
 
 	if (truncate(filename, size) < 0) {
@@ -686,53 +670,6 @@ isc_file_splitpath(isc_mem_t *mctx, const char *path, char **dirname,
 	return (ISC_R_SUCCESS);
 }
 
-void *
-isc_file_mmap(void *addr, size_t len, int prot, int flags, int fd,
-	      off_t offset) {
-#ifdef HAVE_MMAP
-	return (mmap(addr, len, prot, flags, fd, offset));
-#else  /* ifdef HAVE_MMAP */
-	void *buf;
-	ssize_t ret;
-	off_t end;
-
-	UNUSED(addr);
-	UNUSED(prot);
-	UNUSED(flags);
-
-	end = lseek(fd, 0, SEEK_END);
-	lseek(fd, offset, SEEK_SET);
-	if (end - offset < (off_t)len) {
-		len = end - offset;
-	}
-
-	buf = malloc(len);
-	if (buf == NULL) {
-		return (NULL);
-	}
-
-	ret = read(fd, buf, len);
-	if (ret != (ssize_t)len) {
-		free(buf);
-		buf = NULL;
-	}
-
-	return (buf);
-#endif /* ifdef HAVE_MMAP */
-}
-
-int
-isc_file_munmap(void *addr, size_t len) {
-#ifdef HAVE_MMAP
-	return (munmap(addr, len));
-#else  /* ifdef HAVE_MMAP */
-	UNUSED(len);
-
-	free(addr);
-	return (0);
-#endif /* ifdef HAVE_MMAP */
-}
-
 #define DISALLOW "\\/ABCDEFGHIJKLMNOPQRSTUVWXYZ"
 
 static isc_result_t
@@ -780,7 +717,7 @@ isc_file_sanitize(const char *dir, const char *base, const char *ext,
 		l += strlen(ext) + 1;
 	}
 
-	if (l > length || l > (unsigned)PATH_MAX) {
+	if (l > length || l > (unsigned int)PATH_MAX) {
 		return (ISC_R_NOSPACE);
 	}
 

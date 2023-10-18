@@ -1,6 +1,8 @@
 /*
  * Copyright (C) Internet Systems Consortium, Inc. ("ISC")
  *
+ * SPDX-License-Identifier: MPL-2.0
+ *
  * This Source Code Form is subject to the terms of the Mozilla Public
  * License, v. 2.0. If a copy of the MPL was not distributed with this
  * file, you can obtain one at https://mozilla.org/MPL/2.0/.
@@ -9,8 +11,7 @@
  * information regarding copyright ownership.
  */
 
-#ifndef DNS_NAME_H
-#define DNS_NAME_H 1
+#pragma once
 
 /*****
 ***** Module Info
@@ -30,9 +31,9 @@
  * makes adding names to messages easy.  Having much of the server know
  * the representation would be perilous, and we certainly don't want each
  * user of names to be manipulating such a low-level structure.  This is
- * where the Names and Labels module comes in.  The module allows name or
- * label handles to be created and attached to uncompressed wire format
- * regions.  All name operations and conversions are done through these
+ * where the Names and Labels module comes in. The module allows name
+ * handles to be created and attached to uncompressed wire format
+ * regions. All name operations and conversions are done through these
  * handles.
  *
  * MP:
@@ -55,7 +56,6 @@
  * Standards:
  *\li	RFC1035
  *\li	Draft EDNS0 (0)
- *\li	Draft Binary Labels (2)
  *
  */
 
@@ -76,17 +76,10 @@
 ISC_LANG_BEGINDECLS
 
 /*****
-***** Labels
-*****
-***** A 'label' is basically a region.  It contains one DNS wire format
-***** label of type 00 (ordinary).
-*****/
-
-/*****
 ***** Names
 *****
 ***** A 'name' is a handle to a binary region.  It contains a sequence of one
-***** or more DNS wire format labels of type 00 (ordinary).
+***** or more DNS wire format labels.
 ***** Note that all names are not required to end with the root label,
 ***** as they are in the actual DNS wire protocol.
 *****/
@@ -105,32 +98,29 @@ struct dns_name {
 	unsigned char *ndata;
 	unsigned int   length;
 	unsigned int   labels;
-	unsigned int   attributes;
+	struct dns_name_attrs {
+		bool absolute	  : 1; /*%< Used by name.c */
+		bool readonly	  : 1; /*%< Used by name.c */
+		bool dynamic	  : 1; /*%< Used by name.c */
+		bool dynoffsets	  : 1; /*%< Used by name.c */
+		bool nocompress	  : 1; /*%< Used by name.c */
+		bool cache	  : 1; /*%< Used by resolver. */
+		bool answer	  : 1; /*%< Used by resolver. */
+		bool ncache	  : 1; /*%< Used by resolver. */
+		bool chaining	  : 1; /*%< Used by resolver. */
+		bool chase	  : 1; /*%< Used by resolver. */
+		bool wildcard	  : 1; /*%< Used by server. */
+		bool prerequisite : 1; /*%< Used by client. */
+		bool update	  : 1; /*%< Used by client. */
+		bool hasupdaterec : 1; /*%< Used by client. */
+	} attributes;
 	unsigned char *offsets;
-	isc_buffer_t * buffer;
+	isc_buffer_t  *buffer;
 	ISC_LINK(dns_name_t) link;
 	ISC_LIST(dns_rdataset_t) list;
 };
 
 #define DNS_NAME_MAGIC ISC_MAGIC('D', 'N', 'S', 'n')
-
-#define DNS_NAMEATTR_ABSOLUTE	0x00000001
-#define DNS_NAMEATTR_READONLY	0x00000002
-#define DNS_NAMEATTR_DYNAMIC	0x00000004
-#define DNS_NAMEATTR_DYNOFFSETS 0x00000008
-#define DNS_NAMEATTR_NOCOMPRESS 0x00000010
-/*
- * Attributes below 0x0100 reserved for name.c usage.
- */
-#define DNS_NAMEATTR_CACHE	  0x00000100 /*%< Used by resolver. */
-#define DNS_NAMEATTR_ANSWER	  0x00000200 /*%< Used by resolver. */
-#define DNS_NAMEATTR_NCACHE	  0x00000400 /*%< Used by resolver. */
-#define DNS_NAMEATTR_CHAINING	  0x00000800 /*%< Used by resolver. */
-#define DNS_NAMEATTR_CHASE	  0x00001000 /*%< Used by resolver. */
-#define DNS_NAMEATTR_WILDCARD	  0x00002000 /*%< Used by server. */
-#define DNS_NAMEATTR_PREREQUISITE 0x00004000 /*%< Used by client. */
-#define DNS_NAMEATTR_UPDATE	  0x00008000 /*%< Used by client. */
-#define DNS_NAMEATTR_HASUPDATEREC 0x00010000 /*%< Used by client. */
 
 /*
  * Various flags.
@@ -142,8 +132,8 @@ struct dns_name {
 #define DNS_NAME_CHECKMX	0x0010 /*%< Used by rdata. */
 #define DNS_NAME_CHECKMXFAIL	0x0020 /*%< Used by rdata. */
 
-LIBDNS_EXTERNAL_DATA extern const dns_name_t *dns_rootname;
-LIBDNS_EXTERNAL_DATA extern const dns_name_t *dns_wildcardname;
+extern const dns_name_t *dns_rootname;
+extern const dns_name_t *dns_wildcardname;
 
 /*%<
  * DNS_NAME_INITNONABSOLUTE and DNS_NAME_INITABSOLUTE are macros for
@@ -168,33 +158,37 @@ LIBDNS_EXTERNAL_DATA extern const dns_name_t *dns_wildcardname;
 #define DNS_NAME_INITNONABSOLUTE(A, B)                         \
 	{                                                      \
 		DNS_NAME_MAGIC, A, (sizeof(A) - 1), sizeof(B), \
-			DNS_NAMEATTR_READONLY, B, NULL,        \
+			{ .readonly = true }, B, NULL,         \
 			{ (void *)-1, (void *)-1 }, {          \
 			NULL, NULL                             \
 		}                                              \
 	}
 
-#define DNS_NAME_INITABSOLUTE(A, B)                                       \
-	{                                                                 \
-		DNS_NAME_MAGIC, A, sizeof(A), sizeof(B),                  \
-			DNS_NAMEATTR_READONLY | DNS_NAMEATTR_ABSOLUTE, B, \
-			NULL, { (void *)-1, (void *)-1 }, {               \
-			NULL, NULL                                        \
-		}                                                         \
+#define DNS_NAME_INITABSOLUTE(A, B)                                      \
+	{                                                                \
+		DNS_NAME_MAGIC, A, sizeof(A), sizeof(B),                 \
+			{ .readonly = true, .absolute = true }, B, NULL, \
+			{ (void *)-1, (void *)-1 }, {                    \
+			NULL, NULL                                       \
+		}                                                        \
 	}
 
-#define DNS_NAME_INITEMPTY                                 \
-	{                                                  \
-		DNS_NAME_MAGIC, NULL, 0, 0, 0, NULL, NULL, \
-			{ (void *)-1, (void *)-1 }, {      \
-			NULL, NULL                         \
-		}                                          \
+#define DNS_NAME_INITEMPTY                                  \
+	{                                                   \
+		DNS_NAME_MAGIC, NULL, 0, 0, {}, NULL, NULL, \
+			{ (void *)-1, (void *)-1 }, {       \
+			NULL, NULL                          \
+		}                                           \
 	}
 
 /*%
- * Standard size of a wire format name
+ * Standard sizes of a wire format name
  */
-#define DNS_NAME_MAXWIRE 255
+#define DNS_NAME_MAXWIRE   255
+#define DNS_NAME_MAXLABELS 128
+#define DNS_NAME_LABELLEN  63
+
+typedef unsigned char dns_offsets_t[DNS_NAME_MAXLABELS];
 
 /*
  * Text output filter procedure.
@@ -243,7 +237,7 @@ dns_name_reset(dns_name_t *name);
  *	  is retained but the buffer itself is cleared.
  *
  * \li	+ Of the attributes associated with 'name', all are retained except
- *	  DNS_NAMEATTR_ABSOLUTE.
+ *	  the absolute flag.
  *
  * Requires:
  * \li	'name' is a valid name.
@@ -349,29 +343,14 @@ dns_name_iswildcard(const dns_name_t *name);
  * \li	FALSE		The least significant label of 'name' is not '*'.
  */
 
-unsigned int
-dns_name_hash(const dns_name_t *name, bool case_sensitive);
+uint32_t
+dns_name_hash(const dns_name_t *name);
 /*%<
  * Provide a hash value for 'name'.
  *
- * Note: if 'case_sensitive' is false, then names which differ only in
- * case will have the same hash value.
- *
- * Requires:
- * \li	'name' is a valid name
- *
- * Returns:
- * \li	A hash value
- */
-
-unsigned int
-dns_name_fullhash(const dns_name_t *name, bool case_sensitive);
-/*%<
- * Provide a hash value for 'name'.  Unlike dns_name_hash(), this function
- * always takes into account of the entire name to calculate the hash value.
- *
- * Note: if 'case_sensitive' is false, then names which differ only in
- * case will have the same hash value.
+ * Note: This function always takes into account of the entire name to calculate
+ * the hash value. The names which differ only in case will have the same hash
+ * value.
  *
  * Requires:
  *\li	'name' is a valid name
@@ -673,8 +652,7 @@ dns_name_fromregion(dns_name_t *name, const isc_region_t *r);
  *	so far converted.  A maximum of 255 bytes is converted.
  *
  * Requires:
- * \li	The data in 'r' is a sequence of one or more type 00 or type 01000001
- *	labels.
+ * \li	The data in 'r' is a sequence of one or more type 00 labels.
  */
 
 void
@@ -690,8 +668,7 @@ dns_name_toregion(const dns_name_t *name, isc_region_t *r);
  */
 
 isc_result_t
-dns_name_fromwire(dns_name_t *name, isc_buffer_t *source,
-		  dns_decompress_t *dctx, unsigned int options,
+dns_name_fromwire(dns_name_t *name, isc_buffer_t *source, dns_decompress_t dctx,
 		  isc_buffer_t *target);
 /*%<
  * Copy the possibly-compressed name at source (active region) into target,
@@ -699,9 +676,6 @@ dns_name_fromwire(dns_name_t *name, isc_buffer_t *source,
  *
  * Notes:
  * \li	Decompression policy is controlled by 'dctx'.
- *
- * \li	If DNS_NAME_DOWNCASE is set, any uppercase letters in 'source' will be
- *	downcased when they are copied into 'target'.
  *
  * Security:
  *
@@ -723,13 +697,12 @@ dns_name_fromwire(dns_name_t *name, isc_buffer_t *source,
  *
  * \li	'dctx' is a valid decompression context.
  *
+ * \li	DNS_NAME_DOWNCASE is not set.
+ *
  * Ensures:
  *
  *	If result is success:
- * \li	 	If 'target' is not NULL, 'name' is attached to it.
- *
- * \li		Uppercase letters are downcased in the copy iff
- *		DNS_NAME_DOWNCASE is set in options.
+ * \li		If 'target' is not NULL, 'name' is attached to it.
  *
  * \li		The current location in source is advanced, and the used space
  *		in target is updated.
@@ -742,23 +715,18 @@ dns_name_fromwire(dns_name_t *name, isc_buffer_t *source,
  * \li	Bad Form: Compression type not allowed
  * \li	Bad Form: Bad compression pointer
  * \li	Bad Form: Input too short
- * \li	Resource Limit: Too many compression pointers
  * \li	Resource Limit: Not enough space in buffer
  */
 
 isc_result_t
 dns_name_towire(const dns_name_t *name, dns_compress_t *cctx,
-		isc_buffer_t *target);
-isc_result_t
-dns_name_towire2(const dns_name_t *name, dns_compress_t *cctx,
-		 isc_buffer_t *target, uint16_t *comp_offsetp);
+		isc_buffer_t *target, uint16_t *comp_offsetp);
 /*%<
  * Convert 'name' into wire format, compressing it as specified by the
  * compression context 'cctx', and storing the result in 'target'.
  *
  * Notes:
- * \li	If the compression context allows global compression, then the
- *	global compression table may be updated.
+ * \li	If compression is permitted, then the cctx table may be updated.
  *
  * Requires:
  * \li	'name' is a valid name
@@ -769,8 +737,7 @@ dns_name_towire2(const dns_name_t *name, dns_compress_t *cctx,
  *
  * \li	target is a valid buffer.
  *
- * \li	Any offsets specified in a global compression table are valid
- *	for buffer.
+ * \li	Any offsets in the compression table are valid for buffer.
  *
  * Ensures:
  *
@@ -830,30 +797,22 @@ dns_name_fromtext(dns_name_t *name, isc_buffer_t *source,
  */
 
 #define DNS_NAME_OMITFINALDOT 0x01U
-#define DNS_NAME_MASTERFILE   0x02U /* escape $ and @ */
+#define DNS_NAME_PRINCIPAL    0x02U /* do not escape $ and @ */
 
 isc_result_t
-dns_name_toprincipal(const dns_name_t *name, isc_buffer_t *target);
-
-isc_result_t
-dns_name_totext(const dns_name_t *name, bool omit_final_dot,
+dns_name_totext(const dns_name_t *name, unsigned int options,
 		isc_buffer_t *target);
-
-isc_result_t
-dns_name_totext2(const dns_name_t *name, unsigned int options,
-		 isc_buffer_t *target);
 /*%<
  * Convert 'name' into text format, storing the result in 'target'.
  *
  * Notes:
- *\li	If 'omit_final_dot' is true, then the final '.' in absolute
- *	names other than the root name will be omitted.
- *
  *\li	If DNS_NAME_OMITFINALDOT is set in options, then the final '.'
  *	in absolute names other than the root name will be omitted.
  *
- *\li	If DNS_NAME_MASTERFILE is set in options, '$' and '@' will also
- *	be escaped.
+ *\li	If DNS_NAME_PRINCIPAL is set in options, '$' and '@' will *not*
+ *	be escaped; otherwise they will, along with other characters that
+ *	are special in zone files ('"', '(', ')', '.', ';', and '\'),
+ *	which are always escaped.
  *
  *\li	If dns_name_countlabels == 0, the name will be "@", representing the
  *	current origin as described by RFC1035.
@@ -864,9 +823,9 @@ dns_name_totext2(const dns_name_t *name, unsigned int options,
  *
  *\li	'name' is a valid name
  *
- *\li	'target' is a valid buffer.
+ *\li	'target' is a valid buffer
  *
- *\li	if dns_name_isabsolute == FALSE, then omit_final_dot == FALSE
+ *\li	if dns_name_isabsolute is false, then omit_final_dot is false
  *
  * Ensures:
  *
@@ -1190,12 +1149,9 @@ dns_name_tostring(const dns_name_t *source, char **target, isc_mem_t *mctx);
  */
 
 isc_result_t
-dns_name_fromstring(dns_name_t *target, const char *src, unsigned int options,
+dns_name_fromstring(dns_name_t *target, const char *src,
+		    const dns_name_t *origin, unsigned int options,
 		    isc_mem_t *mctx);
-isc_result_t
-dns_name_fromstring2(dns_name_t *target, const char *src,
-		     const dns_name_t *origin, unsigned int options,
-		     isc_mem_t *mctx);
 /*%<
  * Convert a string to a name and place it in target, allocating memory
  * as necessary.  'options' has the same semantics as that of
@@ -1224,10 +1180,8 @@ dns_name_settotextfilter(dns_name_totextfilter_t *proc);
  * Set / clear a thread specific function 'proc' to be called at the
  * end of dns_name_totext().
  *
- * Note: Under Windows you need to call "dns_name_settotextfilter(NULL);"
- * prior to exiting the thread otherwise memory will be leaked.
- * For other platforms, which are pthreads based, this is still a good
- * idea but not required.
+ * Note: It's a good practice to call "dns_name_settotextfilter(NULL);"
+ * prior to exiting the thread.
  *
  * Returns
  *\li	#ISC_R_SUCCESS
@@ -1303,8 +1257,15 @@ dns_name_isula(const dns_name_t *owner);
 
 bool
 dns_name_istat(const dns_name_t *name);
-/*
+/*%<
  * Determine if 'name' is a potential 'trust-anchor-telemetry' name.
+ */
+
+bool
+dns_name_isdnssvcb(const dns_name_t *name);
+/*%<
+ * Determine if 'name' is a dns service name,
+ * i.e. it starts with and optional _port label followed by a _dns label.
  */
 
 ISC_LANG_ENDDECLS
@@ -1321,35 +1282,32 @@ ISC_LANG_ENDDECLS
  * WARNING:  No assertion checking is done for these macros.
  */
 
-#define DNS_NAME_INIT(n, o)                       \
-	do {                                      \
-		dns_name_t *_n = (n);             \
-		/* memset(_n, 0, sizeof(*_n)); */ \
-		_n->magic = DNS_NAME_MAGIC;       \
-		_n->ndata = NULL;                 \
-		_n->length = 0;                   \
-		_n->labels = 0;                   \
-		_n->attributes = 0;               \
-		_n->offsets = (o);                \
-		_n->buffer = NULL;                \
-		ISC_LINK_INIT(_n, link);          \
-		ISC_LIST_INIT(_n->list);          \
+#define DNS_NAME_INIT(n, o)                                 \
+	do {                                                \
+		dns_name_t *_n = (n);                       \
+		/* memset(_n, 0, sizeof(*_n)); */           \
+		_n->magic = DNS_NAME_MAGIC;                 \
+		_n->ndata = NULL;                           \
+		_n->length = 0;                             \
+		_n->labels = 0;                             \
+		_n->attributes = (struct dns_name_attrs){}; \
+		_n->offsets = (o);                          \
+		_n->buffer = NULL;                          \
+		ISC_LINK_INIT(_n, link);                    \
+		ISC_LIST_INIT(_n->list);                    \
 	} while (0)
 
-#define DNS_NAME_RESET(n)                                  \
-	do {                                               \
-		(n)->ndata = NULL;                         \
-		(n)->length = 0;                           \
-		(n)->labels = 0;                           \
-		(n)->attributes &= ~DNS_NAMEATTR_ABSOLUTE; \
-		if ((n)->buffer != NULL)                   \
-			isc_buffer_clear((n)->buffer);     \
+#define DNS_NAME_RESET(n)                              \
+	do {                                           \
+		(n)->ndata = NULL;                     \
+		(n)->length = 0;                       \
+		(n)->labels = 0;                       \
+		(n)->attributes.absolute = false;      \
+		if ((n)->buffer != NULL)               \
+			isc_buffer_clear((n)->buffer); \
 	} while (0)
 
 #define DNS_NAME_SETBUFFER(n, b) (n)->buffer = (b)
-
-#define DNS_NAME_ISABSOLUTE(n) \
-	(((n)->attributes & DNS_NAMEATTR_ABSOLUTE) != 0 ? true : false)
 
 #define DNS_NAME_COUNTLABELS(n) ((n)->labels)
 
@@ -1361,9 +1319,9 @@ ISC_LANG_ENDDECLS
 
 #define DNS_NAME_SPLIT(n, l, p, s)                                             \
 	do {                                                                   \
-		dns_name_t * _n = (n);                                         \
-		dns_name_t * _p = (p);                                         \
-		dns_name_t * _s = (s);                                         \
+		dns_name_t  *_n = (n);                                         \
+		dns_name_t  *_p = (p);                                         \
+		dns_name_t  *_s = (s);                                         \
 		unsigned int _l = (l);                                         \
 		if (_p != NULL)                                                \
 			dns_name_getlabelsequence(_n, 0, _n->labels - _l, _p); \
@@ -1378,10 +1336,8 @@ ISC_LANG_ENDDECLS
 #define dns_name_reset(n)	   DNS_NAME_RESET(n)
 #define dns_name_setbuffer(n, b)   DNS_NAME_SETBUFFER(n, b)
 #define dns_name_countlabels(n)	   DNS_NAME_COUNTLABELS(n)
-#define dns_name_isabsolute(n)	   DNS_NAME_ISABSOLUTE(n)
+#define dns_name_isabsolute(n)	   ((n)->attributes.absolute)
 #define dns_name_toregion(n, r)	   DNS_NAME_TOREGION(n, r)
 #define dns_name_split(n, l, p, s) DNS_NAME_SPLIT(n, l, p, s)
 
 #endif /* DNS_NAME_USEINLINE */
-
-#endif /* DNS_NAME_H */

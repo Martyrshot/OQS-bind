@@ -2,6 +2,8 @@
 ############################################################################
 # Copyright (C) Internet Systems Consortium, Inc. ("ISC")
 #
+# SPDX-License-Identifier: MPL-2.0
+#
 # This Source Code Form is subject to the terms of the Mozilla Public
 # License, v. 2.0. If a copy of the MPL was not distributed with this
 # file, you can obtain one at https://mozilla.org/MPL/2.0/.
@@ -74,20 +76,20 @@ PATH = re.compile(TOP + "/")
 
 S = State()
 
-with open(sys.argv[1], "r", encoding='utf-8') as f:
+with open(sys.argv[1], "r", encoding="utf-8") as f:
     for line in f.readlines():
         if line == "==================\n":
             if not S.inside:
                 S.inside = True
             else:
-                DNAME = sha256(S.last_line.encode('utf-8')).hexdigest()
+                DNAME = sha256(S.last_line.encode("utf-8")).hexdigest()
                 DNAME = os.path.join(OUT, DNAME)
                 if not os.path.isdir(DNAME):
                     os.mkdir(DNAME)
-                FNAME = sha256(S.block.encode('utf-8')).hexdigest() + ".tsan"
+                FNAME = sha256(S.block.encode("utf-8")).hexdigest() + ".txt"
                 FNAME = os.path.join(DNAME, FNAME)
                 if not os.path.isfile(FNAME):
-                    with open(FNAME, "w", encoding='utf-8') as w:
+                    with open(FNAME, "w", encoding="utf-8") as w:
                         w.write(S.block)
                 S.reset()
         else:
@@ -108,13 +110,13 @@ with open(sys.argv[1], "r", encoding='utf-8') as f:
                     S.p_index += 1
             for k, v in S.mutexes.items():
                 r = re.compile(k)
-                line = r.sub("M%s" % v, line)
+                line = r.sub("M{:04d}".format(v), line)
             for k, v in S.threads.items():
                 r = re.compile(k)
-                line = r.sub("T%s" % v, line)
+                line = r.sub("T{:04d}".format(v), line)
             for k, v in S.pointers.items():
                 r = re.compile(k)
-                line = r.sub("0x%s" % str(v).zfill(12), line)
+                line = r.sub("0x{:012d}".format(v), line)
 
             line = STACK.sub("", line)
             line = PID.sub("", line)

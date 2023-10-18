@@ -1,6 +1,8 @@
 /*
  * Copyright (C) Internet Systems Consortium, Inc. ("ISC")
  *
+ * SPDX-License-Identifier: MPL-2.0
+ *
  * This Source Code Form is subject to the terms of the Mozilla Public
  * License, v. 2.0. If a copy of the MPL was not distributed with this
  * file, you can obtain one at https://mozilla.org/MPL/2.0/.
@@ -14,18 +16,16 @@
 #include <errno.h>
 #include <stdio.h>
 #include <string.h>
-#include <uv.h>
 
 #include <isc/errno.h>
 #include <isc/list.h>
 #include <isc/log.h>
 #include <isc/mem.h>
 #include <isc/mutex.h>
-#include <isc/platform.h>
-#include <isc/print.h>
 #include <isc/result.h>
 #include <isc/types.h>
 #include <isc/util.h>
+#include <isc/uv.h>
 
 #include <dns/view.h>
 
@@ -53,7 +53,7 @@ struct ns_plugin {
 };
 
 static ns_hooklist_t default_hooktable[NS_HOOKPOINTS_COUNT];
-LIBNS_EXTERNAL_DATA ns_hooktable_t *ns__hook_table = &default_hooktable;
+ns_hooktable_t *ns__hook_table = &default_hooktable;
 
 isc_result_t
 ns_plugin_expandpath(const char *src, char *dst, size_t dstsize) {
@@ -125,10 +125,11 @@ load_plugin(isc_mem_t *mctx, const char *modpath, ns_plugin_t **pluginp) {
 	REQUIRE(pluginp != NULL && *pluginp == NULL);
 
 	plugin = isc_mem_get(mctx, sizeof(*plugin));
-	memset(plugin, 0, sizeof(*plugin));
-	isc_mem_attach(mctx, &plugin->mctx);
+	*plugin = (ns_plugin_t){
+		.modpath = isc_mem_strdup(mctx, modpath),
+	};
 
-	plugin->modpath = isc_mem_strdup(plugin->mctx, modpath);
+	isc_mem_attach(mctx, &plugin->mctx);
 
 	ISC_LINK_INIT(plugin, link);
 
@@ -294,7 +295,8 @@ ns_hooktable_free(isc_mem_t *mctx, void **tablep) {
 
 	for (i = 0; i < NS_HOOKPOINTS_COUNT; i++) {
 		for (hook = ISC_LIST_HEAD((*table)[i]); hook != NULL;
-		     hook = next) {
+		     hook = next)
+		{
 			next = ISC_LIST_NEXT(hook, link);
 			ISC_LIST_UNLINK((*table)[i], hook, link);
 			if (hook->mctx != NULL) {
@@ -318,10 +320,10 @@ ns_hook_add(ns_hooktable_t *hooktable, isc_mem_t *mctx,
 	REQUIRE(hook != NULL);
 
 	copy = isc_mem_get(mctx, sizeof(*copy));
-	memset(copy, 0, sizeof(*copy));
-
-	copy->action = hook->action;
-	copy->action_data = hook->action_data;
+	*copy = (ns_hook_t){
+		.action = hook->action,
+		.action_data = hook->action_data,
+	};
 	isc_mem_attach(mctx, &copy->mctx);
 
 	ISC_LINK_INIT(copy, link);
@@ -335,7 +337,7 @@ ns_plugins_create(isc_mem_t *mctx, ns_plugins_t **listp) {
 	REQUIRE(listp != NULL && *listp == NULL);
 
 	plugins = isc_mem_get(mctx, sizeof(*plugins));
-	memset(plugins, 0, sizeof(*plugins));
+	*plugins = (ns_plugins_t){ 0 };
 	ISC_LIST_INIT(*plugins);
 
 	*listp = plugins;

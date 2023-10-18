@@ -1,6 +1,15 @@
+<!--
 Copyright (C) Internet Systems Consortium, Inc. ("ISC")
 
-See COPYRIGHT in the source root or https://isc.org/copyright.html for terms.
+SPDX-License-Identifier: MPL-2.0
+
+This Source Code Form is subject to the terms of the Mozilla Public
+License, v. 2.0.  If a copy of the MPL was not distributed with this
+file, you can obtain one at https://mozilla.org/MPL/2.0/.
+
+See the COPYRIGHT file distributed with this work for additional
+information regarding copyright ownership.
+-->
 
 	  CDS / CDNSKEY Child side processing.
 
@@ -20,10 +29,12 @@ See COPYRIGHT in the source root or https://isc.org/copyright.html for terms.
 
   Non-matching CDS and CDNSKEY are removed.
 
-* auto-dnssec maintain should cds and/or cdnskey to zone apex iff the 
-  DNSKEY is published and is signing the DNSKEY RRset.   CDS and CDNSKEY
-  records are only removed if there is a deletion date set (implicit on
-  matching DNSKEY going inactive / unpublished or explicit).
+* dnssec-policy publishes cds and/or cdnskey to zone apex iff the
+  DNSKEY is published, is signing the DNSKEY RRset, and if it has been
+  propagated into caches.
+
+  CDS and CDNSKEY records are removed if the corresponding DNSKEY has
+  been removed from zone and caches.
 
 * UPDATE should check that CDS and CDNSKEY match a active DNSKEY that
   is signing the DNSKEY RRset and ignore otherwise.  This should be

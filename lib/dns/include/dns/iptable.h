@@ -1,6 +1,8 @@
 /*
  * Copyright (C) Internet Systems Consortium, Inc. ("ISC")
  *
+ * SPDX-License-Identifier: MPL-2.0
+ *
  * This Source Code Form is subject to the terms of the Mozilla Public
  * License, v. 2.0. If a copy of the MPL was not distributed with this
  * file, you can obtain one at https://mozilla.org/MPL/2.0/.
@@ -9,8 +11,7 @@
  * information regarding copyright ownership.
  */
 
-#ifndef DNS_IPTABLE_H
-#define DNS_IPTABLE_H 1
+#pragma once
 
 #include <inttypes.h>
 #include <stdbool.h>
@@ -23,7 +24,7 @@
 
 struct dns_iptable {
 	unsigned int	  magic;
-	isc_mem_t *	  mctx;
+	isc_mem_t	 *mctx;
 	isc_refcount_t	  refcount;
 	isc_radix_tree_t *radix;
 	ISC_LINK(dns_iptable_t) nextincache;
@@ -64,5 +65,3 @@ void
 dns_iptable_detach(dns_iptable_t **tabp);
 
 ISC_LANG_ENDDECLS
-
-#endif /* DNS_IPTABLE_H */

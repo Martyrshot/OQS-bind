@@ -1,9 +1,11 @@
 #!/bin/sh
-#
+
 # Copyright (C) Internet Systems Consortium, Inc. ("ISC")
 #
+# SPDX-License-Identifier: MPL-2.0
+#
 # This Source Code Form is subject to the terms of the Mozilla Public
-# License, v. 2.0. If a copy of the MPL was not distributed with this
+# License, v. 2.0.  If a copy of the MPL was not distributed with this
 # file, you can obtain one at https://mozilla.org/MPL/2.0/.
 #
 # See the COPYRIGHT file distributed with this work for additional
@@ -16,12 +18,20 @@
 #
 $SHELL clean.sh
 
+if $FEATURETEST --have-fips-dh
+then
+	copy_setports ns1/tls.conf.in ns1/tls.conf
+	copy_setports ns1/tls.options.in ns1/tls.options
+else
+	: > ns1/tls.conf
+	: > ns1/tls.options
+fi
 copy_setports ns1/named.conf.in ns1/named.conf
 copy_setports ns2/named.conf.in ns2/named.conf
 copy_setports ns3/named.conf.in ns3/named.conf
 copy_setports ns5/named.conf.in ns5/named.conf
 copy_setports ns6/named.conf.in ns6/named.conf
-copy_setports ns7/named.conf.in ns7/named.conf
+copy_setports ns7/named1.conf.in ns7/named.conf
 copy_setports ns8/named.conf.in ns8/named.conf
 
 # If "tkey-gssapi-credential" is set in the configuration and GSSAPI support is
@@ -49,6 +59,7 @@ sed 's/example.nil/unixtime.nil/g' ns1/example1.db > ns1/unixtime.db
 sed 's/example.nil/yyyymmddvv.nil/g' ns1/example1.db > ns1/yyyymmddvv.db
 sed 's/example.nil/keytests.nil/g' ns1/example1.db > ns1/keytests.db
 cp -f ns3/example.db.in ns3/example.db
+cp -f ns3/relaxed.db.in ns3/relaxed.db
 cp -f ns3/too-big.test.db.in ns3/too-big.test.db
 
 # update_test.pl has its own zone file because it
@@ -70,12 +81,27 @@ EOF
 
 $TSIGKEYGEN ddns-key.example.nil > ns1/ddns.key
 
-$TSIGKEYGEN -a hmac-md5 md5-key > ns1/md5.key
+if $FEATURETEST --md5; then
+	$TSIGKEYGEN -a hmac-md5 md5-key > ns1/md5.key
+else
+	echo "/* MD5 NOT SUPPORTED */" > ns1/md5.key
+fi
 $TSIGKEYGEN -a hmac-sha1 sha1-key > ns1/sha1.key
 $TSIGKEYGEN -a hmac-sha224 sha224-key > ns1/sha224.key
 $TSIGKEYGEN -a hmac-sha256 sha256-key > ns1/sha256.key
 $TSIGKEYGEN -a hmac-sha384 sha384-key > ns1/sha384.key
 $TSIGKEYGEN -a hmac-sha512 sha512-key > ns1/sha512.key
+
+if $FEATURETEST --md5; then
+	echo 'key "legacy-157" { algorithm "hmac-md5"; secret "mGcDSCx/fF121GOVJlITLg=="; };' > ns1/legacy157.key
+else
+	echo "/* MD5 NOT SUPPORTED */" > ns1/legacy157.key
+fi
+echo 'key "legacy-161" { algorithm "hmac-sha1"; secret "N80fGvcr8JifzRUJ62R4rQ=="; };' > ns1/legacy161.key
+echo 'key "legacy-162" { algorithm "hmac-sha224"; secret "nSIKzFAGS7/tvBs8JteI+Q=="; };' > ns1/legacy162.key
+echo 'key "legacy-163" { algorithm "hmac-sha256"; secret "CvaupxnDeES3HnlYhTq53w=="; };' > ns1/legacy163.key
+echo 'key "legacy-164" { algorithm "hmac-sha384"; secret "wDldBJwJrYfPoL1Pj4ucOQ=="; };' > ns1/legacy164.key
+echo 'key "legacy-165" { algorithm "hmac-sha512"; secret "OgZrTcEa8P76hVY+xyN7Wg=="; };' > ns1/legacy165.key
 
 (cd ns3; $SHELL -e sign.sh)
 

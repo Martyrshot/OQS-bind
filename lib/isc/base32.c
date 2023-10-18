@@ -1,6 +1,8 @@
 /*
  * Copyright (C) Internet Systems Consortium, Inc. ("ISC")
  *
+ * SPDX-License-Identifier: MPL-2.0
+ *
  * This Source Code Form is subject to the terms of the Mozilla Public
  * License, v. 2.0. If a copy of the MPL was not distributed with this
  * file, you can obtain one at https://mozilla.org/MPL/2.0/.
@@ -147,19 +149,7 @@ typedef struct {
 	bool pad;	  /*%< Expect padding */
 } base32_decode_ctx_t;
 
-static inline void
-base32_decode_init(base32_decode_ctx_t *ctx, int length, const char base[],
-		   bool pad, isc_buffer_t *target) {
-	ctx->digits = 0;
-	ctx->seen_end = false;
-	ctx->seen_32 = 0;
-	ctx->length = length;
-	ctx->target = target;
-	ctx->base = base;
-	ctx->pad = pad;
-}
-
-static inline isc_result_t
+static isc_result_t
 base32_decode_char(base32_decode_ctx_t *ctx, int c) {
 	const char *s;
 	unsigned int last;
@@ -267,7 +257,7 @@ base32_decode_char(base32_decode_ctx_t *ctx, int c) {
 	return (ISC_R_SUCCESS);
 }
 
-static inline isc_result_t
+static isc_result_t
 base32_decode_finish(base32_decode_ctx_t *ctx) {
 	if (ctx->length > 0) {
 		return (ISC_R_UNEXPECTEDEND);
@@ -291,14 +281,14 @@ static isc_result_t
 base32_tobuffer(isc_lex_t *lexer, const char base[], bool pad,
 		isc_buffer_t *target, int length) {
 	unsigned int before, after;
-	base32_decode_ctx_t ctx;
+	base32_decode_ctx_t ctx = {
+		.length = length, .base = base, .target = target, .pad = pad
+	};
 	isc_textregion_t *tr;
 	isc_token_t token;
 	bool eol;
 
 	REQUIRE(length >= -2);
-
-	base32_decode_init(&ctx, length, base, pad, target);
 
 	before = isc_buffer_usedlength(target);
 	while (!ctx.seen_end && (ctx.length != 0)) {
@@ -348,9 +338,10 @@ isc_base32hexnp_tobuffer(isc_lex_t *lexer, isc_buffer_t *target, int length) {
 static isc_result_t
 base32_decodestring(const char *cstr, const char base[], bool pad,
 		    isc_buffer_t *target) {
-	base32_decode_ctx_t ctx;
+	base32_decode_ctx_t ctx = {
+		.length = -1, .base = base, .target = target, .pad = pad
+	};
 
-	base32_decode_init(&ctx, -1, base, pad, target);
 	for (;;) {
 		int c = *cstr++;
 		if (c == '\0') {
@@ -383,9 +374,10 @@ isc_base32hexnp_decodestring(const char *cstr, isc_buffer_t *target) {
 static isc_result_t
 base32_decoderegion(isc_region_t *source, const char base[], bool pad,
 		    isc_buffer_t *target) {
-	base32_decode_ctx_t ctx;
+	base32_decode_ctx_t ctx = {
+		.length = -1, .base = base, .target = target, .pad = pad
+	};
 
-	base32_decode_init(&ctx, -1, base, pad, target);
 	while (source->length != 0) {
 		int c = *source->base;
 		RETERR(base32_decode_char(&ctx, c));

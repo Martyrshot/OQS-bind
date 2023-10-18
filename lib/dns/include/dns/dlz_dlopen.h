@@ -1,6 +1,8 @@
 /*
  * Copyright (C) Internet Systems Consortium, Inc. ("ISC")
  *
+ * SPDX-License-Identifier: MPL-2.0
+ *
  * This Source Code Form is subject to the terms of the Mozilla Public
  * License, v. 2.0. If a copy of the MPL was not distributed with this
  * file, you can obtain one at https://mozilla.org/MPL/2.0/.
@@ -11,8 +13,7 @@
 
 /*! \file dns/dlz_dlopen.h */
 
-#ifndef DLZ_DLOPEN_H
-#define DLZ_DLOPEN_H
+#pragma once
 
 #include <inttypes.h>
 #include <stdbool.h>
@@ -56,7 +57,7 @@ dlz_dlopen_destroy_t(void *dbdata);
 typedef isc_result_t
 dlz_dlopen_findzonedb_t(void *dbdata, const char *name,
 			dns_clientinfomethods_t *methods,
-			dns_clientinfo_t *	 clientinfo);
+			dns_clientinfo_t	*clientinfo);
 
 /*
  * dlz_dlopen_lookup() is required for all DLZ external drivers
@@ -153,5 +154,3 @@ dlz_dlopen_delrdataset_t(const char *name, const char *type, void *dbdata,
 			 void *version);
 
 ISC_LANG_ENDDECLS
-
-#endif /* ifndef DLZ_DLOPEN_H */

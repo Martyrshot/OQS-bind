@@ -1,6 +1,8 @@
 /*
  * Copyright (C) Internet Systems Consortium, Inc. ("ISC")
  *
+ * SPDX-License-Identifier: MPL-2.0
+ *
  * This Source Code Form is subject to the terms of the Mozilla Public
  * License, v. 2.0. If a copy of the MPL was not distributed with this
  * file, you can obtain one at https://mozilla.org/MPL/2.0/.
@@ -9,13 +11,24 @@
  * information regarding copyright ownership.
  */
 
+#include <inttypes.h>
+#include <sys/stat.h>
+
 #include <isc/os.h>
+#include <isc/types.h>
+#include <isc/util.h>
+
+#include "os_p.h"
+
+static unsigned int isc__os_ncpus = 0;
+static unsigned long isc__os_cacheline = ISC_OS_CACHELINE_SIZE;
+static mode_t isc__os_umask = 0;
 
 #ifdef HAVE_SYSCONF
 
 #include <unistd.h>
 
-static inline long
+static long
 sysconf_ncpus(void) {
 #if defined(_SC_NPROCESSORS_ONLN)
 	return (sysconf((_SC_NPROCESSORS_ONLN)));
@@ -46,21 +59,55 @@ sysctl_ncpus(void) {
 }
 #endif /* if defined(HAVE_SYS_SYSCTL_H) && defined(HAVE_SYSCTLBYNAME) */
 
-unsigned int
-isc_os_ncpus(void) {
-	long ncpus = 0;
-
+static void
+ncpus_initialize(void) {
 #if defined(HAVE_SYSCONF)
-	ncpus = sysconf_ncpus();
+	isc__os_ncpus = sysconf_ncpus();
 #endif /* if defined(HAVE_SYSCONF) */
 #if defined(HAVE_SYS_SYSCTL_H) && defined(HAVE_SYSCTLBYNAME)
-	if (ncpus <= 0) {
-		ncpus = sysctl_ncpus();
+	if (isc__os_ncpus <= 0) {
+		isc__os_ncpus = sysctl_ncpus();
 	}
 #endif /* if defined(HAVE_SYS_SYSCTL_H) && defined(HAVE_SYSCTLBYNAME) */
-	if (ncpus <= 0) {
-		ncpus = 1;
+	if (isc__os_ncpus == 0) {
+		isc__os_ncpus = 1;
 	}
+}
 
-	return ((unsigned int)ncpus);
+static void
+umask_initialize(void) {
+	isc__os_umask = umask(0);
+	(void)umask(isc__os_umask);
+}
+
+unsigned int
+isc_os_ncpus(void) {
+	return (isc__os_ncpus);
+}
+
+unsigned long
+isc_os_cacheline(void) {
+	return (isc__os_cacheline);
+}
+
+mode_t
+isc_os_umask(void) {
+	return (isc__os_umask);
+}
+
+void
+isc__os_initialize(void) {
+	umask_initialize();
+	ncpus_initialize();
+#if defined(HAVE_SYSCONF) && defined(_SC_LEVEL1_DCACHE_LINESIZE)
+	long s = sysconf(_SC_LEVEL1_DCACHE_LINESIZE);
+	if (s > 0 && (unsigned long)s > isc__os_cacheline) {
+		isc__os_cacheline = s;
+	}
+#endif
+}
+
+void
+isc__os_shutdown(void) {
+	/* empty, but defined for completeness */;
 }

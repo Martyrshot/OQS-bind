@@ -1,6 +1,8 @@
 /*
  * Copyright (C) Internet Systems Consortium, Inc. ("ISC")
  *
+ * SPDX-License-Identifier: MPL-2.0
+ *
  * This Source Code Form is subject to the terms of the Mozilla Public
  * License, v. 2.0. If a copy of the MPL was not distributed with this
  * file, you can obtain one at https://mozilla.org/MPL/2.0/.
@@ -9,14 +11,20 @@
  * information regarding copyright ownership.
  */
 
-#ifndef ISC_HASH_H
-#define ISC_HASH_H 1
+#pragma once
 
 #include <inttypes.h>
 #include <stdbool.h>
 
-#include "isc/lang.h"
-#include "isc/types.h"
+#include <isc/assertions.h>
+#include <isc/lang.h>
+#include <isc/types.h>
+#include <isc/util.h>
+
+#define ISC_HASHSIZE(bits)  (UINT64_C(1) << (bits))
+#define ISC_HASH_OVERCOMMIT 3
+#define ISC_HASH_MIN_BITS   2U
+#define ISC_HASH_MAX_BITS   32U
 
 /***
  *** Functions
@@ -59,6 +67,26 @@ isc_hash64(const void *data, const size_t length, const bool case_sensitive);
  * \li 32 or 64-bit hash value
  */
 
-ISC_LANG_ENDDECLS
+/*!
+ * \brief Return a hash value of a specified number of bits
+ *
+ * This function uses Fibonacci Hashing to convert a 32 bit hash value
+ * 'val' into a smaller hash value of up to 'bits' bits. This results
+ * in better hash table distribution than the use of modulo.
+ *
+ * Requires:
+ * \li 'bits' is less than 32.
+ *
+ * Returns:
+ * \li a hash value of length 'bits'.
+ */
+#define ISC_HASH_GOLDENRATIO_32 0x61C88647
 
-#endif /* ISC_HASH_H */
+static inline uint32_t
+isc_hash_bits32(uint32_t val, unsigned int bits) {
+	ISC_REQUIRE(bits <= ISC_HASH_MAX_BITS);
+	/* High bits are more random. */
+	return (val * ISC_HASH_GOLDENRATIO_32 >> (32 - bits));
+}
+
+ISC_LANG_ENDDECLS

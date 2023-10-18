@@ -1,6 +1,8 @@
 /*
  * Copyright (C) Internet Systems Consortium, Inc. ("ISC")
  *
+ * SPDX-License-Identifier: MPL-2.0
+ *
  * This Source Code Form is subject to the terms of the Mozilla Public
  * License, v. 2.0. If a copy of the MPL was not distributed with this
  * file, you can obtain one at https://mozilla.org/MPL/2.0/.
@@ -9,8 +11,7 @@
  * information regarding copyright ownership.
  */
 
-#ifndef ISC_REGION_H
-#define ISC_REGION_H 1
+#pragma once
 
 /*! \file isc/region.h */
 
@@ -23,7 +24,7 @@ struct isc_region {
 };
 
 struct isc_textregion {
-	char *	     base;
+	char	    *base;
 	unsigned int length;
 };
 
@@ -31,12 +32,12 @@ struct isc_textregion {
  * discussing the region api.
  */
 struct isc_constregion {
-	const void * base;
+	const void  *base;
 	unsigned int length;
 };
 
 struct isc_consttextregion {
-	const char * base;
+	const char  *base;
 	unsigned int length;
 };
 
@@ -92,5 +93,3 @@ isc_region_compare(isc_region_t *r1, isc_region_t *r2);
  */
 
 ISC_LANG_ENDDECLS
-
-#endif /* ISC_REGION_H */

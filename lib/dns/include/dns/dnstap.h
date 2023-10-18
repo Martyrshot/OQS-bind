@@ -1,6 +1,8 @@
 /*
  * Copyright (C) Internet Systems Consortium, Inc. ("ISC")
  *
+ * SPDX-License-Identifier: MPL-2.0
+ *
  * This Source Code Form is subject to the terms of the Mozilla Public
  * License, v. 2.0. If a copy of the MPL was not distributed with this
  * file, you can obtain one at https://mozilla.org/MPL/2.0/.
@@ -9,8 +11,7 @@
  * information regarding copyright ownership.
  */
 
-#ifndef _DNSTAP_H
-#define _DNSTAP_H
+#pragma once
 
 /*****
 ***** Module Info
@@ -116,7 +117,7 @@ struct dns_dtdata {
 
 isc_result_t
 dns_dt_create(isc_mem_t *mctx, dns_dtmode_t mode, const char *path,
-	      struct fstrm_iothr_options **foptp, isc_task_t *reopen_task,
+	      struct fstrm_iothr_options **foptp, isc_loop_t *loop,
 	      dns_dtenv_t **envp);
 /*%<
  * Create and initialize the dnstap environment.
@@ -137,10 +138,10 @@ dns_dt_create(isc_mem_t *mctx, dns_dtmode_t mode, const char *path,
  *	should also be set.  Other options may be set if desired.
  *	If dns_dt_create succeeds the *foptp is set to NULL.
  *
- *\li	'reopen_task' needs to be set to the task in the context of which
+ *\li	'loop' needs to be set to the loop in which
  *	dns_dt_reopen() will be called.  This is not an optional parameter:
- *	using dns_dt_create() (which sets 'reopen_task' to NULL) is only
- *	allowed in unit tests.
+ *	using dns_dt_create() with 'loop' set to NULL is only allowed in
+ *	unit tests.
  *
  * Requires:
  *
@@ -390,5 +391,3 @@ dns_dt_close(dns_dthandle_t **handlep);
  *
  *\li	'*handlep' is not NULL
  */
-
-#endif /* _DNSTAP_H */

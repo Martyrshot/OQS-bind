@@ -1,6 +1,8 @@
 /*
  * Copyright (C) Internet Systems Consortium, Inc. ("ISC")
  *
+ * SPDX-License-Identifier: MPL-2.0
+ *
  * This Source Code Form is subject to the terms of the Mozilla Public
  * License, v. 2.0. If a copy of the MPL was not distributed with this
  * file, you can obtain one at https://mozilla.org/MPL/2.0/.
@@ -9,8 +11,7 @@
  * information regarding copyright ownership.
  */
 
-#ifndef DNS_RRITERATOR_H
-#define DNS_RRITERATOR_H 1
+#pragma once
 
 /*****
 ***** Module Info
@@ -54,11 +55,11 @@ ISC_LANG_BEGINDECLS
 typedef struct dns_rriterator {
 	unsigned int	    magic;
 	isc_result_t	    result;
-	dns_db_t *	    db;
-	dns_dbiterator_t *  dbit;
-	dns_dbversion_t *   ver;
+	dns_db_t	   *db;
+	dns_dbiterator_t   *dbit;
+	dns_dbversion_t	   *ver;
 	isc_stdtime_t	    now;
-	dns_dbnode_t *	    node;
+	dns_dbnode_t	   *node;
 	dns_fixedname_t	    fixedname;
 	dns_rdatasetiter_t *rdatasetit;
 	dns_rdataset_t	    rdataset;
@@ -176,5 +177,3 @@ dns_rriterator_destroy(dns_rriterator_t *it);
  */
 
 ISC_LANG_ENDDECLS
-
-#endif /* DNS_RRITERATOR_H */

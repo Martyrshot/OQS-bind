@@ -1,6 +1,8 @@
 /*
  * Copyright (C) Internet Systems Consortium, Inc. ("ISC")
  *
+ * SPDX-License-Identifier: MPL-2.0
+ *
  * This Source Code Form is subject to the terms of the Mozilla Public
  * License, v. 2.0. If a copy of the MPL was not distributed with this
  * file, you can obtain one at https://mozilla.org/MPL/2.0/.
@@ -14,6 +16,7 @@
 #include <stdbool.h>
 
 #include <isc/log.h>
+#include <isc/result.h>
 #include <isc/string.h>
 #include <isc/util.h>
 
@@ -24,7 +27,6 @@
 #include <dns/rdataset.h>
 #include <dns/rdatasetiter.h>
 #include <dns/rdatastruct.h>
-#include <dns/result.h>
 
 #include <dst/dst.h>
 
@@ -126,7 +128,7 @@ dns_nsec_buildrdata(dns_db_t *db, dns_dbversion_t *version, dns_dbnode_t *node,
 	max_type = dns_rdatatype_nsec;
 	dns_rdataset_init(&rdataset);
 	rdsiter = NULL;
-	result = dns_db_allrdatasets(db, node, version, 0, &rdsiter);
+	result = dns_db_allrdatasets(db, node, version, 0, 0, &rdsiter);
 	if (result != ISC_R_SUCCESS) {
 		return (result);
 	}
@@ -154,7 +156,8 @@ dns_nsec_buildrdata(dns_db_t *db, dns_dbversion_t *version, dns_dbnode_t *node,
 	{
 		for (i = 0; i <= max_type; i++) {
 			if (dns_nsec_isset(bm, i) &&
-			    !dns_rdatatype_iszonecutauth((dns_rdatatype_t)i)) {
+			    !dns_rdatatype_iszonecutauth((dns_rdatatype_t)i))
+			{
 				dns_nsec_setbit(bm, i, 0);
 			}
 		}
@@ -193,7 +196,7 @@ dns_nsec_build(dns_db_t *db, dns_dbversion_t *version, dns_dbnode_t *node,
 	rdatalist.type = dns_rdatatype_nsec;
 	rdatalist.ttl = ttl;
 	ISC_LIST_APPEND(rdatalist.rdata, &rdata, link);
-	RETERR(dns_rdatalist_tordataset(&rdatalist, &rdataset));
+	dns_rdatalist_tordataset(&rdatalist, &rdataset);
 	result = dns_db_addrdataset(db, node, version, 0, &rdataset, 0, NULL);
 	if (result == DNS_R_UNCHANGED) {
 		result = ISC_R_SUCCESS;
@@ -245,7 +248,8 @@ dns_nsec_typepresent(dns_rdata_t *nsec, dns_rdatatype_t type) {
 }
 
 isc_result_t
-dns_nsec_nseconly(dns_db_t *db, dns_dbversion_t *version, bool *answer) {
+dns_nsec_nseconly(dns_db_t *db, dns_dbversion_t *version, dns_diff_t *diff,
+		  bool *answer) {
 	dns_dbnode_t *node = NULL;
 	dns_rdataset_t rdataset;
 	dns_rdata_dnskey_t dnskey;
@@ -280,8 +284,35 @@ dns_nsec_nseconly(dns_db_t *db, dns_dbversion_t *version, bool *answer) {
 		RUNTIME_CHECK(result == ISC_R_SUCCESS);
 
 		if (dnskey.algorithm == DST_ALG_RSAMD5 ||
-		    dnskey.algorithm == DST_ALG_RSASHA1) {
-			break;
+		    dnskey.algorithm == DST_ALG_DSA ||
+		    dnskey.algorithm == DST_ALG_RSASHA1)
+		{
+			bool deleted = false;
+			if (diff != NULL) {
+				for (dns_difftuple_t *tuple =
+					     ISC_LIST_HEAD(diff->tuples);
+				     tuple != NULL;
+				     tuple = ISC_LIST_NEXT(tuple, link))
+				{
+					if (tuple->rdata.type !=
+						    dns_rdatatype_dnskey ||
+					    tuple->op != DNS_DIFFOP_DEL)
+					{
+						continue;
+					}
+
+					if (dns_rdata_compare(
+						    &rdata, &tuple->rdata) == 0)
+					{
+						deleted = true;
+						break;
+					}
+				}
+			}
+
+			if (!deleted) {
+				break;
+			}
 		}
 	}
 	dns_rdataset_disassociate(&rdataset);
@@ -327,6 +358,16 @@ dns_nsec_noexistnodata(dns_rdatatype_t type, const dns_name_t *name,
 		return (result);
 	}
 	dns_rdataset_current(nsecset, &rdata);
+
+#ifdef notyet
+	if (!dns_nsec_typepresent(&rdata, dns_rdatatype_rrsig) ||
+	    !dns_nsec_typepresent(&rdata, dns_rdatatype_nsec))
+	{
+		(*logit)(arg, ISC_LOG_DEBUG(3),
+			 "NSEC missing RRSIG and/or NSEC from type map");
+		return (ISC_R_IGNORE);
+	}
+#endif
 
 	(*logit)(arg, ISC_LOG_DEBUG(3), "looking for relevant NSEC");
 	relation = dns_name_fullcompare(name, nsecname, &order, &olabels);
@@ -459,4 +500,33 @@ dns_nsec_noexistnodata(dns_rdatatype_t type, const dns_name_t *name,
 	(*logit)(arg, ISC_LOG_DEBUG(3), "nsec range ok");
 	*exists = false;
 	return (ISC_R_SUCCESS);
+}
+
+bool
+dns_nsec_requiredtypespresent(dns_rdataset_t *nsecset) {
+	dns_rdataset_t rdataset;
+	isc_result_t result;
+	bool found = false;
+
+	REQUIRE(DNS_RDATASET_VALID(nsecset));
+	REQUIRE(nsecset->type == dns_rdatatype_nsec);
+
+	dns_rdataset_init(&rdataset);
+	dns_rdataset_clone(nsecset, &rdataset);
+
+	for (result = dns_rdataset_first(&rdataset); result == ISC_R_SUCCESS;
+	     result = dns_rdataset_next(&rdataset))
+	{
+		dns_rdata_t rdata = DNS_RDATA_INIT;
+		dns_rdataset_current(&rdataset, &rdata);
+		if (!dns_nsec_typepresent(&rdata, dns_rdatatype_nsec) ||
+		    !dns_nsec_typepresent(&rdata, dns_rdatatype_rrsig))
+		{
+			dns_rdataset_disassociate(&rdataset);
+			return (false);
+		}
+		found = true;
+	}
+	dns_rdataset_disassociate(&rdataset);
+	return (found);
 }

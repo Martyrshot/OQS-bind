@@ -1,6 +1,8 @@
 /*
  * Copyright (C) Internet Systems Consortium, Inc. ("ISC")
  *
+ * SPDX-License-Identifier: MPL-2.0 and MIT
+ *
  * This Source Code Form is subject to the terms of the Mozilla Public
  * License, v. 2.0. If a copy of the MPL was not distributed with this
  * file, you can obtain one at https://mozilla.org/MPL/2.0/.
@@ -275,7 +277,7 @@ parse_url_char(state_t s, const char ch) {
 			return (s_dead);
 		}
 
-		/* FALLTHROUGH */
+		FALLTHROUGH;
 	case s_req_server_start:
 	case s_req_server:
 		if (ch == '/') {
@@ -397,7 +399,7 @@ http_parse_host_char(host_state_t s, const char ch) {
 			return (s_http_host);
 		}
 
-		/* FALLTHROUGH */
+		FALLTHROUGH;
 	case s_http_host_v6_end:
 		if (ch == ':') {
 			return (s_http_host_port_start);
@@ -410,7 +412,7 @@ http_parse_host_char(host_state_t s, const char ch) {
 			return (s_http_host_v6_end);
 		}
 
-		/* FALLTHROUGH */
+		FALLTHROUGH;
 	case s_http_host_v6_start:
 		if (isxdigit((unsigned char)ch) || ch == ':' || ch == '.') {
 			return (s_http_host_v6);
@@ -426,7 +428,7 @@ http_parse_host_char(host_state_t s, const char ch) {
 			return (s_http_host_v6_end);
 		}
 
-		/* FALLTHROUGH */
+		FALLTHROUGH;
 	case s_http_host_v6_zone_start:
 		/* RFC 6874 Zone ID consists of 1*( unreserved / pct-encoded) */
 		if (isalnum((unsigned char)ch) || ch == '%' || ch == '.' ||
@@ -576,7 +578,7 @@ isc_url_parse(const char *buf, size_t buflen, bool is_connect,
 
 		case s_req_server_with_at:
 			found_at = 1;
-			/* FALLTHROUGH */
+			FALLTHROUGH;
 		case s_req_server:
 			uf = ISC_UF_HOST;
 			break;
@@ -594,8 +596,7 @@ isc_url_parse(const char *buf, size_t buflen, bool is_connect,
 			break;
 
 		default:
-			INSIST(0);
-			ISC_UNREACHABLE();
+			UNREACHABLE();
 		}
 
 		/* Nothing's changed; soldier on */
@@ -630,7 +631,8 @@ isc_url_parse(const char *buf, size_t buflen, bool is_connect,
 
 	/* CONNECT requests can only contain "hostname:port" */
 	if (is_connect &&
-	    up->field_set != ((1 << ISC_UF_HOST) | (1 << ISC_UF_PORT))) {
+	    up->field_set != ((1 << ISC_UF_HOST) | (1 << ISC_UF_PORT)))
+	{
 		return (ISC_R_FAILURE);
 	}
 

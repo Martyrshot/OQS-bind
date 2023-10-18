@@ -1,9 +1,11 @@
 #!/bin/sh -e
-#
+
 # Copyright (C) Internet Systems Consortium, Inc. ("ISC")
 #
+# SPDX-License-Identifier: MPL-2.0
+#
 # This Source Code Form is subject to the terms of the Mozilla Public
-# License, v. 2.0. If a copy of the MPL was not distributed with this
+# License, v. 2.0.  If a copy of the MPL was not distributed with this
 # file, you can obtain one at https://mozilla.org/MPL/2.0/.
 #
 # See the COPYRIGHT file distributed with this work for additional
@@ -11,7 +13,7 @@
 
 . ../conf.sh
 
-$SHELL clean.sh 
+$SHELL clean.sh
 
 copy_setports ns2/named1.conf.in ns2/named.conf
 
@@ -24,10 +26,4 @@ copy_setports ns2/named-alt6.conf.in ns2/named-alt6.conf
 copy_setports ns2/named-alt7.conf.in ns2/named-alt7.conf
 
 mkdir ns2/nope
-
-if [ 1 = "${CYGWIN:-0}" ]
-then
-    setfacl -s user::r-x,group::r-x,other::r-x ns2/nope
-else
-    chmod 555 ns2/nope
-fi
+chmod 555 ns2/nope

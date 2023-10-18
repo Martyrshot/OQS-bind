@@ -1,6 +1,8 @@
 /*
  * Copyright (C) Internet Systems Consortium, Inc. ("ISC")
  *
+ * SPDX-License-Identifier: MPL-2.0
+ *
  * This Source Code Form is subject to the terms of the Mozilla Public
  * License, v. 2.0. If a copy of the MPL was not distributed with this
  * file, you can obtain one at https://mozilla.org/MPL/2.0/.
@@ -25,47 +27,34 @@
 #include <dns/keyvalues.h>
 #include <dns/log.h>
 
+#include <dst/dst.h>
+
+/* Default TTLsig (maximum zone ttl) */
+#define DEFAULT_TTLSIG 604800 /* one week */
+
 isc_result_t
 dns_kasp_create(isc_mem_t *mctx, const char *name, dns_kasp_t **kaspp) {
 	dns_kasp_t *kasp;
+	dns_kasp_t k = {
+		.magic = DNS_KASP_MAGIC,
+		.digests = ISC_LIST_INITIALIZER,
+		.keys = ISC_LIST_INITIALIZER,
+		.link = ISC_LINK_INITIALIZER,
+	};
 
 	REQUIRE(name != NULL);
 	REQUIRE(kaspp != NULL && *kaspp == NULL);
 
 	kasp = isc_mem_get(mctx, sizeof(*kasp));
+	*kasp = k;
+
 	kasp->mctx = NULL;
 	isc_mem_attach(mctx, &kasp->mctx);
-
 	kasp->name = isc_mem_strdup(mctx, name);
 	isc_mutex_init(&kasp->lock);
-	kasp->frozen = false;
-
 	isc_refcount_init(&kasp->references, 1);
 
-	ISC_LINK_INIT(kasp, link);
-
-	kasp->signatures_refresh = DNS_KASP_SIG_REFRESH;
-	kasp->signatures_validity = DNS_KASP_SIG_VALIDITY;
-	kasp->signatures_validity_dnskey = DNS_KASP_SIG_VALIDITY_DNSKEY;
-
-	ISC_LIST_INIT(kasp->keys);
-
-	kasp->dnskey_ttl = DNS_KASP_KEY_TTL;
-	kasp->publish_safety = DNS_KASP_PUBLISH_SAFETY;
-	kasp->retire_safety = DNS_KASP_RETIRE_SAFETY;
-	kasp->purge_keys = DNS_KASP_PURGE_KEYS;
-
-	kasp->zone_max_ttl = DNS_KASP_ZONE_MAXTTL;
-	kasp->zone_propagation_delay = DNS_KASP_ZONE_PROPDELAY;
-
-	kasp->parent_ds_ttl = DNS_KASP_DS_TTL;
-	kasp->parent_propagation_delay = DNS_KASP_PARENT_PROPDELAY;
-
-	kasp->nsec3 = false;
-
-	kasp->magic = DNS_KASP_MAGIC;
 	*kaspp = kasp;
-
 	return (ISC_R_SUCCESS);
 }
 
@@ -78,10 +67,10 @@ dns_kasp_attach(dns_kasp_t *source, dns_kasp_t **targetp) {
 	*targetp = source;
 }
 
-static inline void
+static void
 destroy(dns_kasp_t *kasp) {
-	dns_kasp_key_t *key;
-	dns_kasp_key_t *key_next;
+	dns_kasp_key_t *key, *key_next;
+	dns_kasp_digest_t *digest, *digest_next;
 
 	REQUIRE(!ISC_LINK_LINKED(kasp, link));
 
@@ -91,6 +80,15 @@ destroy(dns_kasp_t *kasp) {
 		dns_kasp_key_destroy(key);
 	}
 	INSIST(ISC_LIST_EMPTY(kasp->keys));
+
+	for (digest = ISC_LIST_HEAD(kasp->digests); digest != NULL;
+	     digest = digest_next)
+	{
+		digest_next = ISC_LIST_NEXT(digest, link);
+		ISC_LIST_UNLINK(kasp->digests, digest, link);
+		isc_mem_put(kasp->mctx, digest, sizeof(*digest));
+	}
+	INSIST(ISC_LIST_EMPTY(kasp->digests));
 
 	isc_mutex_destroy(&kasp->lock);
 	isc_mem_free(kasp->mctx, kasp->name);
@@ -252,11 +250,30 @@ dns_kasp_setretiresafety(dns_kasp_t *kasp, uint32_t value) {
 	kasp->retire_safety = value;
 }
 
-dns_ttl_t
-dns_kasp_zonemaxttl(dns_kasp_t *kasp) {
+bool
+dns_kasp_inlinesigning(dns_kasp_t *kasp) {
 	REQUIRE(DNS_KASP_VALID(kasp));
 	REQUIRE(kasp->frozen);
 
+	return (kasp->inline_signing);
+}
+
+void
+dns_kasp_setinlinesigning(dns_kasp_t *kasp, bool value) {
+	REQUIRE(DNS_KASP_VALID(kasp));
+	REQUIRE(!kasp->frozen);
+
+	kasp->inline_signing = value;
+}
+
+dns_ttl_t
+dns_kasp_zonemaxttl(dns_kasp_t *kasp, bool fallback) {
+	REQUIRE(DNS_KASP_VALID(kasp));
+	REQUIRE(kasp->frozen);
+
+	if (kasp->zone_max_ttl == 0 && fallback) {
+		return (DEFAULT_TTLSIG);
+	}
 	return (kasp->zone_max_ttl);
 }
 
@@ -522,4 +539,55 @@ dns_kasp_setnsec3param(dns_kasp_t *kasp, uint8_t iter, bool optout,
 	kasp->nsec3param.iterations = iter;
 	kasp->nsec3param.optout = optout;
 	kasp->nsec3param.saltlen = saltlen;
+}
+
+bool
+dns_kasp_cdnskey(dns_kasp_t *kasp) {
+	REQUIRE(kasp != NULL);
+	REQUIRE(kasp->frozen);
+
+	return kasp->cdnskey;
+}
+
+void
+dns_kasp_setcdnskey(dns_kasp_t *kasp, bool cdnskey) {
+	REQUIRE(kasp != NULL);
+	REQUIRE(!kasp->frozen);
+
+	kasp->cdnskey = cdnskey;
+}
+
+dns_kasp_digestlist_t
+dns_kasp_digests(dns_kasp_t *kasp) {
+	REQUIRE(DNS_KASP_VALID(kasp));
+	REQUIRE(kasp->frozen);
+
+	return (kasp->digests);
+}
+
+void
+dns_kasp_adddigest(dns_kasp_t *kasp, dns_dsdigest_t alg) {
+	dns_kasp_digest_t *digest;
+
+	REQUIRE(DNS_KASP_VALID(kasp));
+	REQUIRE(!kasp->frozen);
+
+	/* Suppress unsupported algorithms */
+	if (!dst_ds_digest_supported(alg)) {
+		return;
+	}
+
+	/* Suppress duplicates */
+	for (dns_kasp_digest_t *d = ISC_LIST_HEAD(kasp->digests); d != NULL;
+	     d = ISC_LIST_NEXT(d, link))
+	{
+		if (d->digest == alg) {
+			return;
+		}
+	}
+
+	digest = isc_mem_get(kasp->mctx, sizeof(*digest));
+	digest->digest = alg;
+	ISC_LINK_INIT(digest, link);
+	ISC_LIST_APPEND(kasp->digests, digest, link);
 }

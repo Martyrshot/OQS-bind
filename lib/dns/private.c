@@ -1,6 +1,8 @@
 /*
  * Copyright (C) Internet Systems Consortium, Inc. ("ISC")
  *
+ * SPDX-License-Identifier: MPL-2.0
+ *
  * This Source Code Form is subject to the terms of the Mozilla Public
  * License, v. 2.0. If a copy of the MPL was not distributed with this
  * file, you can obtain one at https://mozilla.org/MPL/2.0/.
@@ -12,7 +14,6 @@
 #include <stdbool.h>
 
 #include <isc/base64.h>
-#include <isc/print.h>
 #include <isc/result.h>
 #include <isc/string.h>
 #include <isc/types.h>
@@ -70,7 +71,8 @@ ignore(dns_rdata_t *param, dns_rdataset_t *privateset) {
 
 		dns_rdataset_current(privateset, &private);
 		if (!dns_nsec3param_fromprivate(&private, &rdata, buf,
-						sizeof(buf))) {
+						sizeof(buf)))
+		{
 			continue;
 		}
 		/*
@@ -176,7 +178,8 @@ dns_private_chains(dns_db_t *db, dns_dbversion_t *ver,
 
 			dns_rdataset_current(&privateset, &private);
 			if (!dns_nsec3param_fromprivate(&private, &rdata, buf,
-							sizeof(buf))) {
+							sizeof(buf)))
+			{
 				continue;
 			}
 			if (REMOVE(rdata.data[1])) {
@@ -213,7 +216,8 @@ dns_private_chains(dns_db_t *db, dns_dbversion_t *ver,
 
 			dns_rdataset_current(&privateset, &private);
 			if (!dns_nsec3param_fromprivate(&private, &rdata, buf,
-							sizeof(buf))) {
+							sizeof(buf)))
+			{
 				continue;
 			}
 			if (CREATE(rdata.data[1])) {
@@ -281,7 +285,8 @@ dns_private_chains(dns_db_t *db, dns_dbversion_t *ver,
 
 		dns_rdataset_current(&privateset, &private);
 		if (!dns_nsec3param_fromprivate(&private, &rdata, buf,
-						sizeof(buf))) {
+						sizeof(buf)))
+		{
 			/*
 			 * Look for record that says we are signing the
 			 * zone with a key.
@@ -345,7 +350,8 @@ dns_private_totext(dns_rdata_t *private, isc_buffer_t *buf) {
 		isc_buffer_t b;
 
 		if (!dns_nsec3param_fromprivate(private, &rdata, nsec3buf,
-						sizeof(nsec3buf))) {
+						sizeof(nsec3buf)))
+		{
 			CHECK(ISC_R_FAILURE);
 		}
 
@@ -381,7 +387,8 @@ dns_private_totext(dns_rdata_t *private, isc_buffer_t *buf) {
 	} else if (private->length == 5) {
 		unsigned char alg = private->data[0];
 		dns_keytag_t keyid = (private->data[2] | private->data[1] << 8);
-		char keybuf[BUFSIZ], algbuf[DNS_SECALG_FORMATSIZE];
+		char keybuf[DNS_SECALG_FORMATSIZE + BUFSIZ],
+			algbuf[DNS_SECALG_FORMATSIZE];
 		bool del = private->data[3];
 		bool complete = private->data[4];
 

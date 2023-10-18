@@ -1,6 +1,8 @@
 /*
  * Copyright (C) Internet Systems Consortium, Inc. ("ISC")
  *
+ * SPDX-License-Identifier: MPL-2.0
+ *
  * This Source Code Form is subject to the terms of the Mozilla Public
  * License, v. 2.0. If a copy of the MPL was not distributed with this
  * file, you can obtain one at https://mozilla.org/MPL/2.0/.
@@ -9,8 +11,7 @@
  * information regarding copyright ownership.
  */
 
-#ifndef DNS_KEYMGR_H
-#define DNS_KEYMGR_H 1
+#pragma once
 
 /*! \file dns/keymgr.h */
 
@@ -128,5 +129,3 @@ dns_keymgr_status(dns_kasp_t *kasp, dns_dnsseckeylist_t *keyring,
  */
 
 ISC_LANG_ENDDECLS
-
-#endif /* DNS_KEYMGR_H */

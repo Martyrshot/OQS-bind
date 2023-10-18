@@ -1,6 +1,8 @@
 /*
  * Copyright (C) Internet Systems Consortium, Inc. ("ISC")
  *
+ * SPDX-License-Identifier: MPL-2.0
+ *
  * This Source Code Form is subject to the terms of the Mozilla Public
  * License, v. 2.0. If a copy of the MPL was not distributed with this
  * file, you can obtain one at https://mozilla.org/MPL/2.0/.
@@ -9,10 +11,22 @@
  * information regarding copyright ownership.
  */
 
-#ifndef ISC_LIST_H
-#define ISC_LIST_H 1
+#pragma once
 
 #include <isc/assertions.h>
+
+#define ISC_LINK_TOMBSTONE(type) ((type *)-1)
+
+#define ISC_LIST_INITIALIZER                \
+	{                                   \
+		.head = NULL, .tail = NULL, \
+	}
+#define ISC_LINK_INITIALIZER_TYPE(type)           \
+	{                                         \
+		.prev = ISC_LINK_TOMBSTONE(type), \
+		.next = ISC_LINK_TOMBSTONE(type), \
+	}
+#define ISC_LINK_INITIALIZER ISC_LINK_INITIALIZER_TYPE(void)
 
 #ifdef ISC_LIST_CHECKINIT
 #define ISC_LINK_INSIST(x) ISC_INSIST(x)
@@ -34,13 +48,15 @@
 	struct {                   \
 		type *prev, *next; \
 	}
-#define ISC_LINK_INIT_TYPE(elt, link, type)      \
-	do {                                     \
-		(elt)->link.prev = (type *)(-1); \
-		(elt)->link.next = (type *)(-1); \
+#define ISC_LINK_INIT_TYPE(elt, link, type)                  \
+	do {                                                 \
+		(elt)->link.prev = ISC_LINK_TOMBSTONE(type); \
+		(elt)->link.next = ISC_LINK_TOMBSTONE(type); \
 	} while (0)
-#define ISC_LINK_INIT(elt, link)   ISC_LINK_INIT_TYPE(elt, link, void)
-#define ISC_LINK_LINKED(elt, link) ((void *)((elt)->link.prev) != (void *)(-1))
+#define ISC_LINK_INIT(elt, link) ISC_LINK_INIT_TYPE(elt, link, void)
+#define ISC_LINK_LINKED_TYPE(elt, link, type) \
+	((type *)((elt)->link.prev) != ISC_LINK_TOMBSTONE(type))
+#define ISC_LINK_LINKED(elt, link) ISC_LINK_LINKED_TYPE(elt, link, void)
 
 #define ISC_LIST_HEAD(list)  ((list).head)
 #define ISC_LIST_TAIL(list)  ((list).tail)
@@ -102,8 +118,8 @@
 			ISC_INSIST((list).head == (elt));               \
 			(list).head = (elt)->link.next;                 \
 		}                                                       \
-		(elt)->link.prev = (type *)(-1);                        \
-		(elt)->link.next = (type *)(-1);                        \
+		(elt)->link.prev = ISC_LINK_TOMBSTONE(type);            \
+		(elt)->link.next = ISC_LINK_TOMBSTONE(type);            \
 		ISC_INSIST((list).head != (elt));                       \
 		ISC_INSIST((list).tail != (elt));                       \
 	} while (0)
@@ -198,4 +214,30 @@
 #define __ISC_LIST_DEQUEUEUNSAFE_TYPE(list, elt, link, type) \
 	__ISC_LIST_UNLINKUNSAFE_TYPE(list, elt, link, type)
 
-#endif /* ISC_LIST_H */
+#define ISC_LIST_MOVEUNSAFE(dest, src)    \
+	{                                 \
+		(dest).head = (src).head; \
+		(dest).tail = (src).tail; \
+		(src).head = NULL;        \
+		(src).tail = NULL;        \
+	}
+
+#define ISC_LIST_MOVE(dest, src)                \
+	{                                       \
+		INSIST(ISC_LIST_EMPTY(dest));   \
+		ISC_LIST_MOVEUNSAFE(dest, src); \
+	}
+
+/* clang-format off */
+#define ISC_LIST_FOREACH(list, elt, link)	\
+	for (elt = ISC_LIST_HEAD(list);		\
+	     elt != NULL;			\
+	     elt = ISC_LIST_NEXT(elt, link))
+/* clang-format on */
+
+/* clang-format off */
+#define ISC_LIST_FOREACH_SAFE(list, elt, link, next)						\
+	for (elt = ISC_LIST_HEAD(list), next = (elt != NULL) ? ISC_LIST_NEXT(elt, link) : NULL;	\
+	     elt != NULL;									\
+	     elt = next, next = (elt != NULL) ? ISC_LIST_NEXT(elt, link) : NULL)
+/* clang-format on */

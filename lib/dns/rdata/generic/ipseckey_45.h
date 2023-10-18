@@ -1,6 +1,8 @@
 /*
  * Copyright (C) Internet Systems Consortium, Inc. ("ISC")
  *
+ * SPDX-License-Identifier: MPL-2.0
+ *
  * This Source Code Form is subject to the terms of the Mozilla Public
  * License, v. 2.0. If a copy of the MPL was not distributed with this
  * file, you can obtain one at https://mozilla.org/MPL/2.0/.
@@ -9,8 +11,7 @@
  * information regarding copyright ownership.
  */
 
-#ifndef GENERIC_IPSECKEY_45_H
-#define GENERIC_IPSECKEY_45_H 1
+#pragma once
 
 typedef struct dns_rdata_ipseckey {
 	dns_rdatacommon_t common;
@@ -24,5 +25,3 @@ typedef struct dns_rdata_ipseckey {
 	unsigned char *key;
 	uint16_t keylength;
 } dns_rdata_ipseckey_t;
-
-#endif /* GENERIC_IPSECKEY_45_H */

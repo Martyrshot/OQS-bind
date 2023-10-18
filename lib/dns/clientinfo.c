@@ -1,6 +1,8 @@
 /*
  * Copyright (C) Internet Systems Consortium, Inc. ("ISC")
  *
+ * SPDX-License-Identifier: MPL-2.0
+ *
  * This Source Code Form is subject to the terms of the Mozilla Public
  * License, v. 2.0. If a copy of the MPL was not distributed with this
  * file, you can obtain one at https://mozilla.org/MPL/2.0/.
@@ -12,6 +14,7 @@
 /*! \file */
 
 #include <dns/clientinfo.h>
+#include <dns/ecs.h>
 
 void
 dns_clientinfomethods_init(dns_clientinfomethods_t *methods,
@@ -26,4 +29,14 @@ dns_clientinfo_init(dns_clientinfo_t *ci, void *data, void *versionp) {
 	ci->version = DNS_CLIENTINFO_VERSION;
 	ci->data = data;
 	ci->dbversion = versionp;
+	dns_ecs_init(&ci->ecs);
+}
+
+void
+dns_clientinfo_setecs(dns_clientinfo_t *ci, dns_ecs_t *ecs) {
+	if (ecs != NULL) {
+		ci->ecs = *ecs;
+	} else {
+		dns_ecs_init(&ci->ecs);
+	}
 }

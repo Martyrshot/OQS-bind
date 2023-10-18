@@ -1,6 +1,8 @@
 /*
  * Copyright (C) Internet Systems Consortium, Inc. ("ISC")
  *
+ * SPDX-License-Identifier: MPL-2.0
+ *
  * This Source Code Form is subject to the terms of the Mozilla Public
  * License, v. 2.0. If a copy of the MPL was not distributed with this
  * file, you can obtain one at https://mozilla.org/MPL/2.0/.
@@ -9,8 +11,7 @@
  * information regarding copyright ownership.
  */
 
-#ifndef GENERIC_NAPTR_35_H
-#define GENERIC_NAPTR_35_H 1
+#pragma once
 
 /*!
  *  \brief Per RFC2915 */
@@ -28,5 +29,3 @@ typedef struct dns_rdata_naptr {
 	uint8_t regexp_len;
 	dns_name_t replacement;
 } dns_rdata_naptr_t;
-
-#endif /* GENERIC_NAPTR_35_H */

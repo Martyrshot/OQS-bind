@@ -1,6 +1,8 @@
 /*
  * Copyright (C) Internet Systems Consortium, Inc. ("ISC")
  *
+ * SPDX-License-Identifier: MPL-2.0
+ *
  * This Source Code Form is subject to the terms of the Mozilla Public
  * License, v. 2.0. If a copy of the MPL was not distributed with this
  * file, you can obtain one at https://mozilla.org/MPL/2.0/.
@@ -9,8 +11,7 @@
  * information regarding copyright ownership.
  */
 
-#ifndef DNS_DBITERATOR_H
-#define DNS_DBITERATOR_H 1
+#pragma once
 
 /*****
 ***** Module Info
@@ -67,15 +68,16 @@ ISC_LANG_BEGINDECLS
 *****/
 
 typedef struct dns_dbiteratormethods {
-	void (*destroy)(dns_dbiterator_t **iteratorp);
-	isc_result_t (*first)(dns_dbiterator_t *iterator);
-	isc_result_t (*last)(dns_dbiterator_t *iterator);
-	isc_result_t (*seek)(dns_dbiterator_t *iterator,
-			     const dns_name_t *name);
-	isc_result_t (*prev)(dns_dbiterator_t *iterator);
-	isc_result_t (*next)(dns_dbiterator_t *iterator);
+	void (*destroy)(dns_dbiterator_t **iteratorp DNS__DB_FLARG);
+	isc_result_t (*first)(dns_dbiterator_t *iterator DNS__DB_FLARG);
+	isc_result_t (*last)(dns_dbiterator_t *iterator DNS__DB_FLARG);
+	isc_result_t (*seek)(dns_dbiterator_t	   *iterator,
+			     const dns_name_t *name DNS__DB_FLARG);
+	isc_result_t (*prev)(dns_dbiterator_t *iterator DNS__DB_FLARG);
+	isc_result_t (*next)(dns_dbiterator_t *iterator DNS__DB_FLARG);
 	isc_result_t (*current)(dns_dbiterator_t *iterator,
-				dns_dbnode_t **nodep, dns_name_t *name);
+				dns_dbnode_t	**nodep,
+				dns_name_t *name  DNS__DB_FLARG);
 	isc_result_t (*pause)(dns_dbiterator_t *iterator);
 	isc_result_t (*origin)(dns_dbiterator_t *iterator, dns_name_t *name);
 } dns_dbiteratormethods_t;
@@ -96,13 +98,14 @@ struct dns_dbiterator {
 	/* Unlocked. */
 	unsigned int		 magic;
 	dns_dbiteratormethods_t *methods;
-	dns_db_t *		 db;
+	dns_db_t		*db;
 	bool			 relative_names;
-	bool			 cleaning;
 };
 
+#define dns_dbiterator_destroy(iteratorp) \
+	dns__dbiterator_destroy(iteratorp DNS__DB_FILELINE)
 void
-dns_dbiterator_destroy(dns_dbiterator_t **iteratorp);
+dns__dbiterator_destroy(dns_dbiterator_t **iteratorp DNS__DB_FLARG);
 /*%<
  * Destroy '*iteratorp'.
  *
@@ -117,8 +120,10 @@ dns_dbiterator_destroy(dns_dbiterator_t **iteratorp);
  *\li	*iteratorp == NULL.
  */
 
+#define dns_dbiterator_first(iterator) \
+	dns__dbiterator_first(iterator DNS__DB_FILELINE)
 isc_result_t
-dns_dbiterator_first(dns_dbiterator_t *iterator);
+dns__dbiterator_first(dns_dbiterator_t *iterator DNS__DB_FLARG);
 /*%<
  * Move the node cursor to the first node in the database (if any).
  *
@@ -132,8 +137,10 @@ dns_dbiterator_first(dns_dbiterator_t *iterator);
  *\li	Other results are possible, depending on the DB implementation.
  */
 
+#define dns_dbiterator_last(iterator) \
+	dns__dbiterator_last(iterator DNS__DB_FILELINE)
 isc_result_t
-dns_dbiterator_last(dns_dbiterator_t *iterator);
+dns__dbiterator_last(dns_dbiterator_t *iterator DNS__DB_FLARG);
 /*%<
  * Move the node cursor to the last node in the database (if any).
  *
@@ -147,8 +154,11 @@ dns_dbiterator_last(dns_dbiterator_t *iterator);
  *\li	Other results are possible, depending on the DB implementation.
  */
 
+#define dns_dbiterator_seek(iterator, name) \
+	dns__dbiterator_seek(iterator, name DNS__DB_FILELINE)
 isc_result_t
-dns_dbiterator_seek(dns_dbiterator_t *iterator, const dns_name_t *name);
+dns__dbiterator_seek(dns_dbiterator_t	   *iterator,
+		     const dns_name_t *name DNS__DB_FLARG);
 /*%<
  * Move the node cursor to the node with name 'name'.
  *
@@ -166,8 +176,10 @@ dns_dbiterator_seek(dns_dbiterator_t *iterator, const dns_name_t *name);
  *\li	Other results are possible, depending on the DB implementation.
  */
 
+#define dns_dbiterator_prev(iterator) \
+	dns__dbiterator_prev(iterator DNS__DB_FILELINE)
 isc_result_t
-dns_dbiterator_prev(dns_dbiterator_t *iterator);
+dns__dbiterator_prev(dns_dbiterator_t *iterator DNS__DB_FLARG);
 /*%<
  * Move the node cursor to the previous node in the database (if any).
  *
@@ -182,8 +194,10 @@ dns_dbiterator_prev(dns_dbiterator_t *iterator);
  *\li	Other results are possible, depending on the DB implementation.
  */
 
+#define dns_dbiterator_next(iterator) \
+	dns__dbiterator_next(iterator DNS__DB_FILELINE)
 isc_result_t
-dns_dbiterator_next(dns_dbiterator_t *iterator);
+dns__dbiterator_next(dns_dbiterator_t *iterator DNS__DB_FLARG);
 /*%<
  * Move the node cursor to the next node in the database (if any).
  *
@@ -198,9 +212,11 @@ dns_dbiterator_next(dns_dbiterator_t *iterator);
  *\li	Other results are possible, depending on the DB implementation.
  */
 
+#define dns_dbiterator_current(iterator, nodep, name) \
+	dns__dbiterator_current(iterator, nodep, name DNS__DB_FILELINE)
 isc_result_t
-dns_dbiterator_current(dns_dbiterator_t *iterator, dns_dbnode_t **nodep,
-		       dns_name_t *name);
+dns__dbiterator_current(dns_dbiterator_t *iterator, dns_dbnode_t **nodep,
+			dns_name_t *name DNS__DB_FLARG);
 /*%<
  * Return the current node.
  *
@@ -274,18 +290,4 @@ dns_dbiterator_origin(dns_dbiterator_t *iterator, dns_name_t *name);
  *\li	Other results are possible, depending on the DB implementation.
  */
 
-void
-dns_dbiterator_setcleanmode(dns_dbiterator_t *iterator, bool mode);
-/*%<
- * Indicate that the given iterator is/is not cleaning the DB.
- *
- * Notes:
- *\li	When 'mode' is true,
- *
- * Requires:
- *\li	'iterator' is a valid iterator.
- */
-
 ISC_LANG_ENDDECLS
-
-#endif /* DNS_DBITERATOR_H */

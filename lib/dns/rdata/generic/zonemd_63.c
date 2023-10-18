@@ -1,6 +1,8 @@
 /*
  * Copyright (C) Internet Systems Consortium, Inc. ("ISC")
  *
+ * SPDX-License-Identifier: MPL-2.0
+ *
  * This Source Code Form is subject to the terms of the Mozilla Public
  * License, v. 2.0. If a copy of the MPL was not distributed with this
  * file, you can obtain one at https://mozilla.org/MPL/2.0/.
@@ -16,7 +18,7 @@
 
 #define RRTYPE_ZONEMD_ATTRIBUTES 0
 
-static inline isc_result_t
+static isc_result_t
 fromtext_zonemd(ARGS_FROMTEXT) {
 	isc_token_t token;
 	int digest_type, length;
@@ -75,7 +77,7 @@ fromtext_zonemd(ARGS_FROMTEXT) {
 	return (result);
 }
 
-static inline isc_result_t
+static isc_result_t
 totext_zonemd(ARGS_TOTEXT) {
 	isc_region_t sr;
 	char buf[sizeof("0123456789")];
@@ -138,7 +140,7 @@ totext_zonemd(ARGS_TOTEXT) {
 	return (ISC_R_SUCCESS);
 }
 
-static inline isc_result_t
+static isc_result_t
 fromwire_zonemd(ARGS_FROMWIRE) {
 	isc_region_t sr;
 	size_t digestlen = 0;
@@ -146,7 +148,6 @@ fromwire_zonemd(ARGS_FROMWIRE) {
 	UNUSED(type);
 	UNUSED(rdclass);
 	UNUSED(dctx);
-	UNUSED(options);
 
 	isc_buffer_activeregion(source, &sr);
 
@@ -190,7 +191,7 @@ fromwire_zonemd(ARGS_FROMWIRE) {
 	return (mem_tobuffer(target, sr.base, sr.length));
 }
 
-static inline isc_result_t
+static isc_result_t
 towire_zonemd(ARGS_TOWIRE) {
 	isc_region_t sr;
 
@@ -203,7 +204,7 @@ towire_zonemd(ARGS_TOWIRE) {
 	return (mem_tobuffer(target, sr.base, sr.length));
 }
 
-static inline int
+static int
 compare_zonemd(ARGS_COMPARE) {
 	isc_region_t r1;
 	isc_region_t r2;
@@ -219,7 +220,7 @@ compare_zonemd(ARGS_COMPARE) {
 	return (isc_region_compare(&r1, &r2));
 }
 
-static inline isc_result_t
+static isc_result_t
 fromstruct_zonemd(ARGS_FROMSTRUCT) {
 	dns_rdata_zonemd_t *zonemd = source;
 
@@ -246,7 +247,7 @@ fromstruct_zonemd(ARGS_FROMSTRUCT) {
 	return (mem_tobuffer(target, zonemd->digest, zonemd->length));
 }
 
-static inline isc_result_t
+static isc_result_t
 tostruct_zonemd(ARGS_TOSTRUCT) {
 	dns_rdata_zonemd_t *zonemd = target;
 	isc_region_t region;
@@ -270,15 +271,11 @@ tostruct_zonemd(ARGS_TOSTRUCT) {
 	zonemd->length = region.length;
 
 	zonemd->digest = mem_maybedup(mctx, region.base, region.length);
-	if (zonemd->digest == NULL) {
-		return (ISC_R_NOMEMORY);
-	}
-
 	zonemd->mctx = mctx;
 	return (ISC_R_SUCCESS);
 }
 
-static inline void
+static void
 freestruct_zonemd(ARGS_FREESTRUCT) {
 	dns_rdata_zonemd_t *zonemd = source;
 
@@ -295,18 +292,19 @@ freestruct_zonemd(ARGS_FREESTRUCT) {
 	zonemd->mctx = NULL;
 }
 
-static inline isc_result_t
+static isc_result_t
 additionaldata_zonemd(ARGS_ADDLDATA) {
 	REQUIRE(rdata->type == dns_rdatatype_zonemd);
 
 	UNUSED(rdata);
+	UNUSED(owner);
 	UNUSED(add);
 	UNUSED(arg);
 
 	return (ISC_R_SUCCESS);
 }
 
-static inline isc_result_t
+static isc_result_t
 digest_zonemd(ARGS_DIGEST) {
 	isc_region_t r;
 
@@ -317,7 +315,7 @@ digest_zonemd(ARGS_DIGEST) {
 	return ((digest)(arg, &r));
 }
 
-static inline bool
+static bool
 checkowner_zonemd(ARGS_CHECKOWNER) {
 	REQUIRE(type == dns_rdatatype_zonemd);
 
@@ -329,7 +327,7 @@ checkowner_zonemd(ARGS_CHECKOWNER) {
 	return (true);
 }
 
-static inline bool
+static bool
 checknames_zonemd(ARGS_CHECKNAMES) {
 	REQUIRE(rdata->type == dns_rdatatype_zonemd);
 
@@ -340,7 +338,7 @@ checknames_zonemd(ARGS_CHECKNAMES) {
 	return (true);
 }
 
-static inline int
+static int
 casecompare_zonemd(ARGS_COMPARE) {
 	return (compare_zonemd(rdata1, rdata2));
 }

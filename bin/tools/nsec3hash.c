@@ -1,6 +1,8 @@
 /*
  * Copyright (C) Internet Systems Consortium, Inc. ("ISC")
  *
+ * SPDX-License-Identifier: MPL-2.0
+ *
  * This Source Code Form is subject to the terms of the Mozilla Public
  * License, v. 2.0. If a copy of the MPL was not distributed with this
  * file, you can obtain one at https://mozilla.org/MPL/2.0/.
@@ -20,9 +22,9 @@
 #include <isc/file.h>
 #include <isc/hex.h>
 #include <isc/iterated_hash.h>
-#include <isc/print.h>
 #include <isc/result.h>
 #include <isc/string.h>
+#include <isc/tls.h>
 #include <isc/types.h>
 #include <isc/util.h>
 
@@ -33,7 +35,7 @@
 
 const char *program = "nsec3hash";
 
-ISC_NORETURN static void
+noreturn static void
 fatal(const char *format, ...);
 
 static void
@@ -45,6 +47,7 @@ fatal(const char *format, ...) {
 	vfprintf(stderr, format, args);
 	va_end(args);
 	fprintf(stderr, "\n");
+	isc__tls_setfatalmode();
 	exit(1);
 }
 
@@ -65,8 +68,8 @@ usage(void) {
 }
 
 typedef void
-nsec3printer(unsigned algo, unsigned flags, unsigned iters, const char *saltstr,
-	     const char *domain, const char *digest);
+nsec3printer(unsigned int algo, unsigned int flags, unsigned int iters,
+	     const char *saltstr, const char *domain, const char *digest);
 
 static void
 nsec3hash(nsec3printer *nsec3print, const char *algostr, const char *flagstr,
@@ -136,7 +139,7 @@ nsec3hash(nsec3printer *nsec3print, const char *algostr, const char *flagstr,
 }
 
 static void
-nsec3hash_print(unsigned algo, unsigned flags, unsigned iters,
+nsec3hash_print(unsigned int algo, unsigned int flags, unsigned int iters,
 		const char *saltstr, const char *domain, const char *digest) {
 	UNUSED(flags);
 	UNUSED(domain);
@@ -146,7 +149,7 @@ nsec3hash_print(unsigned algo, unsigned flags, unsigned iters,
 }
 
 static void
-nsec3hash_rdata_print(unsigned algo, unsigned flags, unsigned iters,
+nsec3hash_rdata_print(unsigned int algo, unsigned int flags, unsigned int iters,
 		      const char *saltstr, const char *domain,
 		      const char *digest) {
 	fprintf(stdout, "%s NSEC3 %u %u %u %s %s\n", domain, algo, flags, iters,

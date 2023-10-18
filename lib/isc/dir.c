@@ -1,6 +1,8 @@
 /*
  * Copyright (C) Internet Systems Consortium, Inc. ("ISC")
  *
+ * SPDX-License-Identifier: MPL-2.0
+ *
  * This Source Code Form is subject to the terms of the Mozilla Public
  * License, v. 2.0. If a copy of the MPL was not distributed with this
  * file, you can obtain one at https://mozilla.org/MPL/2.0/.
@@ -13,14 +15,13 @@
 
 #include <ctype.h>
 #include <errno.h>
+#include <netdb.h>
 #include <sys/stat.h>
 #include <sys/types.h>
 #include <unistd.h>
 
 #include <isc/dir.h>
 #include <isc/magic.h>
-#include <isc/netdb.h>
-#include <isc/print.h>
 #include <isc/string.h>
 #include <isc/util.h>
 
@@ -190,77 +191,4 @@ isc_dir_chroot(const char *dirname) {
 #else  /* ifdef HAVE_CHROOT */
 	return (ISC_R_NOTIMPLEMENTED);
 #endif /* ifdef HAVE_CHROOT */
-}
-
-isc_result_t
-isc_dir_createunique(char *templet) {
-	isc_result_t result;
-	char *x;
-	char *p;
-	int i;
-	int pid;
-
-	REQUIRE(templet != NULL);
-
-	/*!
-	 * \brief mkdtemp is not portable, so this emulates it.
-	 */
-
-	pid = getpid();
-
-	/*
-	 * Replace trailing Xs with the process-id, zero-filled.
-	 */
-	for (x = templet + strlen(templet) - 1; *x == 'X' && x >= templet;
-	     x--, pid /= 10)
-	{
-		*x = pid % 10 + '0';
-	}
-
-	x++; /* Set x to start of ex-Xs. */
-
-	do {
-		i = mkdir(templet, 0700);
-		if (i == 0 || errno != EEXIST) {
-			break;
-		}
-
-		/*
-		 * The BSD algorithm.
-		 */
-		p = x;
-		while (*p != '\0') {
-			if (isdigit((unsigned char)*p)) {
-				*p = 'a';
-			} else if (*p != 'z') {
-				++*p;
-			} else {
-				/*
-				 * Reset character and move to next.
-				 */
-				*p++ = 'a';
-				continue;
-			}
-
-			break;
-		}
-
-		if (*p == '\0') {
-			/*
-			 * Tried all combinations.  errno should already
-			 * be EEXIST, but ensure it is anyway for
-			 * isc__errno2result().
-			 */
-			errno = EEXIST;
-			break;
-		}
-	} while (1);
-
-	if (i == -1) {
-		result = isc__errno2result(errno);
-	} else {
-		result = ISC_R_SUCCESS;
-	}
-
-	return (result);
 }

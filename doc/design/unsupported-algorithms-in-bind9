@@ -1,6 +1,15 @@
+<!--
 Copyright (C) Internet Systems Consortium, Inc. ("ISC")
 
-See COPYRIGHT in the source root or https://isc.org/copyright.html for terms.
+SPDX-License-Identifier: MPL-2.0
+
+This Source Code Form is subject to the terms of the Mozilla Public
+License, v. 2.0.  If a copy of the MPL was not distributed with this
+file, you can obtain one at https://mozilla.org/MPL/2.0/.
+
+See the COPYRIGHT file distributed with this work for additional
+information regarding copyright ownership.
+-->
 
 # Unsupported algorithms in BIND 9
 
@@ -37,7 +46,7 @@ as it is not used for *signing* that zone.
 BIND 9 also does not allow unsupported algorithms to be used with `auto-dnssec`:
 
     zone "example" IN {
-        type master;
+        type primary;
         file "db/example.db";
         key-directory "keys/example";
         inline-signing yes;

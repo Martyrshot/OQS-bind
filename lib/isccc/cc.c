@@ -1,5 +1,7 @@
 /*
- * Portions Copyright (C) Internet Systems Consortium, Inc. ("ISC")
+ * Copyright (C) Internet Systems Consortium, Inc. ("ISC")
+ *
+ * SPDX-License-Identifier: MPL-2.0 AND ISC
  *
  * This Source Code Form is subject to the terms of the Mozilla Public
  * License, v. 2.0. If a copy of the MPL was not distributed with this
@@ -7,8 +9,10 @@
  *
  * See the COPYRIGHT file distributed with this work for additional
  * information regarding copyright ownership.
- *
- * Portions Copyright (C) 2001 Nominum, Inc.
+ */
+
+/*
+ * Copyright (C) 2001 Nominum, Inc.
  *
  * Permission to use, copy, modify, and/or distribute this software for any
  * purpose with or without fee is hereby granted, provided that the above
@@ -34,15 +38,12 @@
 
 #include <isc/assertions.h>
 #include <isc/hmac.h>
-#include <isc/print.h>
+#include <isc/result.h>
 #include <isc/safe.h>
-
-#include <pk11/site.h>
 
 #include <isccc/alist.h>
 #include <isccc/base64.h>
 #include <isccc/cc.h>
-#include <isccc/result.h>
 #include <isccc/sexpr.h>
 #include <isccc/symtab.h>
 #include <isccc/symtype.h>
@@ -50,6 +51,10 @@
 
 #define MAX_TAGS     256
 #define DUP_LIFETIME 900
+#ifndef ISCCC_MAXDEPTH
+#define ISCCC_MAXDEPTH \
+	10 /* Big enough for rndc which just sends a string each way. */
+#endif
 
 typedef isccc_sexpr_t *sexpr_ptr;
 
@@ -111,14 +116,14 @@ value_towire(isccc_sexpr_t *elt, isc_buffer_t **buffer) {
 	if (isccc_sexpr_binaryp(elt)) {
 		vr = isccc_sexpr_tobinary(elt);
 		len = REGION_SIZE(*vr);
-		result = isc_buffer_reserve(buffer, 1 + 4);
+		result = isc_buffer_reserve(*buffer, 1 + 4);
 		if (result != ISC_R_SUCCESS) {
 			return (ISC_R_NOSPACE);
 		}
 		isc_buffer_putuint8(*buffer, ISCCC_CCMSGTYPE_BINARYDATA);
 		isc_buffer_putuint32(*buffer, len);
 
-		result = isc_buffer_reserve(buffer, len);
+		result = isc_buffer_reserve(*buffer, len);
 		if (result != ISC_R_SUCCESS) {
 			return (ISC_R_NOSPACE);
 		}
@@ -127,7 +132,7 @@ value_towire(isccc_sexpr_t *elt, isc_buffer_t **buffer) {
 		unsigned int used;
 		isc_buffer_t b;
 
-		result = isc_buffer_reserve(buffer, 1 + 4);
+		result = isc_buffer_reserve(*buffer, 1 + 4);
 		if (result != ISC_R_SUCCESS) {
 			return (ISC_R_NOSPACE);
 		}
@@ -161,7 +166,7 @@ value_towire(isccc_sexpr_t *elt, isc_buffer_t **buffer) {
 		unsigned int used;
 		isc_buffer_t b;
 
-		result = isc_buffer_reserve(buffer, 1 + 4);
+		result = isc_buffer_reserve(*buffer, 1 + 4);
 		if (result != ISC_R_SUCCESS) {
 			return (ISC_R_NOSPACE);
 		}
@@ -204,7 +209,8 @@ table_towire(isccc_sexpr_t *alist, isc_buffer_t **buffer) {
 	unsigned int len;
 
 	for (elt = isccc_alist_first(alist); elt != NULL;
-	     elt = ISCCC_SEXPR_CDR(elt)) {
+	     elt = ISCCC_SEXPR_CDR(elt))
+	{
 		kv = ISCCC_SEXPR_CAR(elt);
 		k = ISCCC_SEXPR_CAR(kv);
 		ks = isccc_sexpr_tostring(k);
@@ -214,7 +220,7 @@ table_towire(isccc_sexpr_t *alist, isc_buffer_t **buffer) {
 		/*
 		 * Emit the key name.
 		 */
-		result = isc_buffer_reserve(buffer, 1 + len);
+		result = isc_buffer_reserve(*buffer, 1 + len);
 		if (result != ISC_R_SUCCESS) {
 			return (ISC_R_NOSPACE);
 		}
@@ -254,7 +260,7 @@ sign(unsigned char *data, unsigned int length, unsigned char *hmac,
 	isc_result_t result;
 	isccc_region_t source, target;
 	unsigned char digest[ISC_MAX_MD_SIZE];
-	unsigned int digestlen;
+	unsigned int digestlen = sizeof(digest);
 	unsigned char digestb64[HSHA_LENGTH + 4];
 
 	source.rstart = digest;
@@ -310,7 +316,7 @@ isccc_cc_towire(isccc_sexpr_t *alist, isc_buffer_t **buffer, uint32_t algorithm,
 	unsigned int hmac_base, signed_base;
 	isc_result_t result;
 
-	result = isc_buffer_reserve(buffer,
+	result = isc_buffer_reserve(*buffer,
 				    4 + ((algorithm == ISCCC_ALG_HMACMD5)
 						 ? sizeof(auth_hmd5)
 						 : sizeof(auth_hsha)));
@@ -377,7 +383,7 @@ verify(isccc_sexpr_t *alist, unsigned char *data, unsigned int length,
 	isc_result_t result;
 	isccc_sexpr_t *_auth, *hmac;
 	unsigned char digest[ISC_MAX_MD_SIZE];
-	unsigned int digestlen;
+	unsigned int digestlen = sizeof(digest);
 	unsigned char digestb64[HSHA_LENGTH * 4];
 
 	/*
@@ -470,7 +476,8 @@ verify(isccc_sexpr_t *alist, unsigned char *data, unsigned int length,
 		value = region->rstart;
 		GET8(valalg, value);
 		if ((valalg != algorithm) ||
-		    !isc_safe_memequal(value, digestb64, HSHA_LENGTH)) {
+		    !isc_safe_memequal(value, digestb64, HSHA_LENGTH))
+		{
 			return (ISCCC_R_BADAUTH);
 		}
 	}
@@ -480,18 +487,24 @@ verify(isccc_sexpr_t *alist, unsigned char *data, unsigned int length,
 
 static isc_result_t
 table_fromwire(isccc_region_t *source, isccc_region_t *secret,
-	       uint32_t algorithm, isccc_sexpr_t **alistp);
+	       uint32_t algorithm, unsigned int depth, isccc_sexpr_t **alistp);
 
 static isc_result_t
-list_fromwire(isccc_region_t *source, isccc_sexpr_t **listp);
+list_fromwire(isccc_region_t *source, unsigned int depth,
+	      isccc_sexpr_t **listp);
 
 static isc_result_t
-value_fromwire(isccc_region_t *source, isccc_sexpr_t **valuep) {
+value_fromwire(isccc_region_t *source, unsigned int depth,
+	       isccc_sexpr_t **valuep) {
 	unsigned int msgtype;
 	uint32_t len;
 	isccc_sexpr_t *value;
 	isccc_region_t active;
 	isc_result_t result;
+
+	if (depth > ISCCC_MAXDEPTH) {
+		return (ISCCC_R_MAXDEPTH);
+	}
 
 	if (REGION_SIZE(*source) < 1 + 4) {
 		return (ISC_R_UNEXPECTEDEND);
@@ -513,9 +526,9 @@ value_fromwire(isccc_region_t *source, isccc_sexpr_t **valuep) {
 			result = ISC_R_NOMEMORY;
 		}
 	} else if (msgtype == ISCCC_CCMSGTYPE_TABLE) {
-		result = table_fromwire(&active, NULL, 0, valuep);
+		result = table_fromwire(&active, NULL, 0, depth + 1, valuep);
 	} else if (msgtype == ISCCC_CCMSGTYPE_LIST) {
-		result = list_fromwire(&active, valuep);
+		result = list_fromwire(&active, depth + 1, valuep);
 	} else {
 		result = ISCCC_R_SYNTAX;
 	}
@@ -525,7 +538,7 @@ value_fromwire(isccc_region_t *source, isccc_sexpr_t **valuep) {
 
 static isc_result_t
 table_fromwire(isccc_region_t *source, isccc_region_t *secret,
-	       uint32_t algorithm, isccc_sexpr_t **alistp) {
+	       uint32_t algorithm, unsigned int depth, isccc_sexpr_t **alistp) {
 	char key[256];
 	uint32_t len;
 	isc_result_t result;
@@ -534,6 +547,10 @@ table_fromwire(isccc_region_t *source, isccc_region_t *secret,
 	unsigned char *checksum_rstart;
 
 	REQUIRE(alistp != NULL && *alistp == NULL);
+
+	if (depth > ISCCC_MAXDEPTH) {
+		return (ISCCC_R_MAXDEPTH);
+	}
 
 	checksum_rstart = NULL;
 	first_tag = true;
@@ -551,7 +568,7 @@ table_fromwire(isccc_region_t *source, isccc_region_t *secret,
 		GET_MEM(key, len, source->rstart);
 		key[len] = '\0'; /* Ensure NUL termination. */
 		value = NULL;
-		result = value_fromwire(source, &value);
+		result = value_fromwire(source, depth + 1, &value);
 		if (result != ISC_R_SUCCESS) {
 			goto bad;
 		}
@@ -589,14 +606,19 @@ bad:
 }
 
 static isc_result_t
-list_fromwire(isccc_region_t *source, isccc_sexpr_t **listp) {
+list_fromwire(isccc_region_t *source, unsigned int depth,
+	      isccc_sexpr_t **listp) {
 	isccc_sexpr_t *list, *value;
 	isc_result_t result;
+
+	if (depth > ISCCC_MAXDEPTH) {
+		return (ISCCC_R_MAXDEPTH);
+	}
 
 	list = NULL;
 	while (!REGION_EMPTY(*source)) {
 		value = NULL;
-		result = value_fromwire(source, &value);
+		result = value_fromwire(source, depth + 1, &value);
 		if (result != ISC_R_SUCCESS) {
 			isccc_sexpr_free(&list);
 			return (result);
@@ -628,7 +650,7 @@ isccc_cc_fromwire(isccc_region_t *source, isccc_sexpr_t **alistp,
 		return (ISCCC_R_UNKNOWNVERSION);
 	}
 
-	return (table_fromwire(source, secret, algorithm, alistp));
+	return (table_fromwire(source, secret, algorithm, 0, alistp));
 }
 
 static isc_result_t
@@ -852,7 +874,7 @@ isccc_cc_definestring(isccc_sexpr_t *alist, const char *key, const char *str) {
 	isccc_region_t r;
 
 	len = strlen(str);
-	DE_CONST(str, r.rstart);
+	r.rstart = UNCONST(str);
 	r.rend = r.rstart + len;
 
 	return (isccc_alist_definebinary(alist, key, &r));
@@ -1000,12 +1022,14 @@ isccc_cc_checkdup(isccc_symtab_t *symtab, isccc_sexpr_t *message,
 		_frm = "";
 	} else {
 		_frm = tmp;
+		INSIST(_frm != NULL);
 	}
 	tmp = NULL;
 	if (isccc_cc_lookupstring(_ctrl, "_to", &tmp) != ISC_R_SUCCESS) {
 		_to = "";
 	} else {
 		_to = tmp;
+		INSIST(_to != NULL);
 	}
 	/*
 	 * Ensure there is no newline in any of the strings.  This is so

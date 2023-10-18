@@ -1,6 +1,8 @@
 /*
  * Copyright (C) Internet Systems Consortium, Inc. ("ISC")
  *
+ * SPDX-License-Identifier: MPL-2.0
+ *
  * This Source Code Form is subject to the terms of the Mozilla Public
  * License, v. 2.0. If a copy of the MPL was not distributed with this
  * file, you can obtain one at https://mozilla.org/MPL/2.0/.
@@ -9,8 +11,7 @@
  * information regarding copyright ownership.
  */
 
-#ifndef ANY_255_TSIG_250_H
-#define ANY_255_TSIG_250_H 1
+#pragma once
 
 /*% RFC2845 */
 typedef struct dns_rdata_any_tsig {
@@ -26,5 +27,3 @@ typedef struct dns_rdata_any_tsig {
 	uint16_t otherlen;
 	unsigned char *other;
 } dns_rdata_any_tsig_t;
-
-#endif /* ANY_255_TSIG_250_H */

@@ -1,6 +1,8 @@
 /*
  * Copyright (C) Internet Systems Consortium, Inc. ("ISC")
  *
+ * SPDX-License-Identifier: MPL-2.0
+ *
  * This Source Code Form is subject to the terms of the Mozilla Public
  * License, v. 2.0. If a copy of the MPL was not distributed with this
  * file, you can obtain one at https://mozilla.org/MPL/2.0/.
@@ -21,8 +23,7 @@
  * in a place that can be accessed from multiple threads.
  */
 
-#ifndef ISC_PORTSET_H
-#define ISC_PORTSET_H 1
+#pragma once
 
 /***
  ***	Imports
@@ -132,5 +133,3 @@ isc_portset_removerange(isc_portset_t *portset, in_port_t port_lo,
  */
 
 ISC_LANG_ENDDECLS
-
-#endif /* ISC_PORTSET_H */

@@ -1,6 +1,8 @@
 /*
  * Copyright (C) Internet Systems Consortium, Inc. ("ISC")
  *
+ * SPDX-License-Identifier: MPL-2.0
+ *
  * This Source Code Form is subject to the terms of the Mozilla Public
  * License, v. 2.0. If a copy of the MPL was not distributed with this
  * file, you can obtain one at https://mozilla.org/MPL/2.0/.
@@ -9,14 +11,18 @@
  * information regarding copyright ownership.
  */
 
-#ifndef DNS_RDATATYPE_H
-#define DNS_RDATATYPE_H 1
+#pragma once
 
 /*! \file dns/rdatatype.h */
 
 #include <isc/lang.h>
 
 #include <dns/types.h>
+
+#define DNS_TYPEPAIR_TYPE(type)	  ((dns_rdatatype_t)((type)&0xFFFF))
+#define DNS_TYPEPAIR_COVERS(type) ((dns_rdatatype_t)((type) >> 16))
+#define DNS_TYPEPAIR_VALUE(base, ext) \
+	((dns_typepair_t)(((uint32_t)ext) << 16) | (((uint32_t)base) & 0xffff))
 
 ISC_LANG_BEGINDECLS
 
@@ -91,5 +97,3 @@ dns_rdatatype_format(dns_rdatatype_t rdtype, char *array, unsigned int size);
  */
 
 ISC_LANG_ENDDECLS
-
-#endif /* DNS_RDATATYPE_H */

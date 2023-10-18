@@ -1,6 +1,8 @@
 /*
  * Copyright (C) Internet Systems Consortium, Inc. ("ISC")
  *
+ * SPDX-License-Identifier: MPL-2.0
+ *
  * This Source Code Form is subject to the terms of the Mozilla Public
  * License, v. 2.0. If a copy of the MPL was not distributed with this
  * file, you can obtain one at https://mozilla.org/MPL/2.0/.
@@ -32,13 +34,10 @@
 #include <isc/file.h>
 #include <isc/mem.h>
 #include <isc/net.h>
-#include <isc/print.h>
 #include <isc/result.h>
 #include <isc/string.h>
 #include <isc/time.h>
 #include <isc/util.h>
-
-#include <pk11/site.h>
 
 #include <dns/keyvalues.h>
 #include <dns/name.h>
@@ -61,7 +60,7 @@ bool verbose = false;
 
 const char *keyfile, *keydef;
 
-ISC_NORETURN static void
+noreturn static void
 usage(int status);
 
 static void
@@ -222,7 +221,7 @@ main(int argc, char **argv) {
 	if (keysize < 0) {
 		keysize = alg_bits(alg);
 	}
-	algname = alg_totext(alg);
+	algname = dst_hmac_algorithm_totext(alg);
 
 	isc_mem_create(&mctx);
 	isc_buffer_init(&key_txtbuffer, &key_txtsecret, sizeof(key_txtsecret));

@@ -1,6 +1,8 @@
 /*
  * Copyright (C) Internet Systems Consortium, Inc. ("ISC")
  *
+ * SPDX-License-Identifier: MPL-2.0
+ *
  * This Source Code Form is subject to the terms of the Mozilla Public
  * License, v. 2.0. If a copy of the MPL was not distributed with this
  * file, you can obtain one at https://mozilla.org/MPL/2.0/.
@@ -10,9 +12,11 @@
  */
 
 #include <inttypes.h>
+#include <limits.h>
 #include <stdbool.h>
 
 #include <isc/aes.h>
+#include <isc/async.h>
 #include <isc/atomic.h>
 #include <isc/formatcheck.h>
 #include <isc/fuzz.h>
@@ -21,8 +25,6 @@
 #include <isc/mutex.h>
 #include <isc/nonce.h>
 #include <isc/once.h>
-#include <isc/platform.h>
-#include <isc/print.h>
 #include <isc/random.h>
 #include <isc/safe.h>
 #include <isc/serial.h>
@@ -30,8 +32,8 @@
 #include <isc/stats.h>
 #include <isc/stdio.h>
 #include <isc/string.h>
-#include <isc/task.h>
 #include <isc/thread.h>
+#include <isc/tid.h>
 #include <isc/timer.h>
 #include <isc/util.h>
 
@@ -42,7 +44,6 @@
 #include <dns/dispatch.h>
 #include <dns/dnstap.h>
 #include <dns/edns.h>
-#include <dns/events.h>
 #include <dns/message.h>
 #include <dns/peer.h>
 #include <dns/rcode.h>
@@ -51,6 +52,7 @@
 #include <dns/rdatalist.h>
 #include <dns/rdataset.h>
 #include <dns/resolver.h>
+#include <dns/result.h>
 #include <dns/stats.h>
 #include <dns/tsig.h>
 #include <dns/view.h>
@@ -78,7 +80,7 @@
  * need for locking.
  *
  * If a routine is ever created that allows someone other than the client's
- * task to change the client, then the client will have to be locked.
+ * loop to change the client, then the client will have to be locked.
  */
 
 #ifdef NS_CLIENT_TRACE
@@ -113,17 +115,10 @@
 #define NS_CLIENT_DROPPORT 1
 #endif /* ifndef NS_CLIENT_DROPPORT */
 
-LIBNS_EXTERNAL_DATA atomic_uint_fast64_t ns_client_requests =
-	ATOMIC_VAR_INIT(0);
+atomic_uint_fast64_t ns_client_requests = 0;
 
 static void
-clientmgr_attach(ns_clientmgr_t *source, ns_clientmgr_t **targetp);
-static void
-clientmgr_detach(ns_clientmgr_t **mp);
-static void
-clientmgr_destroy(ns_clientmgr_t *manager);
-static void
-ns_client_endrequest(ns_client_t *client);
+clientmgr_destroy_cb(void *arg);
 static void
 ns_client_dumpmessage(ns_client_t *client, const char *reason);
 static void
@@ -151,7 +146,7 @@ ns_client_killoldestquery(ns_client_t *client) {
 	if (oldest != NULL) {
 		ISC_LIST_UNLINK(client->manager->recursing, oldest, rlink);
 		ns_query_cancel(oldest);
-		ns_stats_increment(client->sctx->nsstats,
+		ns_stats_increment(client->manager->sctx->nsstats,
 				   ns_statscounter_reclimitdropped);
 	}
 	UNLOCK(&client->manager->reclock);
@@ -165,8 +160,58 @@ ns_client_settimeout(ns_client_t *client, unsigned int seconds) {
 }
 
 static void
+client_extendederror_reset(ns_client_t *client) {
+	if (client->ede == NULL) {
+		return;
+	}
+	isc_mem_put(client->manager->mctx, client->ede->value,
+		    client->ede->length);
+	isc_mem_put(client->manager->mctx, client->ede, sizeof(dns_ednsopt_t));
+	client->ede = NULL;
+}
+
+void
+ns_client_extendederror(ns_client_t *client, uint16_t code, const char *text) {
+	unsigned char ede[DNS_EDE_EXTRATEXT_LEN + 2];
+	isc_buffer_t buf;
+	uint16_t len = sizeof(uint16_t);
+
+	REQUIRE(NS_CLIENT_VALID(client));
+
+	if (client->ede != NULL) {
+		ns_client_log(client, NS_LOGCATEGORY_CLIENT,
+			      NS_LOGMODULE_CLIENT, ISC_LOG_DEBUG(1),
+			      "already have ede, ignoring %u %s", code,
+			      text == NULL ? "(null)" : text);
+		return;
+	}
+
+	ns_client_log(client, NS_LOGCATEGORY_CLIENT, NS_LOGMODULE_CLIENT,
+		      ISC_LOG_DEBUG(1), "set ede: info-code %u extra-text %s",
+		      code, text == NULL ? "(null)" : text);
+
+	isc_buffer_init(&buf, ede, sizeof(ede));
+	isc_buffer_putuint16(&buf, code);
+	if (text != NULL && strlen(text) > 0) {
+		if (strlen(text) < DNS_EDE_EXTRATEXT_LEN) {
+			isc_buffer_putstr(&buf, text);
+			len += (uint16_t)(strlen(text));
+		} else {
+			ns_client_log(client, NS_LOGCATEGORY_CLIENT,
+				      NS_LOGMODULE_CLIENT, ISC_LOG_WARNING,
+				      "ede extra-text too long, ignoring");
+		}
+	}
+
+	client->ede = isc_mem_get(client->manager->mctx, sizeof(dns_ednsopt_t));
+	client->ede->code = DNS_OPT_EDE;
+	client->ede->length = len;
+	client->ede->value = isc_mem_get(client->manager->mctx, len);
+	memmove(client->ede->value, ede, len);
+};
+
+static void
 ns_client_endrequest(ns_client_t *client) {
-	INSIST(client->nupdates == 0);
 	INSIST(client->state == NS_CLIENTSTATE_WORKING ||
 	       client->state == NS_CLIENTSTATE_RECURSING);
 
@@ -188,9 +233,13 @@ ns_client_endrequest(ns_client_t *client) {
 
 	if (client->view != NULL) {
 #ifdef ENABLE_AFL
-		if (client->sctx->fuzztype == isc_fuzz_resolver) {
-			dns_cache_clean(client->view->cache, INT_MAX);
-			dns_adb_flush(client->view->adb);
+		if (client->manager->sctx->fuzztype == isc_fuzz_resolver) {
+			dns_adb_t *adb = NULL;
+			dns_view_getadb(client->view, &adb);
+			if (adb != NULL) {
+				dns_adb_flush(adb);
+				dns_adb_detach(&adb);
+			}
 		}
 #endif /* ifdef ENABLE_AFL */
 		dns_view_detach(&client->view);
@@ -201,37 +250,26 @@ ns_client_endrequest(ns_client_t *client) {
 		dns_message_puttemprdataset(client->message, &client->opt);
 	}
 
+	client_extendederror_reset(client);
 	client->signer = NULL;
 	client->udpsize = 512;
 	client->extflags = 0;
 	client->ednsversion = -1;
+	client->additionaldepth = 0;
 	dns_ecs_init(&client->ecs);
 	dns_message_reset(client->message, DNS_MESSAGE_INTENTPARSE);
-
-	/*
-	 * Clean up from recursion - normally this would be done in
-	 * fetch_callback(), but if we're shutting down and canceling then
-	 * it might not have happened.
-	 */
-	if (client->recursionquota != NULL) {
-		isc_quota_detach(&client->recursionquota);
-		if (client->query.prefetch == NULL) {
-			ns_stats_decrement(client->sctx->nsstats,
-					   ns_statscounter_recursclients);
-		}
-	}
 
 	/*
 	 * Clear all client attributes that are specific to the request
 	 */
 	client->attributes = 0;
 #ifdef ENABLE_AFL
-	if (client->sctx->fuzznotify != NULL &&
-	    (client->sctx->fuzztype == isc_fuzz_client ||
-	     client->sctx->fuzztype == isc_fuzz_tcpclient ||
-	     client->sctx->fuzztype == isc_fuzz_resolver))
+	if (client->manager->sctx->fuzznotify != NULL &&
+	    (client->manager->sctx->fuzztype == isc_fuzz_client ||
+	     client->manager->sctx->fuzztype == isc_fuzz_tcpclient ||
+	     client->manager->sctx->fuzztype == isc_fuzz_resolver))
 	{
-		client->sctx->fuzznotify();
+		client->manager->sctx->fuzznotify();
 	}
 #endif /* ENABLE_AFL */
 }
@@ -257,13 +295,33 @@ client_senddone(isc_nmhandle_t *handle, isc_result_t result, void *cbarg) {
 	REQUIRE(client->sendhandle == handle);
 
 	CTRACE("senddone");
+
+	/*
+	 * Set sendhandle to NULL, but don't detach it immediately, in
+	 * case we need to retry the send. If we do resend, then
+	 * sendhandle will be reattached. Whether or not we resend,
+	 * we will then detach the handle from *this* send by detaching
+	 * 'handle' directly below.
+	 */
+	client->sendhandle = NULL;
+
 	if (result != ISC_R_SUCCESS) {
-		ns_client_log(client, DNS_LOGCATEGORY_SECURITY,
-			      NS_LOGMODULE_CLIENT, ISC_LOG_DEBUG(3),
-			      "send failed: %s", isc_result_totext(result));
+		if (!TCP_CLIENT(client) && result == ISC_R_MAXSIZE) {
+			ns_client_log(client, DNS_LOGCATEGORY_SECURITY,
+				      NS_LOGMODULE_CLIENT, ISC_LOG_DEBUG(3),
+				      "send exceeded maximum size: truncating");
+			client->query.attributes &= ~NS_QUERYATTR_ANSWERED;
+			client->rcode_override = dns_rcode_noerror;
+			ns_client_error(client, ISC_R_MAXSIZE);
+		} else {
+			ns_client_log(client, DNS_LOGCATEGORY_SECURITY,
+				      NS_LOGMODULE_CLIENT, ISC_LOG_DEBUG(3),
+				      "send failed: %s",
+				      isc_result_totext(result));
+		}
 	}
 
-	isc_nmhandle_detach(&client->sendhandle);
+	isc_nmhandle_detach(&handle);
 }
 
 static void
@@ -276,8 +334,9 @@ client_allocsendbuf(ns_client_t *client, isc_buffer_t *buffer,
 
 	if (TCP_CLIENT(client)) {
 		INSIST(client->tcpbuf == NULL);
-		client->tcpbuf = isc_mem_get(client->mctx,
+		client->tcpbuf = isc_mem_get(client->manager->send_mctx,
 					     NS_CLIENT_TCP_BUFFER_SIZE);
+		client->tcpbuf_size = NS_CLIENT_TCP_BUFFER_SIZE;
 		data = client->tcpbuf;
 		isc_buffer_init(buffer, data, NS_CLIENT_TCP_BUFFER_SIZE);
 	} else {
@@ -304,12 +363,31 @@ client_allocsendbuf(ns_client_t *client, isc_buffer_t *buffer,
 
 static void
 client_sendpkg(ns_client_t *client, isc_buffer_t *buffer) {
+	isc_result_t result;
 	isc_region_t r;
+	dns_ttl_t min_ttl = 0;
 
 	REQUIRE(client->sendhandle == NULL);
 
-	isc_buffer_usedregion(buffer, &r);
+	if (isc_buffer_base(buffer) == client->tcpbuf) {
+		size_t used = isc_buffer_usedlength(buffer);
+		client->tcpbuf = isc_mem_creget(
+			client->manager->send_mctx, client->tcpbuf,
+			client->tcpbuf_size, used, sizeof(char));
+		client->tcpbuf_size = used;
+		r.base = client->tcpbuf;
+		r.length = used;
+	} else {
+		isc_buffer_usedregion(buffer, &r);
+	}
 	isc_nmhandle_attach(client->handle, &client->sendhandle);
+
+	if (isc_nm_is_http_handle(client->handle)) {
+		result = dns_message_response_minttl(client->message, &min_ttl);
+		if (result == ISC_R_SUCCESS) {
+			isc_nm_set_maxage(client->handle, min_ttl);
+		}
+	}
 	isc_nm_send(client->handle, &r, client_senddone, client);
 }
 
@@ -371,9 +449,8 @@ ns_client_sendraw(ns_client_t *client, dns_message_t *message) {
 	return;
 done:
 	if (client->tcpbuf != NULL) {
-		isc_mem_put(client->mctx, client->tcpbuf,
-			    NS_CLIENT_TCP_BUFFER_SIZE);
-		client->tcpbuf = NULL;
+		isc_mem_put(client->manager->send_mctx, client->tcpbuf,
+			    client->tcpbuf_size);
 	}
 
 	ns_client_drop(client, result);
@@ -386,6 +463,7 @@ ns_client_send(ns_client_t *client) {
 	isc_buffer_t buffer = { .magic = 0 };
 	isc_region_t r;
 	dns_compress_t cctx;
+	unsigned int compflags;
 	bool cleanup_cctx = false;
 	unsigned int render_opts;
 	unsigned int preferred_glue;
@@ -453,31 +531,28 @@ ns_client_send(ns_client_t *client) {
 	}
 
 	client_allocsendbuf(client, &buffer, &data);
-
-	result = dns_compress_init(&cctx, -1, client->mctx);
-	if (result != ISC_R_SUCCESS) {
-		goto cleanup;
-	}
+	compflags = 0;
 	if (client->peeraddr_valid && client->view != NULL) {
 		isc_netaddr_t netaddr;
 		dns_name_t *name = NULL;
 
 		isc_netaddr_fromsockaddr(&netaddr, &client->peeraddr);
 		if (client->message->tsigkey != NULL) {
-			name = &client->message->tsigkey->name;
+			name = client->message->tsigkey->name;
 		}
 
 		if (client->view->nocasecompress == NULL ||
 		    !dns_acl_allowed(&netaddr, name,
 				     client->view->nocasecompress, env))
 		{
-			dns_compress_setsensitive(&cctx, true);
+			compflags |= DNS_COMPRESS_CASE;
 		}
 
 		if (!client->view->msgcompression) {
-			dns_compress_disable(&cctx);
+			compflags = DNS_COMPRESS_DISABLED;
 		}
 	}
+	dns_compress_init(&cctx, client->manager->mctx, compflags);
 	cleanup_cctx = true;
 
 	result = dns_message_renderbegin(client->message, &cctx, &buffer);
@@ -550,8 +625,8 @@ renderend:
 		dns_name_t *zo = dns_zone_getorigin(client->query.authzone);
 
 		isc_buffer_init(&b, zone, sizeof(zone));
-		dns_compress_setmethods(&cctx, DNS_COMPRESS_NONE);
-		eresult = dns_name_towire(zo, &cctx, &b);
+		dns_compress_setpermitted(&cctx, false);
+		eresult = dns_name_towire(zo, &cctx, &b, NULL);
 		if (eresult == ISC_R_SUCCESS) {
 			isc_buffer_usedregion(&b, &zr);
 		}
@@ -588,16 +663,15 @@ renderend:
 
 		switch (isc_sockaddr_pf(&client->peeraddr)) {
 		case AF_INET:
-			isc_stats_increment(client->sctx->tcpoutstats4,
-					    ISC_MIN((int)respsize / 16, 256));
+			isc_histomulti_inc(client->manager->sctx->tcpoutstats4,
+					   DNS_SIZEHISTO_BUCKETOUT(respsize));
 			break;
 		case AF_INET6:
-			isc_stats_increment(client->sctx->tcpoutstats6,
-					    ISC_MIN((int)respsize / 16, 256));
+			isc_histomulti_inc(client->manager->sctx->tcpoutstats6,
+					   DNS_SIZEHISTO_BUCKETOUT(respsize));
 			break;
 		default:
-			INSIST(0);
-			ISC_UNREACHABLE();
+			UNREACHABLE();
 		}
 	} else {
 #ifdef HAVE_DNSTAP
@@ -618,38 +692,38 @@ renderend:
 
 		switch (isc_sockaddr_pf(&client->peeraddr)) {
 		case AF_INET:
-			isc_stats_increment(client->sctx->udpoutstats4,
-					    ISC_MIN((int)respsize / 16, 256));
+			isc_histomulti_inc(client->manager->sctx->udpoutstats4,
+					   DNS_SIZEHISTO_BUCKETOUT(respsize));
 			break;
 		case AF_INET6:
-			isc_stats_increment(client->sctx->udpoutstats6,
-					    ISC_MIN((int)respsize / 16, 256));
+			isc_histomulti_inc(client->manager->sctx->udpoutstats6,
+					   DNS_SIZEHISTO_BUCKETOUT(respsize));
 			break;
 		default:
-			INSIST(0);
-			ISC_UNREACHABLE();
+			UNREACHABLE();
 		}
 	}
 
 	/* update statistics (XXXJT: is it okay to access message->xxxkey?) */
-	ns_stats_increment(client->sctx->nsstats, ns_statscounter_response);
+	ns_stats_increment(client->manager->sctx->nsstats,
+			   ns_statscounter_response);
 
-	dns_rcodestats_increment(client->sctx->rcodestats,
+	dns_rcodestats_increment(client->manager->sctx->rcodestats,
 				 client->message->rcode);
 	if (opt_included) {
-		ns_stats_increment(client->sctx->nsstats,
+		ns_stats_increment(client->manager->sctx->nsstats,
 				   ns_statscounter_edns0out);
 	}
 	if (client->message->tsigkey != NULL) {
-		ns_stats_increment(client->sctx->nsstats,
+		ns_stats_increment(client->manager->sctx->nsstats,
 				   ns_statscounter_tsigout);
 	}
 	if (client->message->sig0key != NULL) {
-		ns_stats_increment(client->sctx->nsstats,
+		ns_stats_increment(client->manager->sctx->nsstats,
 				   ns_statscounter_sig0out);
 	}
 	if ((client->message->flags & DNS_MESSAGEFLAG_TC) != 0) {
-		ns_stats_increment(client->sctx->nsstats,
+		ns_stats_increment(client->manager->sctx->nsstats,
 				   ns_statscounter_truncatedresp);
 	}
 
@@ -659,9 +733,8 @@ renderend:
 
 cleanup:
 	if (client->tcpbuf != NULL) {
-		isc_mem_put(client->mctx, client->tcpbuf,
-			    NS_CLIENT_TCP_BUFFER_SIZE);
-		client->tcpbuf = NULL;
+		isc_mem_put(client->manager->send_mctx, client->tcpbuf,
+			    client->tcpbuf_size);
 	}
 
 	if (cleanup_cctx) {
@@ -699,8 +772,9 @@ ns_client_dropport(in_port_t port) {
 
 void
 ns_client_error(ns_client_t *client, isc_result_t result) {
+	dns_message_t *message = NULL;
 	dns_rcode_t rcode;
-	dns_message_t *message;
+	bool trunc = false;
 
 	REQUIRE(NS_CLIENT_VALID(client));
 
@@ -712,6 +786,10 @@ ns_client_error(ns_client_t *client, isc_result_t result) {
 		rcode = dns_result_torcode(result);
 	} else {
 		rcode = (dns_rcode_t)(client->rcode_override & 0xfff);
+	}
+
+	if (result == ISC_R_MAXSIZE) {
+		trunc = true;
 	}
 
 #if NS_CLIENT_DROPPORT
@@ -747,18 +825,19 @@ ns_client_error(ns_client_t *client, isc_result_t result) {
 		dns_rrl_result_t rrl_result;
 		int loglevel;
 
-		INSIST(rcode != dns_rcode_noerror &&
-		       rcode != dns_rcode_nxdomain);
-		if ((client->sctx->options & NS_SERVER_LOGQUERIES) != 0) {
+		if ((client->manager->sctx->options & NS_SERVER_LOGQUERIES) !=
+		    0)
+		{
 			loglevel = DNS_RRL_LOG_DROP;
 		} else {
 			loglevel = ISC_LOG_DEBUG(1);
 		}
 		wouldlog = isc_log_wouldlog(ns_lctx, loglevel);
-		rrl_result = dns_rrl(
-			client->view, &client->peeraddr, TCP_CLIENT(client),
-			dns_rdataclass_in, dns_rdatatype_none, NULL, result,
-			client->now, wouldlog, log_buf, sizeof(log_buf));
+		rrl_result = dns_rrl(client->view, NULL, &client->peeraddr,
+				     TCP_CLIENT(client), dns_rdataclass_in,
+				     dns_rdatatype_none, NULL, result,
+				     client->now, wouldlog, log_buf,
+				     sizeof(log_buf));
 		if (rrl_result != DNS_RRL_RESULT_OK) {
 			/*
 			 * Log dropped errors in the query category
@@ -777,10 +856,12 @@ ns_client_error(ns_client_t *client, isc_result_t result) {
 			 * so don't try to slip any error responses.
 			 */
 			if (!client->view->rrl->log_only) {
-				ns_stats_increment(client->sctx->nsstats,
-						   ns_statscounter_ratedropped);
-				ns_stats_increment(client->sctx->nsstats,
-						   ns_statscounter_dropped);
+				ns_stats_increment(
+					client->manager->sctx->nsstats,
+					ns_statscounter_ratedropped);
+				ns_stats_increment(
+					client->manager->sctx->nsstats,
+					ns_statscounter_dropped);
 				ns_client_drop(client, DNS_R_DROP);
 				return;
 			}
@@ -810,7 +891,11 @@ ns_client_error(ns_client_t *client, isc_result_t result) {
 			return;
 		}
 	}
+
 	message->rcode = rcode;
+	if (trunc) {
+		message->flags |= DNS_MESSAGEFLAG_TC;
+	}
 
 	if (rcode == dns_rcode_formerr) {
 		/*
@@ -858,9 +943,10 @@ ns_client_error(ns_client_t *client, isc_result_t result) {
 		isc_interval_set(&i, client->view->fail_ttl, 0);
 		result = isc_time_nowplusinterval(&expire, &i);
 		if (result == ISC_R_SUCCESS) {
-			dns_badcache_add(
-				client->view->failcache, client->query.qname,
-				client->query.qtype, true, flags, &expire);
+			dns_badcache_add(client->view->failcache,
+					 client->query.qname,
+					 client->query.qtype, true, flags,
+					 isc_time_seconds(&expire));
 		}
 	}
 
@@ -871,11 +957,10 @@ isc_result_t
 ns_client_addopt(ns_client_t *client, dns_message_t *message,
 		 dns_rdataset_t **opt) {
 	unsigned char ecs[ECS_SIZE];
-	char nsid[BUFSIZ], *nsidp = NULL;
+	char nsid[_POSIX_HOST_NAME_MAX + 1], *nsidp = NULL;
 	unsigned char cookie[COOKIE_SIZE];
 	isc_result_t result;
 	dns_view_t *view = NULL;
-	dns_resolver_t *resolver = NULL;
 	uint16_t udpsize;
 	dns_ednsopt_t ednsopts[DNS_EDNSOPTIONS];
 	int count = 0;
@@ -890,22 +975,20 @@ ns_client_addopt(ns_client_t *client, dns_message_t *message,
 
 	env = client->manager->aclenv;
 	view = client->view;
-	resolver = (view != NULL) ? view->resolver : NULL;
-	if (resolver != NULL) {
-		udpsize = dns_resolver_getudpsize(resolver);
+	if (view != NULL) {
+		udpsize = dns_view_getudpsize(view);
 	} else {
-		udpsize = client->sctx->udpsize;
+		udpsize = client->manager->sctx->udpsize;
 	}
 
 	flags = client->extflags & DNS_MESSAGEEXTFLAG_REPLYPRESERVE;
 
 	/* Set EDNS options if applicable */
 	if (WANTNSID(client)) {
-		if (client->sctx->server_id != NULL) {
-			nsidp = client->sctx->server_id;
-		} else if (client->sctx->gethostname != NULL) {
-			result = client->sctx->gethostname(nsid, sizeof(nsid));
-			if (result != ISC_R_SUCCESS) {
+		if (client->manager->sctx->server_id != NULL) {
+			nsidp = client->manager->sctx->server_id;
+		} else if (client->manager->sctx->usehostname) {
+			if (gethostname(nsid, sizeof(nsid)) != 0) {
 				goto no_nsid;
 			}
 			nsidp = nsid;
@@ -922,15 +1005,15 @@ ns_client_addopt(ns_client_t *client, dns_message_t *message,
 no_nsid:
 	if ((client->attributes & NS_CLIENTATTR_WANTCOOKIE) != 0) {
 		isc_buffer_t buf;
-		isc_stdtime_t now;
+		isc_stdtime_t now = isc_stdtime_now();
 		uint32_t nonce;
 
 		isc_buffer_init(&buf, cookie, sizeof(cookie));
-		isc_stdtime_get(&now);
 
 		isc_random_buf(&nonce, sizeof(nonce));
 
-		compute_cookie(client, now, nonce, client->sctx->secret, &buf);
+		compute_cookie(client, now, nonce,
+			       client->manager->sctx->secret, &buf);
 
 		INSIST(count < DNS_EDNSOPTIONS);
 		ednsopts[count].code = DNS_OPT_COOKIE;
@@ -983,8 +1066,7 @@ no_nsid:
 			memmove(addr, &client->ecs.addr.type, addrl);
 			break;
 		default:
-			INSIST(0);
-			ISC_UNREACHABLE();
+			UNREACHABLE();
 		}
 
 		isc_buffer_init(&buf, ecs, sizeof(ecs));
@@ -1001,7 +1083,7 @@ no_nsid:
 			if ((plen % 8) != 0) {
 				addr[addrl - 1] &= ~0U << (8 - (plen % 8));
 			}
-			isc_buffer_putmem(&buf, addr, (unsigned)addrl);
+			isc_buffer_putmem(&buf, addr, (unsigned int)addrl);
 		}
 
 		ednsopts[count].code = DNS_OPT_CLIENT_SUBNET;
@@ -1023,6 +1105,14 @@ no_nsid:
 		ednsopts[count].code = DNS_OPT_TCP_KEEPALIVE;
 		ednsopts[count].length = 2;
 		ednsopts[count].value = advtimo;
+		count++;
+	}
+
+	if (client->ede != NULL) {
+		INSIST(count < DNS_EDNSOPTIONS);
+		ednsopts[count].code = DNS_OPT_EDE;
+		ednsopts[count].length = client->ede->length;
+		ednsopts[count].value = client->ede->value;
 		count++;
 	}
 
@@ -1058,30 +1148,25 @@ static void
 compute_cookie(ns_client_t *client, uint32_t when, uint32_t nonce,
 	       const unsigned char *secret, isc_buffer_t *buf) {
 	unsigned char digest[ISC_MAX_MD_SIZE] ISC_NONSTRING = { 0 };
-	STATIC_ASSERT(ISC_MAX_MD_SIZE >= ISC_SIPHASH24_TAG_LENGTH, "You need "
-								   "to "
-								   "increase "
-								   "the digest "
-								   "buffer.");
-	STATIC_ASSERT(ISC_MAX_MD_SIZE >= ISC_AES_BLOCK_LENGTH, "You need to "
-							       "increase the "
-							       "digest "
-							       "buffer.");
+	STATIC_ASSERT(ISC_MAX_MD_SIZE >= ISC_SIPHASH24_TAG_LENGTH,
+		      "You need to increase the digest buffer.");
+	STATIC_ASSERT(ISC_MAX_MD_SIZE >= ISC_AES_BLOCK_LENGTH,
+		      "You need to increase the digest buffer.");
 
-	switch (client->sctx->cookiealg) {
+	switch (client->manager->sctx->cookiealg) {
 	case ns_cookiealg_siphash24: {
 		unsigned char input[16 + 16] ISC_NONSTRING = { 0 };
 		size_t inputlen = 0;
 		isc_netaddr_t netaddr;
 		unsigned char *cp;
 
-		cp = isc_buffer_used(buf);
 		isc_buffer_putmem(buf, client->cookie, 8);
 		isc_buffer_putuint8(buf, NS_COOKIE_VERSION_1);
-		isc_buffer_putuint24(buf, 0); /* Reserved */
+		isc_buffer_putuint8(buf, 0);  /* Reserved */
+		isc_buffer_putuint16(buf, 0); /* Reserved */
 		isc_buffer_putuint32(buf, when);
 
-		memmove(input, cp, 16);
+		memmove(input, (unsigned char *)isc_buffer_used(buf) - 16, 16);
 
 		isc_netaddr_fromsockaddr(&netaddr, &client->peeraddr);
 		switch (netaddr.family) {
@@ -1096,11 +1181,10 @@ compute_cookie(ns_client_t *client, uint32_t when, uint32_t nonce,
 			inputlen = 32;
 			break;
 		default:
-			INSIST(0);
-			ISC_UNREACHABLE();
+			UNREACHABLE();
 		}
 
-		isc_siphash24(secret, input, inputlen, digest);
+		isc_siphash24(secret, input, inputlen, true, digest);
 		isc_buffer_putmem(buf, digest, 8);
 		break;
 	}
@@ -1110,11 +1194,10 @@ compute_cookie(ns_client_t *client, uint32_t when, uint32_t nonce,
 		unsigned char *cp;
 		unsigned int i;
 
-		cp = isc_buffer_used(buf);
 		isc_buffer_putmem(buf, client->cookie, 8);
 		isc_buffer_putuint32(buf, nonce);
 		isc_buffer_putuint32(buf, when);
-		memmove(input, cp, 16);
+		memmove(input, (unsigned char *)isc_buffer_used(buf) - 16, 16);
 		isc_aes128_crypt(secret, input, digest);
 		for (i = 0; i < 8; i++) {
 			input[i] = digest[i] ^ digest[i + 8];
@@ -1134,12 +1217,11 @@ compute_cookie(ns_client_t *client, uint32_t when, uint32_t nonce,
 			for (i = 0; i < 8; i++) {
 				input[i + 8] = digest[i] ^ digest[i + 8];
 			}
-			isc_aes128_crypt(client->sctx->secret, input + 8,
-					 digest);
+			isc_aes128_crypt(client->manager->sctx->secret,
+					 input + 8, digest);
 			break;
 		default:
-			INSIST(0);
-			ISC_UNREACHABLE();
+			UNREACHABLE();
 		}
 		for (i = 0; i < 8; i++) {
 			digest[i] ^= digest[i + 8];
@@ -1149,8 +1231,7 @@ compute_cookie(ns_client_t *client, uint32_t when, uint32_t nonce,
 	}
 
 	default:
-		INSIST(0);
-		ISC_UNREACHABLE();
+		UNREACHABLE();
 	}
 }
 
@@ -1167,7 +1248,7 @@ process_cookie(ns_client_t *client, isc_buffer_t *buf, size_t optlen) {
 	/*
 	 * If we have already seen a cookie option skip this cookie option.
 	 */
-	if ((!client->sctx->answercookie) ||
+	if ((!client->manager->sctx->answercookie) ||
 	    (client->attributes & NS_CLIENTATTR_WANTCOOKIE) != 0)
 	{
 		isc_buffer_forward(buf, (unsigned int)optlen);
@@ -1176,7 +1257,8 @@ process_cookie(ns_client_t *client, isc_buffer_t *buf, size_t optlen) {
 
 	client->attributes |= NS_CLIENTATTR_WANTCOOKIE;
 
-	ns_stats_increment(client->sctx->nsstats, ns_statscounter_cookiein);
+	ns_stats_increment(client->manager->sctx->nsstats,
+			   ns_statscounter_cookiein);
 
 	if (optlen != COOKIE_SIZE) {
 		/*
@@ -1187,11 +1269,12 @@ process_cookie(ns_client_t *client, isc_buffer_t *buf, size_t optlen) {
 		isc_buffer_forward(buf, (unsigned int)optlen);
 
 		if (optlen == 8U) {
-			ns_stats_increment(client->sctx->nsstats,
+			ns_stats_increment(client->manager->sctx->nsstats,
 					   ns_statscounter_cookienew);
 		} else {
-			ns_stats_increment(client->sctx->nsstats,
+			ns_stats_increment(client->manager->sctx->nsstats,
 					   ns_statscounter_cookiebadsize);
+			client->attributes |= NS_CLIENTATTR_BADCOOKIE;
 		}
 		return;
 	}
@@ -1210,39 +1293,41 @@ process_cookie(ns_client_t *client, isc_buffer_t *buf, size_t optlen) {
 	 * Allow for a 5 minute clock skew between servers sharing a secret.
 	 * Only accept COOKIE if we have talked to the client in the last hour.
 	 */
-	isc_stdtime_get(&now);
-	if (isc_serial_gt(when, (now + 300)) || /* In the future. */
-	    isc_serial_lt(when, (now - 3600)))
-	{ /* In the past. */
-		ns_stats_increment(client->sctx->nsstats,
+	now = isc_stdtime_now();
+	if (isc_serial_gt(when, (now + 300)) /* In the future. */ ||
+	    isc_serial_lt(when, (now - 3600)) /* In the past. */)
+	{
+		client->attributes |= NS_CLIENTATTR_BADCOOKIE;
+		ns_stats_increment(client->manager->sctx->nsstats,
 				   ns_statscounter_cookiebadtime);
 		return;
 	}
 
 	isc_buffer_init(&db, dbuf, sizeof(dbuf));
-	compute_cookie(client, when, nonce, client->sctx->secret, &db);
+	compute_cookie(client, when, nonce, client->manager->sctx->secret, &db);
 
 	if (isc_safe_memequal(old, dbuf, COOKIE_SIZE)) {
-		ns_stats_increment(client->sctx->nsstats,
+		ns_stats_increment(client->manager->sctx->nsstats,
 				   ns_statscounter_cookiematch);
 		client->attributes |= NS_CLIENTATTR_HAVECOOKIE;
 		return;
 	}
 
-	for (altsecret = ISC_LIST_HEAD(client->sctx->altsecrets);
+	for (altsecret = ISC_LIST_HEAD(client->manager->sctx->altsecrets);
 	     altsecret != NULL; altsecret = ISC_LIST_NEXT(altsecret, link))
 	{
 		isc_buffer_init(&db, dbuf, sizeof(dbuf));
 		compute_cookie(client, when, nonce, altsecret->secret, &db);
 		if (isc_safe_memequal(old, dbuf, COOKIE_SIZE)) {
-			ns_stats_increment(client->sctx->nsstats,
+			ns_stats_increment(client->manager->sctx->nsstats,
 					   ns_statscounter_cookiematch);
 			client->attributes |= NS_CLIENTATTR_HAVECOOKIE;
 			return;
 		}
 	}
 
-	ns_stats_increment(client->sctx->nsstats,
+	client->attributes |= NS_CLIENTATTR_BADCOOKIE;
+	ns_stats_increment(client->manager->sctx->nsstats,
 			   ns_statscounter_cookienomatch);
 }
 
@@ -1349,9 +1434,7 @@ process_ecs(ns_client_t *client, isc_buffer_t *buf, size_t optlen) {
 
 		if ((addrlen % 8) != 0) {
 			uint8_t bits = ~0U << (8 - (addrlen % 8));
-			/* cppcheck-suppress objectIndex */
 			bits &= paddr[addrbytes - 1];
-			/* cppcheck-suppress objectIndex */
 			if (bits != paddr[addrbytes - 1]) {
 				return (DNS_R_OPTERR);
 			}
@@ -1380,7 +1463,7 @@ process_keytag(ns_client_t *client, isc_buffer_t *buf, size_t optlen) {
 		return (ISC_R_SUCCESS);
 	}
 
-	client->keytag = isc_mem_get(client->mctx, optlen);
+	client->keytag = isc_mem_get(client->manager->mctx, optlen);
 	{
 		client->keytag_len = (uint16_t)optlen;
 		memmove(client->keytag, isc_buffer_current(buf), optlen);
@@ -1422,7 +1505,7 @@ process_opt(ns_client_t *client, dns_rdataset_t *opt) {
 	 */
 	client->ednsversion = (opt->ttl & 0x00FF0000) >> 16;
 	if (client->ednsversion > DNS_EDNS_VERSION) {
-		ns_stats_increment(client->sctx->nsstats,
+		ns_stats_increment(client->manager->sctx->nsstats,
 				   ns_statscounter_badednsver);
 		result = ns_client_addopt(client, client->message,
 					  &client->opt);
@@ -1447,7 +1530,7 @@ process_opt(ns_client_t *client, dns_rdataset_t *opt) {
 			case DNS_OPT_NSID:
 				if (!WANTNSID(client)) {
 					ns_stats_increment(
-						client->sctx->nsstats,
+						client->manager->sctx->nsstats,
 						ns_statscounter_nsidopt);
 				}
 				client->attributes |= NS_CLIENTATTR_WANTNSID;
@@ -1459,7 +1542,7 @@ process_opt(ns_client_t *client, dns_rdataset_t *opt) {
 			case DNS_OPT_EXPIRE:
 				if (!WANTEXPIRE(client)) {
 					ns_stats_increment(
-						client->sctx->nsstats,
+						client->manager->sctx->nsstats,
 						ns_statscounter_expireopt);
 				}
 				client->attributes |= NS_CLIENTATTR_WANTEXPIRE;
@@ -1471,23 +1554,26 @@ process_opt(ns_client_t *client, dns_rdataset_t *opt) {
 					ns_client_error(client, result);
 					return (result);
 				}
-				ns_stats_increment(client->sctx->nsstats,
-						   ns_statscounter_ecsopt);
+				ns_stats_increment(
+					client->manager->sctx->nsstats,
+					ns_statscounter_ecsopt);
 				break;
 			case DNS_OPT_TCP_KEEPALIVE:
 				if (!USEKEEPALIVE(client)) {
 					ns_stats_increment(
-						client->sctx->nsstats,
+						client->manager->sctx->nsstats,
 						ns_statscounter_keepaliveopt);
 				}
 				client->attributes |=
 					NS_CLIENTATTR_USEKEEPALIVE;
+				isc_nmhandle_keepalive(client->handle, true);
 				isc_buffer_forward(&optbuf, optlen);
 				break;
 			case DNS_OPT_PAD:
 				client->attributes |= NS_CLIENTATTR_WANTPAD;
-				ns_stats_increment(client->sctx->nsstats,
-						   ns_statscounter_padopt);
+				ns_stats_increment(
+					client->manager->sctx->nsstats,
+					ns_statscounter_padopt);
 				isc_buffer_forward(&optbuf, optlen);
 				break;
 			case DNS_OPT_KEY_TAG:
@@ -1497,19 +1583,22 @@ process_opt(ns_client_t *client, dns_rdataset_t *opt) {
 					ns_client_error(client, result);
 					return (result);
 				}
-				ns_stats_increment(client->sctx->nsstats,
-						   ns_statscounter_keytagopt);
+				ns_stats_increment(
+					client->manager->sctx->nsstats,
+					ns_statscounter_keytagopt);
 				break;
 			default:
-				ns_stats_increment(client->sctx->nsstats,
-						   ns_statscounter_otheropt);
+				ns_stats_increment(
+					client->manager->sctx->nsstats,
+					ns_statscounter_otheropt);
 				isc_buffer_forward(&optbuf, optlen);
 				break;
 			}
 		}
 	}
 
-	ns_stats_increment(client->sctx->nsstats, ns_statscounter_edns0in);
+	ns_stats_increment(client->manager->sctx->nsstats,
+			   ns_statscounter_edns0in);
 	client->attributes |= NS_CLIENTATTR_WANTOPT;
 
 	return (result);
@@ -1532,17 +1621,17 @@ ns__client_reset_cb(void *client0) {
 
 	ns_client_endrequest(client);
 	if (client->tcpbuf != NULL) {
-		isc_mem_put(client->mctx, client->tcpbuf,
-			    NS_CLIENT_TCP_BUFFER_SIZE);
+		isc_mem_put(client->manager->send_mctx, client->tcpbuf,
+			    client->tcpbuf_size);
 	}
 
 	if (client->keytag != NULL) {
-		isc_mem_put(client->mctx, client->keytag, client->keytag_len);
+		isc_mem_put(client->manager->mctx, client->keytag,
+			    client->keytag_len);
 		client->keytag_len = 0;
 	}
 
 	client->state = NS_CLIENTSTATE_READY;
-	INSIST(client->recursionquota == NULL);
 
 #ifdef WANT_SINGLETRACE
 	isc_log_setforcelog(false);
@@ -1552,6 +1641,11 @@ ns__client_reset_cb(void *client0) {
 void
 ns__client_put_cb(void *client0) {
 	ns_client_t *client = client0;
+	ns_clientmgr_t *manager = NULL;
+
+	REQUIRE(NS_CLIENT_VALID(client));
+
+	manager = client->manager;
 
 	ns_client_log(client, DNS_LOGCATEGORY_SECURITY, NS_LOGMODULE_CLIENT,
 		      ISC_LOG_DEBUG(3), "freeing client");
@@ -1560,11 +1654,12 @@ ns__client_put_cb(void *client0) {
 	 * Call this first because it requires a valid client.
 	 */
 	ns_query_free(client);
+	client_extendederror_reset(client);
 
 	client->magic = 0;
-	client->shuttingdown = true;
 
-	isc_mem_put(client->mctx, client->sendbuf, NS_CLIENT_SEND_BUFFER_SIZE);
+	isc_mem_put(manager->send_mctx, client->sendbuf,
+		    NS_CLIENT_SEND_BUFFER_SIZE);
 	if (client->opt != NULL) {
 		INSIST(dns_rdataset_isassociated(client->opt));
 		dns_rdataset_disassociate(client->opt);
@@ -1573,30 +1668,15 @@ ns__client_put_cb(void *client0) {
 
 	dns_message_detach(&client->message);
 
-	if (client->manager != NULL) {
-		clientmgr_detach(&client->manager);
-	}
-
-	/*
-	 * Detaching the task must be done after unlinking from
-	 * the manager's lists because the manager accesses
-	 * client->task.
-	 */
-	if (client->task != NULL) {
-		isc_task_detach(&client->task);
-	}
-
 	/*
 	 * Destroy the fetchlock mutex that was created in
 	 * ns_query_init().
 	 */
 	isc_mutex_destroy(&client->query.fetchlock);
 
-	if (client->sctx != NULL) {
-		ns_server_detach(&client->sctx);
-	}
+	isc_mem_put(manager->mctx, client, sizeof(*client));
 
-	isc_mem_detach(&client->mctx);
+	ns_clientmgr_detach(&manager);
 }
 
 /*
@@ -1604,8 +1684,8 @@ ns__client_put_cb(void *client0) {
  * or tcpmsg (TCP case).
  */
 void
-ns__client_request(isc_nmhandle_t *handle, isc_result_t eresult,
-		   isc_region_t *region, void *arg) {
+ns_client_request(isc_nmhandle_t *handle, isc_result_t eresult,
+		  isc_region_t *region, void *arg) {
 	ns_client_t *client = NULL;
 	isc_result_t result;
 	isc_result_t sigresult = ISC_R_SUCCESS;
@@ -1621,10 +1701,27 @@ ns__client_request(isc_nmhandle_t *handle, isc_result_t eresult,
 	bool notimp;
 	size_t reqsize;
 	dns_aclenv_t *env = NULL;
-	isc_sockaddr_t sockaddr;
 #ifdef HAVE_DNSTAP
 	dns_dtmsgtype_t dtmsgtype;
 #endif /* ifdef HAVE_DNSTAP */
+	static const char *ra_reasons[] = {
+		"ACLs not processed yet",
+		"no resolver in view",
+		"recursion not enabled for view",
+		"allow-recursion did not match",
+		"allow-query-cache did not match",
+		"allow-recursion-on did not match",
+		"allow-query-cache-on did not match",
+	};
+	enum refusal_reasons {
+		INVALID,
+		NO_RESOLVER,
+		RECURSION_DISABLED,
+		ALLOW_RECURSION,
+		ALLOW_QUERY_CACHE,
+		ALLOW_RECURSION_ON,
+		ALLOW_QUERY_CACHE_ON
+	} ra_refusal_reason = INVALID;
 
 	if (eresult != ISC_R_SUCCESS) {
 		return;
@@ -1637,8 +1734,9 @@ ns__client_request(isc_nmhandle_t *handle, isc_result_t eresult,
 			ns_interfacemgr_getclientmgr(ifp->mgr);
 
 		INSIST(VALID_MANAGER(clientmgr));
+		INSIST(clientmgr->tid == isc_tid());
 
-		client = isc_nmhandle_getextra(handle);
+		client = isc_mem_get(clientmgr->mctx, sizeof(*client));
 
 		result = ns__client_setup(client, clientmgr, true);
 		if (result != ISC_R_SUCCESS) {
@@ -1667,8 +1765,6 @@ ns__client_request(isc_nmhandle_t *handle, isc_result_t eresult,
 		client->attributes |= NS_CLIENTATTR_TCP;
 	}
 
-	INSIST(client->recursionquota == NULL);
-
 	INSIST(client->state == NS_CLIENTSTATE_READY);
 
 	(void)atomic_fetch_add_relaxed(&ns_client_requests, 1);
@@ -1684,7 +1780,7 @@ ns__client_request(isc_nmhandle_t *handle, isc_result_t eresult,
 
 	client->state = NS_CLIENTSTATE_WORKING;
 
-	TIME_NOW(&client->requesttime);
+	client->requesttime = isc_time_now();
 	client->tnow = client->requesttime;
 	client->now = isc_time_seconds(&client->tnow);
 
@@ -1697,19 +1793,21 @@ ns__client_request(isc_nmhandle_t *handle, isc_result_t eresult,
 		ns_client_log(client, DNS_LOGCATEGORY_SECURITY,
 			      NS_LOGMODULE_CLIENT, ISC_LOG_DEBUG(10),
 			      "dropped request: suspicious port");
+		isc_nm_bad_request(handle);
 		return;
 	}
 #endif /* if NS_CLIENT_DROPPORT */
 
 	env = client->manager->aclenv;
-	if (client->sctx->blackholeacl != NULL &&
-	    (dns_acl_match(&netaddr, NULL, client->sctx->blackholeacl, env,
-			   &match, NULL) == ISC_R_SUCCESS) &&
+	if (client->manager->sctx->blackholeacl != NULL &&
+	    (dns_acl_match(&netaddr, NULL, client->manager->sctx->blackholeacl,
+			   env, &match, NULL) == ISC_R_SUCCESS) &&
 	    match > 0)
 	{
 		ns_client_log(client, DNS_LOGCATEGORY_SECURITY,
 			      NS_LOGMODULE_CLIENT, ISC_LOG_DEBUG(10),
 			      "dropped request: blackholed peer");
+		isc_nm_bad_request(handle);
 		return;
 	}
 
@@ -1723,6 +1821,10 @@ ns__client_request(isc_nmhandle_t *handle, isc_result_t eresult,
 		 * There isn't enough header to determine whether
 		 * this was a request or a response.  Drop it.
 		 */
+		ns_client_log(client, DNS_LOGCATEGORY_SECURITY,
+			      NS_LOGMODULE_CLIENT, ISC_LOG_DEBUG(10),
+			      "dropped request: invalid message header");
+		isc_nm_bad_request(handle);
 		return;
 	}
 
@@ -1738,7 +1840,10 @@ ns__client_request(isc_nmhandle_t *handle, isc_result_t eresult,
 	 * If it's a TCP response, discard it here.
 	 */
 	if ((flags & DNS_MESSAGEFLAG_QR) != 0) {
-		CTRACE("unexpected response");
+		ns_client_log(client, DNS_LOGCATEGORY_SECURITY,
+			      NS_LOGMODULE_CLIENT, ISC_LOG_DEBUG(10),
+			      "dropped request: unexpected response");
+		isc_nm_bad_request(handle);
 		return;
 	}
 
@@ -1746,41 +1851,39 @@ ns__client_request(isc_nmhandle_t *handle, isc_result_t eresult,
 	 * Update some statistics counters.  Don't count responses.
 	 */
 	if (isc_sockaddr_pf(&client->peeraddr) == PF_INET) {
-		ns_stats_increment(client->sctx->nsstats,
+		ns_stats_increment(client->manager->sctx->nsstats,
 				   ns_statscounter_requestv4);
 	} else {
-		ns_stats_increment(client->sctx->nsstats,
+		ns_stats_increment(client->manager->sctx->nsstats,
 				   ns_statscounter_requestv6);
 	}
 	if (TCP_CLIENT(client)) {
-		ns_stats_increment(client->sctx->nsstats,
+		ns_stats_increment(client->manager->sctx->nsstats,
 				   ns_statscounter_requesttcp);
 		switch (isc_sockaddr_pf(&client->peeraddr)) {
 		case AF_INET:
-			isc_stats_increment(client->sctx->tcpinstats4,
-					    ISC_MIN((int)reqsize / 16, 18));
+			isc_histomulti_inc(client->manager->sctx->tcpinstats4,
+					   DNS_SIZEHISTO_BUCKETIN(reqsize));
 			break;
 		case AF_INET6:
-			isc_stats_increment(client->sctx->tcpinstats6,
-					    ISC_MIN((int)reqsize / 16, 18));
+			isc_histomulti_inc(client->manager->sctx->tcpinstats6,
+					   DNS_SIZEHISTO_BUCKETIN(reqsize));
 			break;
 		default:
-			INSIST(0);
-			ISC_UNREACHABLE();
+			UNREACHABLE();
 		}
 	} else {
 		switch (isc_sockaddr_pf(&client->peeraddr)) {
 		case AF_INET:
-			isc_stats_increment(client->sctx->udpinstats4,
-					    ISC_MIN((int)reqsize / 16, 18));
+			isc_histomulti_inc(client->manager->sctx->udpinstats4,
+					   DNS_SIZEHISTO_BUCKETIN(reqsize));
 			break;
 		case AF_INET6:
-			isc_stats_increment(client->sctx->udpinstats6,
-					    ISC_MIN((int)reqsize / 16, 18));
+			isc_histomulti_inc(client->manager->sctx->udpinstats6,
+					   DNS_SIZEHISTO_BUCKETIN(reqsize));
 			break;
 		default:
-			INSIST(0);
-			ISC_UNREACHABLE();
+			UNREACHABLE();
 		}
 	}
 
@@ -1809,19 +1912,7 @@ ns__client_request(isc_nmhandle_t *handle, isc_result_t eresult,
 		return;
 	}
 
-	/*
-	 * Disable pipelined TCP query processing if necessary.
-	 */
-	if (TCP_CLIENT(client) &&
-	    (client->message->opcode != dns_opcode_query ||
-	     (client->sctx->keepresporder != NULL &&
-	      dns_acl_allowed(&netaddr, NULL, client->sctx->keepresporder,
-			      env))))
-	{
-		isc_nm_tcpdns_sequential(handle);
-	}
-
-	dns_opcodestats_increment(client->sctx->opcodestats,
+	dns_opcodestats_increment(client->manager->sctx->opcodestats,
 				  client->message->opcode);
 	switch (client->message->opcode) {
 	case dns_opcode_query:
@@ -1836,11 +1927,12 @@ ns__client_request(isc_nmhandle_t *handle, isc_result_t eresult,
 	}
 
 	client->message->rcode = dns_rcode_noerror;
+	client->ede = NULL;
 
 	/*
 	 * Deal with EDNS.
 	 */
-	if ((client->sctx->options & NS_SERVER_NOEDNS) != 0) {
+	if ((client->manager->sctx->options & NS_SERVER_NOEDNS) != 0) {
 		opt = NULL;
 	} else {
 		opt = dns_message_getopt(client->message);
@@ -1854,7 +1946,9 @@ ns__client_request(isc_nmhandle_t *handle, isc_result_t eresult,
 		 * Are returning FORMERR to all EDNS queries?
 		 * Simulate a STD13 compliant server.
 		 */
-		if ((client->sctx->options & NS_SERVER_EDNSFORMERR) != 0) {
+		if ((client->manager->sctx->options & NS_SERVER_EDNSFORMERR) !=
+		    0)
+		{
 			ns_client_error(client, DNS_R_FORMERR);
 			return;
 		}
@@ -1862,7 +1956,9 @@ ns__client_request(isc_nmhandle_t *handle, isc_result_t eresult,
 		/*
 		 * Are returning NOTIMP to all EDNS queries?
 		 */
-		if ((client->sctx->options & NS_SERVER_EDNSNOTIMP) != 0) {
+		if ((client->manager->sctx->options & NS_SERVER_EDNSNOTIMP) !=
+		    0)
+		{
 			ns_client_error(client, DNS_R_NOTIMP);
 			return;
 		}
@@ -1870,7 +1966,9 @@ ns__client_request(isc_nmhandle_t *handle, isc_result_t eresult,
 		/*
 		 * Are returning REFUSED to all EDNS queries?
 		 */
-		if ((client->sctx->options & NS_SERVER_EDNSREFUSED) != 0) {
+		if ((client->manager->sctx->options & NS_SERVER_EDNSREFUSED) !=
+		    0)
+		{
 			ns_client_error(client, DNS_R_REFUSED);
 			return;
 		}
@@ -1878,7 +1976,8 @@ ns__client_request(isc_nmhandle_t *handle, isc_result_t eresult,
 		/*
 		 * Are we dropping all EDNS queries?
 		 */
-		if ((client->sctx->options & NS_SERVER_DROPEDNS) != 0) {
+		if ((client->manager->sctx->options & NS_SERVER_DROPEDNS) != 0)
+		{
 			ns_client_drop(client, ISC_R_SUCCESS);
 			return;
 		}
@@ -1917,14 +2016,12 @@ ns__client_request(isc_nmhandle_t *handle, isc_result_t eresult,
 		return;
 	}
 
-	sockaddr = isc_nmhandle_localaddr(handle);
-	isc_netaddr_fromsockaddr(&client->destaddr, &sockaddr);
+	client->destsockaddr = isc_nmhandle_localaddr(handle);
+	isc_netaddr_fromsockaddr(&client->destaddr, &client->destsockaddr);
 
-	isc_sockaddr_fromnetaddr(&client->destsockaddr, &client->destaddr, 0);
-
-	result = client->sctx->matchingview(&netaddr, &client->destaddr,
-					    client->message, env, &sigresult,
-					    &client->view);
+	result = client->manager->sctx->matchingview(
+		&netaddr, &client->destaddr, client->message, env, &sigresult,
+		&client->view);
 	if (result != ISC_R_SUCCESS) {
 		char classname[DNS_RDATACLASS_FORMATSIZE];
 
@@ -1949,6 +2046,7 @@ ns__client_request(isc_nmhandle_t *handle, isc_result_t eresult,
 			      NS_LOGMODULE_CLIENT, ISC_LOG_DEBUG(1),
 			      "no matching view in class '%s'", classname);
 		ns_client_dumpmessage(client, "no matching view in class");
+		ns_client_extendederror(client, DNS_EDE_PROHIBITED, NULL);
 		ns_client_error(client, notimp ? DNS_R_NOTIMP : DNS_R_REFUSED);
 		return;
 	}
@@ -1968,10 +2066,10 @@ ns__client_request(isc_nmhandle_t *handle, isc_result_t eresult,
 	if (result != ISC_R_NOTFOUND) {
 		signame = NULL;
 		if (dns_message_gettsig(client->message, &signame) != NULL) {
-			ns_stats_increment(client->sctx->nsstats,
+			ns_stats_increment(client->manager->sctx->nsstats,
 					   ns_statscounter_tsigin);
 		} else {
-			ns_stats_increment(client->sctx->nsstats,
+			ns_stats_increment(client->manager->sctx->nsstats,
 					   ns_statscounter_sig0in);
 		}
 	}
@@ -1997,13 +2095,12 @@ ns__client_request(isc_nmhandle_t *handle, isc_result_t eresult,
 		isc_result_t tresult;
 
 		/* There is a signature, but it is bad. */
-		ns_stats_increment(client->sctx->nsstats,
+		ns_stats_increment(client->manager->sctx->nsstats,
 				   ns_statscounter_invalidsig);
 		signame = NULL;
 		if (dns_message_gettsig(client->message, &signame) != NULL) {
 			char namebuf[DNS_NAME_FORMATSIZE];
-			char cnamebuf[DNS_NAME_FORMATSIZE];
-			dns_name_format(signame, namebuf, sizeof(namebuf));
+
 			status = client->message->tsigstatus;
 			isc_buffer_init(&b, tsigrcode, sizeof(tsigrcode) - 1);
 			tresult = dns_tsigrcode_totext(status, &b);
@@ -2012,23 +2109,17 @@ ns__client_request(isc_nmhandle_t *handle, isc_result_t eresult,
 			if (client->message->tsigkey->generated) {
 				dns_name_format(
 					client->message->tsigkey->creator,
-					cnamebuf, sizeof(cnamebuf));
-				ns_client_log(
-					client, DNS_LOGCATEGORY_SECURITY,
-					NS_LOGMODULE_CLIENT, ISC_LOG_ERROR,
-					"request has invalid signature: "
-					"TSIG %s (%s): %s (%s)",
-					namebuf, cnamebuf,
-					isc_result_totext(result), tsigrcode);
+					namebuf, sizeof(namebuf));
 			} else {
-				ns_client_log(
-					client, DNS_LOGCATEGORY_SECURITY,
-					NS_LOGMODULE_CLIENT, ISC_LOG_ERROR,
-					"request has invalid signature: "
-					"TSIG %s: %s (%s)",
-					namebuf, isc_result_totext(result),
-					tsigrcode);
+				dns_name_format(signame, namebuf,
+						sizeof(namebuf));
 			}
+			ns_client_log(client, DNS_LOGCATEGORY_SECURITY,
+				      NS_LOGMODULE_CLIENT, ISC_LOG_ERROR,
+				      "request has invalid signature: "
+				      "TSIG %s: %s (%s)",
+				      namebuf, isc_result_totext(result),
+				      tsigrcode);
 		} else {
 			status = client->message->sig0status;
 			isc_buffer_init(&b, tsigrcode, sizeof(tsigrcode) - 1);
@@ -2044,7 +2135,7 @@ ns__client_request(isc_nmhandle_t *handle, isc_result_t eresult,
 		/*
 		 * Accept update messages signed by unknown keys so that
 		 * update forwarding works transparently through slaves
-		 * that don't have all the same keys as the master.
+		 * that don't have all the same keys as the primary.
 		 */
 		if (!(client->message->tsigstatus == dns_tsigerror_badkey &&
 		      client->message->opcode == dns_opcode_update))
@@ -2062,28 +2153,42 @@ ns__client_request(isc_nmhandle_t *handle, isc_result_t eresult,
 	 * cache there is no point in setting RA.
 	 */
 	ra = false;
-	if (client->view->resolver != NULL && client->view->recursion &&
-	    ns_client_checkaclsilent(client, NULL, client->view->recursionacl,
-				     true) == ISC_R_SUCCESS &&
-	    ns_client_checkaclsilent(client, NULL, client->view->cacheacl,
-				     true) == ISC_R_SUCCESS &&
-	    ns_client_checkaclsilent(client, &client->destaddr,
-				     client->view->recursiononacl,
-				     true) == ISC_R_SUCCESS &&
-	    ns_client_checkaclsilent(client, &client->destaddr,
-				     client->view->cacheonacl,
-				     true) == ISC_R_SUCCESS)
-	{
-		ra = true;
-	}
 
-	if (ra) {
+	/* must be initialized before ns_client_log uses it as index */
+	if (client->view->resolver == NULL) {
+		ra_refusal_reason = NO_RESOLVER;
+	} else if (!client->view->recursion) {
+		ra_refusal_reason = RECURSION_DISABLED;
+	} else if (ns_client_checkaclsilent(client, NULL,
+					    client->view->recursionacl,
+					    true) != ISC_R_SUCCESS)
+	{
+		ra_refusal_reason = ALLOW_RECURSION;
+	} else if (ns_client_checkaclsilent(client, NULL,
+					    client->view->cacheacl,
+					    true) != ISC_R_SUCCESS)
+	{
+		ra_refusal_reason = ALLOW_QUERY_CACHE;
+	} else if (ns_client_checkaclsilent(client, &client->destaddr,
+					    client->view->recursiononacl,
+					    true) != ISC_R_SUCCESS)
+	{
+		ra_refusal_reason = ALLOW_RECURSION_ON;
+	} else if (ns_client_checkaclsilent(client, &client->destaddr,
+					    client->view->cacheonacl,
+					    true) != ISC_R_SUCCESS)
+	{
+		ra_refusal_reason = ALLOW_QUERY_CACHE_ON;
+	} else {
+		ra = true;
 		client->attributes |= NS_CLIENTATTR_RA;
 	}
 
 	ns_client_log(client, DNS_LOGCATEGORY_SECURITY, NS_LOGMODULE_CLIENT,
 		      ISC_LOG_DEBUG(3),
-		      ra ? "recursion available" : "recursion not available");
+		      ra ? "recursion available"
+			 : "recursion not available (%s)",
+		      ra_reasons[ra_refusal_reason]);
 
 	/*
 	 * Adjust maximum UDP response size for this client.
@@ -2195,19 +2300,16 @@ ns__client_setup(ns_client_t *client, ns_clientmgr_t *mgr, bool new) {
 	if (new) {
 		REQUIRE(VALID_MANAGER(mgr));
 		REQUIRE(client != NULL);
-		REQUIRE(mgr->tid == isc_nm_tid());
+		REQUIRE(mgr->tid == isc_tid());
 
-		*client = (ns_client_t){ .magic = 0, .tid = mgr->tid };
+		*client = (ns_client_t){ .magic = 0 };
 
-		isc_mem_attach(mgr->mctx, &client->mctx);
-		clientmgr_attach(mgr, &client->manager);
-		ns_server_attach(mgr->sctx, &client->sctx);
-		isc_task_attach(mgr->task, &client->task);
+		ns_clientmgr_attach(mgr, &client->manager);
 
-		dns_message_create(client->mctx, DNS_MESSAGE_INTENTPARSE,
-				   &client->message);
+		dns_message_create(client->manager->mctx,
+				   DNS_MESSAGE_INTENTPARSE, &client->message);
 
-		client->sendbuf = isc_mem_get(client->mctx,
+		client->sendbuf = isc_mem_get(client->manager->send_mctx,
 					      NS_CLIENT_SEND_BUFFER_SIZE);
 		/*
 		 * Set magic earlier than usual because ns_query_init()
@@ -2220,30 +2322,19 @@ ns__client_setup(ns_client_t *client, ns_clientmgr_t *mgr, bool new) {
 		}
 	} else {
 		REQUIRE(NS_CLIENT_VALID(client));
-		REQUIRE(client->tid == isc_nm_tid());
-
-		ns_clientmgr_t *oldmgr = client->manager;
-		ns_server_t *sctx = client->sctx;
-		isc_task_t *task = client->task;
-		unsigned char *sendbuf = client->sendbuf;
-		dns_message_t *message = client->message;
-		isc_mem_t *oldmctx = client->mctx;
-		ns_query_t query = client->query;
-		int tid = client->tid;
+		REQUIRE(client->manager->tid == isc_tid());
 
 		/*
 		 * Retain these values from the existing client, but
 		 * zero every thing else.
 		 */
-		*client = (ns_client_t){ .magic = 0,
-					 .mctx = oldmctx,
-					 .manager = oldmgr,
-					 .sctx = sctx,
-					 .task = task,
-					 .sendbuf = sendbuf,
-					 .message = message,
-					 .query = query,
-					 .tid = tid };
+		*client = (ns_client_t){
+			.magic = 0,
+			.manager = client->manager,
+			.sendbuf = client->sendbuf,
+			.message = client->message,
+			.query = client->query,
+		};
 	}
 
 	client->query.attributes &= ~NS_QUERYATTR_ANSWERED;
@@ -2266,7 +2357,7 @@ ns__client_setup(ns_client_t *client, ns_clientmgr_t *mgr, bool new) {
 
 cleanup:
 	if (client->sendbuf != NULL) {
-		isc_mem_put(client->mctx, client->sendbuf,
+		isc_mem_put(client->manager->send_mctx, client->sendbuf,
 			    NS_CLIENT_SEND_BUFFER_SIZE);
 	}
 
@@ -2274,24 +2365,11 @@ cleanup:
 		dns_message_detach(&client->message);
 	}
 
-	if (client->task != NULL) {
-		isc_task_detach(&client->task);
-	}
-
 	if (client->manager != NULL) {
-		clientmgr_detach(&client->manager);
-	}
-	isc_mem_detach(&client->mctx);
-	if (client->sctx != NULL) {
-		ns_server_detach(&client->sctx);
+		ns_clientmgr_detach(&client->manager);
 	}
 
 	return (result);
-}
-
-bool
-ns_client_shuttingdown(ns_client_t *client) {
-	return (client->shuttingdown);
 }
 
 /***
@@ -2299,95 +2377,110 @@ ns_client_shuttingdown(ns_client_t *client) {
  ***/
 
 static void
-clientmgr_attach(ns_clientmgr_t *source, ns_clientmgr_t **targetp) {
-	int32_t oldrefs;
-
-	REQUIRE(VALID_MANAGER(source));
-	REQUIRE(targetp != NULL && *targetp == NULL);
-
-	oldrefs = isc_refcount_increment0(&source->references);
-	isc_log_write(ns_lctx, NS_LOGCATEGORY_CLIENT, NS_LOGMODULE_CLIENT,
-		      ISC_LOG_DEBUG(3), "clientmgr @%p attach: %d", source,
-		      oldrefs + 1);
-
-	*targetp = source;
-}
-
-static void
-clientmgr_detach(ns_clientmgr_t **mp) {
-	int32_t oldrefs;
-	ns_clientmgr_t *mgr = *mp;
-	*mp = NULL;
-
-	oldrefs = isc_refcount_decrement(&mgr->references);
-	isc_log_write(ns_lctx, NS_LOGCATEGORY_CLIENT, NS_LOGMODULE_CLIENT,
-		      ISC_LOG_DEBUG(3), "clientmgr @%p detach: %d", mgr,
-		      oldrefs - 1);
-	if (oldrefs == 1) {
-		clientmgr_destroy(mgr);
-	}
-}
-
-static void
-clientmgr_destroy(ns_clientmgr_t *manager) {
+clientmgr_destroy_cb(void *arg) {
+	ns_clientmgr_t *manager = (ns_clientmgr_t *)arg;
 	MTRACE("clientmgr_destroy");
 
-	isc_refcount_destroy(&manager->references);
 	manager->magic = 0;
+
+	isc_refcount_destroy(&manager->references);
+
+	isc_loop_detach(&manager->loop);
 
 	dns_aclenv_detach(&manager->aclenv);
 
-	isc_mutex_destroy(&manager->lock);
 	isc_mutex_destroy(&manager->reclock);
 
-	if (manager->excl != NULL) {
-		isc_task_detach(&manager->excl);
-	}
-
-	isc_task_detach(&manager->task);
 	ns_server_detach(&manager->sctx);
+
+	isc_mem_detach(&manager->send_mctx);
 
 	isc_mem_putanddetach(&manager->mctx, manager, sizeof(*manager));
 }
 
+static void
+clientmgr_destroy(ns_clientmgr_t *mgr) {
+	isc_async_run(mgr->loop, clientmgr_destroy_cb, mgr);
+}
+
+ISC_REFCOUNT_IMPL(ns_clientmgr, clientmgr_destroy);
+
 isc_result_t
-ns_clientmgr_create(ns_server_t *sctx, isc_taskmgr_t *taskmgr,
-		    isc_timermgr_t *timermgr, dns_aclenv_t *aclenv, int tid,
-		    ns_clientmgr_t **managerp) {
+ns_clientmgr_create(ns_server_t *sctx, isc_loopmgr_t *loopmgr,
+		    dns_aclenv_t *aclenv, int tid, ns_clientmgr_t **managerp) {
 	ns_clientmgr_t *manager = NULL;
 	isc_mem_t *mctx = NULL;
-	isc_result_t result;
 
 	isc_mem_create(&mctx);
+	isc_mem_setname(mctx, "clientmgr");
 
 	manager = isc_mem_get(mctx, sizeof(*manager));
-	*manager = (ns_clientmgr_t){ .magic = 0, .mctx = mctx };
-
-	result = isc_taskmgr_excltask(taskmgr, &manager->excl);
-	if (result != ISC_R_SUCCESS) {
-		isc_mem_put(mctx, manager, sizeof(*manager));
-		return (result);
-	}
-
-	isc_mutex_init(&manager->lock);
+	*manager = (ns_clientmgr_t){
+		.magic = 0,
+		.mctx = mctx,
+		.tid = tid,
+		.recursing = ISC_LIST_INITIALIZER,
+	};
+	isc_loop_attach(isc_loop_get(loopmgr, tid), &manager->loop);
 	isc_mutex_init(&manager->reclock);
-
-	manager->taskmgr = taskmgr;
-	manager->timermgr = timermgr;
-	manager->tid = tid;
-
 	dns_aclenv_attach(aclenv, &manager->aclenv);
-
-	manager->exiting = false;
-	result = isc_task_create_bound(manager->taskmgr, 20, &manager->task,
-				       manager->tid);
-	RUNTIME_CHECK(result == ISC_R_SUCCESS);
-
 	isc_refcount_init(&manager->references, 1);
-	manager->sctx = NULL;
 	ns_server_attach(sctx, &manager->sctx);
 
-	ISC_LIST_INIT(manager->recursing);
+	/*
+	 * We create specialised per-worker memory context specifically
+	 * dedicated and tuned for allocating send buffers as it is a very
+	 * common operation. Not doing so may result in excessive memory
+	 * use in certain workloads.
+	 *
+	 * Please see this thread for more details:
+	 *
+	 * https://github.com/jemalloc/jemalloc/issues/2483
+	 *
+	 * In particular, this information from the jemalloc developers is
+	 * of the most interest:
+	 *
+	 * https://github.com/jemalloc/jemalloc/issues/2483#issuecomment-1639019699
+	 * https://github.com/jemalloc/jemalloc/issues/2483#issuecomment-1698173849
+	 *
+	 * In essence, we use the following memory management strategy:
+	 *
+	 * 1. We use a per-worker memory arena for send buffers memory
+	 * allocation to reduce lock contention (In reality, we create a
+	 * per-client manager arena, but we have one client manager per
+	 * worker).
+	 *
+	 * 2. The automatically created arenas settings remain unchanged
+	 * and may be controlled by users (e.g. by setting the
+	 * "MALLOC_CONF" variable).
+	 *
+	 * 3. We attune the arenas to not use dirty pages cache as the
+	 * cache would have a poor reuse rate, and that is known to
+	 * significantly contribute to excessive memory use.
+	 *
+	 * 4. There is no strict need for the dirty cache, as there is a
+	 * per arena bin for each allocation size, so because we initially
+	 * allocate strictly 64K per send buffer (enough for a DNS
+	 * message), allocations would get directed to one bin (an "object
+	 * pool" or a "slab") maintained within an arena. That is, there
+	 * is an object pool already, specifically to optimise for the
+	 * case of frequent allocations of objects of the given size. The
+	 * object pool should suffice our needs, as we will end up
+	 * recycling the objects from there without the need to back it by
+	 * an additional layer of dirty pages cache. The dirty pages cache
+	 * would have worked better in the case when there are more
+	 * allocation bins involved due to a higher reuse rate (the case
+	 * of a more "generic" memory management).
+	 */
+	isc_mem_create_arena(&manager->send_mctx);
+	isc_mem_setname(manager->send_mctx, "sendbufs");
+	(void)isc_mem_arena_set_dirty_decay_ms(manager->send_mctx, 0);
+	/*
+	 * Disable muzzy pages cache too, as versions < 5.2.0 have it
+	 * enabled by default. The muzzy pages cache goes right below the
+	 * dirty pages cache and backs it.
+	 */
+	(void)isc_mem_arena_set_muzzy_decay_ms(manager->send_mctx, 0);
 
 	manager->magic = MANAGER_MAGIC;
 
@@ -2399,37 +2492,20 @@ ns_clientmgr_create(ns_server_t *sctx, isc_taskmgr_t *taskmgr,
 }
 
 void
-ns_clientmgr_destroy(ns_clientmgr_t **managerp) {
-	isc_result_t result;
-	ns_clientmgr_t *manager;
-	bool unlock = false;
+ns_clientmgr_shutdown(ns_clientmgr_t *manager) {
+	ns_client_t *client;
 
-	REQUIRE(managerp != NULL);
-	manager = *managerp;
-	*managerp = NULL;
 	REQUIRE(VALID_MANAGER(manager));
 
 	MTRACE("destroy");
 
-	/*
-	 * Check for success because we may already be task-exclusive
-	 * at this point.  Only if we succeed at obtaining an exclusive
-	 * lock now will we need to relinquish it later.
-	 */
-	result = isc_task_beginexclusive(manager->excl);
-	if (result == ISC_R_SUCCESS) {
-		unlock = true;
+	LOCK(&manager->reclock);
+	for (client = ISC_LIST_HEAD(manager->recursing); client != NULL;
+	     client = ISC_LIST_NEXT(client, rlink))
+	{
+		ns_query_cancel(client);
 	}
-
-	manager->exiting = true;
-
-	if (unlock) {
-		isc_task_endexclusive(manager->excl);
-	}
-
-	if (isc_refcount_decrement(&manager->references) == 1) {
-		clientmgr_destroy(manager);
-	}
+	UNLOCK(&manager->reclock);
 }
 
 isc_sockaddr_t *
@@ -2449,6 +2525,7 @@ ns_client_checkaclsilent(ns_client_t *client, isc_netaddr_t *netaddr,
 	dns_aclenv_t *env = client->manager->aclenv;
 	isc_netaddr_t tmpnetaddr;
 	int match;
+	isc_sockaddr_t local;
 
 	if (acl == NULL) {
 		if (default_allow) {
@@ -2463,7 +2540,13 @@ ns_client_checkaclsilent(ns_client_t *client, isc_netaddr_t *netaddr,
 		netaddr = &tmpnetaddr;
 	}
 
-	result = dns_acl_match(netaddr, client->signer, acl, env, &match, NULL);
+	local = isc_nmhandle_localaddr(client->handle);
+	result = dns_acl_match_port_transport(
+		netaddr, isc_sockaddr_getport(&local),
+		isc_nm_socket_type(client->handle),
+		isc_nm_has_encryption(client->handle), client->signer, acl, env,
+		&match, NULL);
+
 	if (result != ISC_R_SUCCESS) {
 		goto deny; /* Internal error, already logged. */
 	}
@@ -2499,6 +2582,7 @@ ns_client_checkacl(ns_client_t *client, isc_sockaddr_t *sockaddr,
 			      NS_LOGMODULE_CLIENT, ISC_LOG_DEBUG(3),
 			      "%s approved", opname);
 	} else {
+		ns_client_extendederror(client, DNS_EDE_PROHIBITED, NULL);
 		ns_client_log(client, DNS_LOGCATEGORY_SECURITY,
 			      NS_LOGMODULE_CLIENT, log_level, "%s denied",
 			      opname);
@@ -2612,12 +2696,12 @@ ns_client_dumpmessage(ns_client_t *client, const char *reason) {
 	 */
 
 	do {
-		buf = isc_mem_get(client->mctx, len);
+		buf = isc_mem_get(client->manager->mctx, len);
 		isc_buffer_init(&buffer, buf, len);
 		result = dns_message_totext(
 			client->message, &dns_master_style_debug, 0, &buffer);
 		if (result == ISC_R_NOSPACE) {
-			isc_mem_put(client->mctx, buf, len);
+			isc_mem_put(client->manager->mctx, buf, len);
 			len += 1024;
 		} else if (result == ISC_R_SUCCESS) {
 			ns_client_log(client, NS_LOGCATEGORY_CLIENT,
@@ -2628,7 +2712,7 @@ ns_client_dumpmessage(ns_client_t *client, const char *reason) {
 	} while (result == ISC_R_NOSPACE);
 
 	if (buf != NULL) {
-		isc_mem_put(client->mctx, buf, len);
+		isc_mem_put(client->manager->mctx, buf, len);
 	}
 }
 
@@ -2730,15 +2814,11 @@ ns_client_sourceip(dns_clientinfo_t *ci, isc_sockaddr_t **addrp) {
 dns_rdataset_t *
 ns_client_newrdataset(ns_client_t *client) {
 	dns_rdataset_t *rdataset;
-	isc_result_t result;
 
 	REQUIRE(NS_CLIENT_VALID(client));
 
 	rdataset = NULL;
-	result = dns_message_gettemprdataset(client->message, &rdataset);
-	if (result != ISC_R_SUCCESS) {
-		return (NULL);
-	}
+	dns_message_gettemprdataset(client->message, &rdataset);
 
 	return (rdataset);
 }
@@ -2766,7 +2846,7 @@ ns_client_newnamebuf(ns_client_t *client) {
 
 	CTRACE("ns_client_newnamebuf");
 
-	isc_buffer_allocate(client->mctx, &dbuf, 1024);
+	isc_buffer_allocate(client->manager->mctx, &dbuf, 1024);
 	ISC_LIST_APPEND(client->query.namebufs, dbuf, link);
 
 	CTRACE("ns_client_newnamebuf: done");
@@ -2777,18 +2857,12 @@ dns_name_t *
 ns_client_newname(ns_client_t *client, isc_buffer_t *dbuf, isc_buffer_t *nbuf) {
 	dns_name_t *name = NULL;
 	isc_region_t r;
-	isc_result_t result;
 
 	REQUIRE((client->query.attributes & NS_QUERYATTR_NAMEBUFUSED) == 0);
 
 	CTRACE("ns_client_newname");
 
-	result = dns_message_gettempname(client->message, &name);
-	if (result != ISC_R_SUCCESS) {
-		CTRACE("ns_client_newname: "
-		       "dns_message_gettempname failed: done");
-		return (NULL);
-	}
+	dns_message_gettempname(client->message, &name);
 	isc_buffer_availableregion(dbuf, &r);
 	isc_buffer_init(nbuf, r.base, r.length);
 	dns_name_setbuffer(name, NULL);
@@ -2865,7 +2939,8 @@ ns_client_newdbversion(ns_client_t *client, unsigned int n) {
 	ns_dbversion_t *dbversion = NULL;
 
 	for (i = 0; i < n; i++) {
-		dbversion = isc_mem_get(client->mctx, sizeof(*dbversion));
+		dbversion = isc_mem_get(client->manager->mctx,
+					sizeof(*dbversion));
 		*dbversion = (ns_dbversion_t){ 0 };
 		ISC_LIST_INITANDAPPEND(client->query.freeversions, dbversion,
 				       link);
@@ -2874,7 +2949,7 @@ ns_client_newdbversion(ns_client_t *client, unsigned int n) {
 	return (ISC_R_SUCCESS);
 }
 
-static inline ns_dbversion_t *
+static ns_dbversion_t *
 client_getdbversion(ns_client_t *client) {
 	ns_dbversion_t *dbversion = NULL;
 

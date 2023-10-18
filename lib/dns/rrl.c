@@ -1,6 +1,8 @@
 /*
  * Copyright (C) Internet Systems Consortium, Inc. ("ISC")
  *
+ * SPDX-License-Identifier: MPL-2.0
+ *
  * This Source Code Form is subject to the terms of the Mozilla Public
  * License, v. 2.0. If a copy of the MPL was not distributed with this
  * file, you can obtain one at https://mozilla.org/MPL/2.0/.
@@ -23,16 +25,18 @@
 #include <isc/mem.h>
 #include <isc/net.h>
 #include <isc/netaddr.h>
-#include <isc/print.h>
+#include <isc/overflow.h>
+#include <isc/result.h>
 #include <isc/util.h>
 
 #include <dns/log.h>
+#include <dns/name.h>
 #include <dns/rcode.h>
 #include <dns/rdataclass.h>
 #include <dns/rdatatype.h>
-#include <dns/result.h>
 #include <dns/rrl.h>
 #include <dns/view.h>
+#include <dns/zone.h>
 
 static void
 log_end(dns_rrl_t *rrl, dns_rrl_entry_t *e, bool early, char *log_buf,
@@ -133,7 +137,7 @@ hash_divisor(unsigned int initial) {
 /*
  * Convert a timestamp to a number of seconds in the past.
  */
-static inline int
+static int
 delta_rrl_time(isc_stdtime_t ts, isc_stdtime_t now) {
 	int delta;
 
@@ -155,7 +159,7 @@ delta_rrl_time(isc_stdtime_t ts, isc_stdtime_t now) {
 	return (0);
 }
 
-static inline int
+static int
 get_age(const dns_rrl_t *rrl, const dns_rrl_entry_t *e, isc_stdtime_t now) {
 	if (!e->ts_valid) {
 		return (DNS_RRL_FOREVER);
@@ -163,7 +167,7 @@ get_age(const dns_rrl_t *rrl, const dns_rrl_entry_t *e, isc_stdtime_t now) {
 	return (delta_rrl_time(e->ts + rrl->ts_bases[e->ts_gen], now));
 }
 
-static inline void
+static void
 set_age(dns_rrl_t *rrl, dns_rrl_entry_t *e, isc_stdtime_t now) {
 	dns_rrl_entry_t *e_old;
 	unsigned int ts_gen;
@@ -230,7 +234,8 @@ expand_entries(dns_rrl_t *rrl, int newsize) {
 	int i;
 
 	if (rrl->num_entries + newsize >= rrl->max_entries &&
-	    rrl->max_entries != 0) {
+	    rrl->max_entries != 0)
+	{
 		newsize = rrl->max_entries - rrl->num_entries;
 		if (newsize <= 0) {
 			return (ISC_R_SUCCESS);
@@ -255,9 +260,8 @@ expand_entries(dns_rrl_t *rrl, int newsize) {
 	}
 
 	bsize = sizeof(dns_rrl_block_t) +
-		(newsize - 1) * sizeof(dns_rrl_entry_t);
-	b = isc_mem_get(rrl->mctx, bsize);
-	memset(b, 0, bsize);
+		ISC_CHECKED_MUL((newsize - 1), sizeof(dns_rrl_entry_t));
+	b = isc_mem_cget(rrl->mctx, 1, bsize);
 	b->size = bsize;
 
 	e = b->entries;
@@ -271,7 +275,7 @@ expand_entries(dns_rrl_t *rrl, int newsize) {
 	return (ISC_R_SUCCESS);
 }
 
-static inline dns_rrl_bin_t *
+static dns_rrl_bin_t *
 get_bin(dns_rrl_hash_t *hash, unsigned int hval) {
 	INSIST(hash != NULL);
 	return (&hash->bins[hval % hash->length]);
@@ -295,7 +299,8 @@ free_old_hash(dns_rrl_t *rrl) {
 
 	isc_mem_put(rrl->mctx, old_hash,
 		    sizeof(*old_hash) +
-			    (old_hash->length - 1) * sizeof(old_hash->bins[0]));
+			    ISC_CHECKED_MUL((old_hash->length - 1),
+					    sizeof(old_hash->bins[0])));
 	rrl->old_hash = NULL;
 }
 
@@ -320,9 +325,9 @@ expand_rrl_hash(dns_rrl_t *rrl, isc_stdtime_t now) {
 	}
 	new_bins = hash_divisor(new_bins);
 
-	hsize = sizeof(dns_rrl_hash_t) + (new_bins - 1) * sizeof(hash->bins[0]);
-	hash = isc_mem_get(rrl->mctx, hsize);
-	memset(hash, 0, hsize);
+	hsize = sizeof(dns_rrl_hash_t) +
+		ISC_CHECKED_MUL((new_bins - 1), sizeof(hash->bins[0]));
+	hash = isc_mem_cget(rrl->mctx, 1, hsize);
 	hash->length = new_bins;
 	rrl->hash_gen ^= 1;
 	hash->gen = rrl->hash_gen;
@@ -370,7 +375,8 @@ ref_entry(dns_rrl_t *rrl, dns_rrl_entry_t *e, int probes, isc_stdtime_t now) {
 	rrl->probes += probes;
 	++rrl->searches;
 	if (rrl->searches > 100 &&
-	    delta_rrl_time(rrl->hash->check_time, now) > 1) {
+	    delta_rrl_time(rrl->hash->check_time, now) > 1)
+	{
 		if (rrl->probes / rrl->searches > 2) {
 			expand_rrl_hash(rrl, now);
 		}
@@ -380,7 +386,7 @@ ref_entry(dns_rrl_t *rrl, dns_rrl_entry_t *e, int probes, isc_stdtime_t now) {
 	}
 }
 
-static inline bool
+static bool
 key_cmp(const dns_rrl_key_t *a, const dns_rrl_key_t *b) {
 	if (memcmp(a, b, sizeof(dns_rrl_key_t)) == 0) {
 		return (true);
@@ -388,7 +394,7 @@ key_cmp(const dns_rrl_key_t *a, const dns_rrl_key_t *b) {
 	return (false);
 }
 
-static inline uint32_t
+static uint32_t
 hash_key(const dns_rrl_key_t *key) {
 	uint32_t hval;
 	int i;
@@ -411,12 +417,10 @@ hash_key(const dns_rrl_key_t *key) {
  */
 static void
 make_key(const dns_rrl_t *rrl, dns_rrl_key_t *key,
-	 const isc_sockaddr_t *client_addr, dns_rdatatype_t qtype,
-	 const dns_name_t *qname, dns_rdataclass_t qclass,
-	 dns_rrl_rtype_t rtype) {
-	dns_name_t base;
-	dns_offsets_t base_offsets;
-	int labels, i;
+	 const isc_sockaddr_t *client_addr, dns_zone_t *zone,
+	 dns_rdatatype_t qtype, const dns_name_t *qname,
+	 dns_rdataclass_t qclass, dns_rrl_rtype_t rtype) {
+	int i;
 
 	memset(key, 0, sizeof(*key));
 
@@ -425,7 +429,8 @@ make_key(const dns_rrl_t *rrl, dns_rrl_key_t *key,
 		key->s.qtype = qtype;
 		key->s.qclass = qclass & 0xff;
 	} else if (rtype == DNS_RRL_RTYPE_REFERRAL ||
-		   rtype == DNS_RRL_RTYPE_NODATA) {
+		   rtype == DNS_RRL_RTYPE_NODATA)
+	{
 		/*
 		 * Because there is no qtype in the empty answer sections of
 		 * referral and NODATA responses, count them as the same.
@@ -434,17 +439,32 @@ make_key(const dns_rrl_t *rrl, dns_rrl_key_t *key,
 	}
 
 	if (qname != NULL && qname->labels != 0) {
-		/*
-		 * Ignore the first label of wildcards.
-		 */
-		if ((qname->attributes & DNS_NAMEATTR_WILDCARD) != 0 &&
-		    (labels = dns_name_countlabels(qname)) > 1)
+		dns_name_t *origin = NULL;
+
+		if (qname->attributes.wildcard && zone != NULL &&
+		    (origin = dns_zone_getorigin(zone)) != NULL)
 		{
-			dns_name_init(&base, base_offsets);
-			dns_name_getlabelsequence(qname, 1, labels - 1, &base);
-			key->s.qname_hash = dns_name_fullhash(&base, false);
+			dns_fixedname_t fixed;
+			dns_name_t *wild;
+			isc_result_t result;
+
+			/*
+			 * Put all wildcard names in one bucket using the zone's
+			 * origin name concatenated to the "*" name.
+			 */
+			wild = dns_fixedname_initname(&fixed);
+			result = dns_name_concatenate(dns_wildcardname, origin,
+						      wild, NULL);
+			if (result != ISC_R_SUCCESS) {
+				/*
+				 * Fallback to use the zone's origin name
+				 * instead of the concatenated name.
+				 */
+				wild = origin;
+			}
+			key->s.qname_hash = dns_name_hash(wild);
 		} else {
-			key->s.qname_hash = dns_name_fullhash(qname, false);
+			key->s.qname_hash = dns_name_hash(qname);
 		}
 	}
 
@@ -464,7 +484,7 @@ make_key(const dns_rrl_t *rrl, dns_rrl_key_t *key,
 	}
 }
 
-static inline dns_rrl_rate_t *
+static dns_rrl_rate_t *
 get_rate(dns_rrl_t *rrl, dns_rrl_rtype_t rtype) {
 	switch (rtype) {
 	case DNS_RRL_RTYPE_QUERY:
@@ -480,8 +500,7 @@ get_rate(dns_rrl_t *rrl, dns_rrl_rtype_t rtype) {
 	case DNS_RRL_RTYPE_ALL:
 		return (&rrl->all_per_second);
 	default:
-		INSIST(0);
-		ISC_UNREACHABLE();
+		UNREACHABLE();
 	}
 }
 
@@ -508,7 +527,7 @@ response_balance(dns_rrl_t *rrl, const dns_rrl_entry_t *e, int age) {
  * Search for an entry for a response and optionally create it.
  */
 static dns_rrl_entry_t *
-get_entry(dns_rrl_t *rrl, const isc_sockaddr_t *client_addr,
+get_entry(dns_rrl_t *rrl, const isc_sockaddr_t *client_addr, dns_zone_t *zone,
 	  dns_rdataclass_t qclass, dns_rdatatype_t qtype,
 	  const dns_name_t *qname, dns_rrl_rtype_t rtype, isc_stdtime_t now,
 	  bool create, char *log_buf, unsigned int log_buf_len) {
@@ -519,7 +538,7 @@ get_entry(dns_rrl_t *rrl, const isc_sockaddr_t *client_addr,
 	dns_rrl_bin_t *new_bin, *old_bin;
 	int probes, age;
 
-	make_key(rrl, &key, client_addr, qtype, qname, qclass, rtype);
+	make_key(rrl, &key, client_addr, zone, qtype, qname, qclass, rtype);
 	hval = hash_key(&key);
 
 	/*
@@ -627,7 +646,7 @@ debit_log(const dns_rrl_entry_t *e, int age, const char *action) {
 		      hash_key(&e->key), age_str, e->responses, action);
 }
 
-static inline dns_rrl_result_t
+static dns_rrl_result_t
 debit_rrl_entry(dns_rrl_t *rrl, dns_rrl_entry_t *e, double qps, double scale,
 		const isc_sockaddr_t *client_addr, isc_stdtime_t now,
 		char *log_buf, unsigned int log_buf_len) {
@@ -649,9 +668,9 @@ debit_rrl_entry(dns_rrl_t *rrl, dns_rrl_entry_t *e, double qps, double scale,
 		/*
 		 * The limit for clients that have used TCP is not scaled.
 		 */
-		credit_e = get_entry(rrl, client_addr, 0, dns_rdatatype_none,
-				     NULL, DNS_RRL_RTYPE_TCP, now, false,
-				     log_buf, log_buf_len);
+		credit_e = get_entry(
+			rrl, client_addr, NULL, 0, dns_rdatatype_none, NULL,
+			DNS_RRL_RTYPE_TCP, now, false, log_buf, log_buf_len);
 		if (credit_e != NULL) {
 			age = get_age(rrl, e, now);
 			if (age < rrl->window) {
@@ -770,7 +789,7 @@ debit_rrl_entry(dns_rrl_t *rrl, dns_rrl_entry_t *e, double qps, double scale,
 	return (DNS_RRL_RESULT_DROP);
 }
 
-static inline dns_rrl_qname_buf_t *
+static dns_rrl_qname_buf_t *
 get_qname(dns_rrl_t *rrl, const dns_rrl_entry_t *e) {
 	dns_rrl_qname_buf_t *qbuf;
 
@@ -781,7 +800,7 @@ get_qname(dns_rrl_t *rrl, const dns_rrl_entry_t *e) {
 	return (qbuf);
 }
 
-static inline void
+static void
 free_qname(dns_rrl_t *rrl, dns_rrl_entry_t *e) {
 	dns_rrl_qname_buf_t *qbuf;
 
@@ -850,8 +869,7 @@ make_log_buf(dns_rrl_t *rrl, dns_rrl_entry_t *e, const char *str1,
 		ADD_LOG_CSTR(&lb, "slip ");
 		break;
 	default:
-		INSIST(0);
-		ISC_UNREACHABLE();
+		UNREACHABLE();
 	}
 
 	switch (e->key.s.rtype) {
@@ -879,8 +897,7 @@ make_log_buf(dns_rrl_t *rrl, dns_rrl_entry_t *e, const char *str1,
 		ADD_LOG_CSTR(&lb, "all ");
 		break;
 	default:
-		INSIST(0);
-		ISC_UNREACHABLE();
+		UNREACHABLE();
 	}
 
 	if (plural) {
@@ -913,7 +930,8 @@ make_log_buf(dns_rrl_t *rrl, dns_rrl_entry_t *e, const char *str1,
 	{
 		qbuf = get_qname(rrl, e);
 		if (save_qname && qbuf == NULL && qname != NULL &&
-		    dns_name_isabsolute(qname)) {
+		    dns_name_isabsolute(qname))
+		{
 			/*
 			 * Capture the qname for the "stop limiting" message.
 			 */
@@ -922,12 +940,11 @@ make_log_buf(dns_rrl_t *rrl, dns_rrl_entry_t *e, const char *str1,
 				ISC_LIST_UNLINK(rrl->qname_free, qbuf, link);
 			} else if (rrl->num_qnames < DNS_RRL_QNAMES) {
 				qbuf = isc_mem_get(rrl->mctx, sizeof(*qbuf));
-				{
-					memset(qbuf, 0, sizeof(*qbuf));
-					ISC_LINK_INIT(qbuf, link);
-					qbuf->index = rrl->num_qnames;
-					rrl->qnames[rrl->num_qnames++] = qbuf;
-				}
+				*qbuf = (dns_rrl_qname_buf_t){
+					.index = rrl->num_qnames,
+				};
+				ISC_LINK_INIT(qbuf, link);
+				rrl->qnames[rrl->num_qnames++] = qbuf;
 			}
 			if (qbuf != NULL) {
 				e->log_qname = qbuf->index;
@@ -942,7 +959,8 @@ make_log_buf(dns_rrl_t *rrl, dns_rrl_entry_t *e, const char *str1,
 		}
 		if (qname != NULL) {
 			ADD_LOG_CSTR(&lb, " for ");
-			(void)dns_name_totext(qname, true, &lb);
+			(void)dns_name_totext(qname, DNS_NAME_OMITFINALDOT,
+					      &lb);
 		} else {
 			ADD_LOG_CSTR(&lb, " for (?)");
 		}
@@ -999,7 +1017,8 @@ log_stops(dns_rrl_t *rrl, isc_stdtime_t now, int limit, char *log_buf,
 		if (now != 0) {
 			age = get_age(rrl, e, now);
 			if (age < DNS_RRL_STOP_LOG_SECS ||
-			    response_balance(rrl, e, age) < 0) {
+			    response_balance(rrl, e, age) < 0)
+			{
 				break;
 			}
 		}
@@ -1028,10 +1047,10 @@ log_stops(dns_rrl_t *rrl, isc_stdtime_t now, int limit, char *log_buf,
  * Main rate limit interface.
  */
 dns_rrl_result_t
-dns_rrl(dns_view_t *view, const isc_sockaddr_t *client_addr, bool is_tcp,
-	dns_rdataclass_t qclass, dns_rdatatype_t qtype, const dns_name_t *qname,
-	isc_result_t resp_result, isc_stdtime_t now, bool wouldlog,
-	char *log_buf, unsigned int log_buf_len) {
+dns_rrl(dns_view_t *view, dns_zone_t *zone, const isc_sockaddr_t *client_addr,
+	bool is_tcp, dns_rdataclass_t qclass, dns_rdatatype_t qtype,
+	const dns_name_t *qname, isc_result_t resp_result, isc_stdtime_t now,
+	bool wouldlog, char *log_buf, unsigned int log_buf_len) {
 	dns_rrl_t *rrl;
 	dns_rrl_rtype_t rtype;
 	dns_rrl_entry_t *e;
@@ -1071,7 +1090,8 @@ dns_rrl(dns_view_t *view, const isc_sockaddr_t *client_addr, bool is_tcp,
 			qps = (1.0 * rrl->qps_responses) / secs;
 			if (secs >= rrl->window) {
 				if (isc_log_wouldlog(dns_lctx,
-						     DNS_RRL_LOG_DEBUG3)) {
+						     DNS_RRL_LOG_DEBUG3))
+				{
 					isc_log_write(dns_lctx,
 						      DNS_LOGCATEGORY_RRL,
 						      DNS_LOGMODULE_REQUEST,
@@ -1104,16 +1124,17 @@ dns_rrl(dns_view_t *view, const isc_sockaddr_t *client_addr, bool is_tcp,
 	 */
 	if (is_tcp) {
 		if (scale < 1.0) {
-			e = get_entry(rrl, client_addr, 0, dns_rdatatype_none,
-				      NULL, DNS_RRL_RTYPE_TCP, now, true,
-				      log_buf, log_buf_len);
+			e = get_entry(rrl, client_addr, NULL, 0,
+				      dns_rdatatype_none, NULL,
+				      DNS_RRL_RTYPE_TCP, now, true, log_buf,
+				      log_buf_len);
 			if (e != NULL) {
 				e->responses = -(rrl->window + 1);
 				set_age(rrl, e, now);
 			}
 		}
 		UNLOCK(&rrl->lock);
-		return (ISC_R_SUCCESS);
+		return (DNS_RRL_RESULT_OK);
 	}
 
 	/*
@@ -1137,8 +1158,8 @@ dns_rrl(dns_view_t *view, const isc_sockaddr_t *client_addr, bool is_tcp,
 		rtype = DNS_RRL_RTYPE_ERROR;
 		break;
 	}
-	e = get_entry(rrl, client_addr, qclass, qtype, qname, rtype, now, true,
-		      log_buf, log_buf_len);
+	e = get_entry(rrl, client_addr, zone, qclass, qtype, qname, rtype, now,
+		      true, log_buf, log_buf_len);
 	if (e == NULL) {
 		UNLOCK(&rrl->lock);
 		return (DNS_RRL_RESULT_OK);
@@ -1172,8 +1193,8 @@ dns_rrl(dns_view_t *view, const isc_sockaddr_t *client_addr, bool is_tcp,
 		dns_rrl_entry_t *e_all;
 		dns_rrl_result_t rrl_all_result;
 
-		e_all = get_entry(rrl, client_addr, 0, dns_rdatatype_none, NULL,
-				  DNS_RRL_RTYPE_ALL, now, true, log_buf,
+		e_all = get_entry(rrl, client_addr, zone, 0, dns_rdatatype_none,
+				  NULL, DNS_RRL_RTYPE_ALL, now, true, log_buf,
 				  log_buf_len);
 		if (e_all == NULL) {
 			UNLOCK(&rrl->lock);
@@ -1303,13 +1324,15 @@ dns_rrl_view_destroy(dns_view_t *view) {
 	h = rrl->hash;
 	if (h != NULL) {
 		isc_mem_put(rrl->mctx, h,
-			    sizeof(*h) + (h->length - 1) * sizeof(h->bins[0]));
+			    sizeof(*h) + ISC_CHECKED_MUL((h->length - 1),
+							 sizeof(h->bins[0])));
 	}
 
 	h = rrl->old_hash;
 	if (h != NULL) {
 		isc_mem_put(rrl->mctx, h,
-			    sizeof(*h) + (h->length - 1) * sizeof(h->bins[0]));
+			    sizeof(*h) + ISC_CHECKED_MUL((h->length - 1),
+							 sizeof(h->bins[0])));
 	}
 
 	isc_mem_putanddetach(&rrl->mctx, rrl, sizeof(*rrl));
@@ -1323,10 +1346,11 @@ dns_rrl_init(dns_rrl_t **rrlp, dns_view_t *view, int min_entries) {
 	*rrlp = NULL;
 
 	rrl = isc_mem_get(view->mctx, sizeof(*rrl));
-	memset(rrl, 0, sizeof(*rrl));
+	*rrl = (dns_rrl_t){
+		.ts_bases[0] = isc_stdtime_now(),
+	};
 	isc_mem_attach(view->mctx, &rrl->mctx);
 	isc_mutex_init(&rrl->lock);
-	isc_stdtime_get(&rrl->ts_bases[0]);
 
 	view->rrl = rrl;
 

@@ -1,7 +1,11 @@
+#!/bin/sh
+
 # Copyright (C) Internet Systems Consortium, Inc. ("ISC")
 #
+# SPDX-License-Identifier: MPL-2.0
+#
 # This Source Code Form is subject to the terms of the Mozilla Public
-# License, v. 2.0. If a copy of the MPL was not distributed with this
+# License, v. 2.0.  If a copy of the MPL was not distributed with this
 # file, you can obtain one at https://mozilla.org/MPL/2.0/.
 #
 # See the COPYRIGHT file distributed with this work for additional
@@ -9,7 +13,7 @@
 
 set -x
 
-PWD=`pwd`
+PWD=$(pwd)
 
 KRB5_CONFIG="${PWD}/krb5.conf"
 export KRB5_CONFIG
@@ -17,9 +21,9 @@ export KRB5_CONFIG
 KRB5_KDC_PROFILE=${PWD}/krb5kdc
 export KRB5_KDC_PROFILE
 
-now=`date +%s`
-lifetime=`expr 2147483647 - $now`
-lifetime=`expr $lifetime / 3600 / 24 - 30`
+now=$(date +%s)
+lifetime=$((2147483647 - now))
+lifetime=$((lifetime / 3600 / 24 - 30))
 
 cat << EOF > "${KRB5_CONFIG}"
 [libdefaults]

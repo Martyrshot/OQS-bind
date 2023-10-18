@@ -1,6 +1,8 @@
 /*
  * Copyright (C) Internet Systems Consortium, Inc. ("ISC")
  *
+ * SPDX-License-Identifier: MPL-2.0
+ *
  * This Source Code Form is subject to the terms of the Mozilla Public
  * License, v. 2.0. If a copy of the MPL was not distributed with this
  * file, you can obtain one at https://mozilla.org/MPL/2.0/.
@@ -17,7 +19,7 @@
 #include <stdio.h>
 #include <stdlib.h>
 
-#include <isc/print.h>
+#include <isc/tls.h>
 
 extern bool verbose;
 extern const char *progname;
@@ -43,5 +45,6 @@ fatal(const char *format, ...) {
 	vfprintf(stderr, format, args);
 	va_end(args);
 	fprintf(stderr, "\n");
+	isc__tls_setfatalmode();
 	exit(1);
 }

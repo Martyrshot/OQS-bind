@@ -1,6 +1,8 @@
 /*
  * Copyright (C) Internet Systems Consortium, Inc. ("ISC")
  *
+ * SPDX-License-Identifier: MPL-2.0
+ *
  * This Source Code Form is subject to the terms of the Mozilla Public
  * License, v. 2.0. If a copy of the MPL was not distributed with this
  * file, you can obtain one at https://mozilla.org/MPL/2.0/.
@@ -9,8 +11,7 @@
  * information regarding copyright ownership.
  */
 
-#ifndef NS_QUERY_H
-#define NS_QUERY_H 1
+#pragma once
 
 /*! \file */
 
@@ -18,7 +19,6 @@
 
 #include <isc/buffer.h>
 #include <isc/netaddr.h>
-#include <isc/task.h>
 #include <isc/types.h>
 
 #include <dns/rdataset.h>
@@ -30,7 +30,7 @@
 
 /*% nameserver database version structure */
 typedef struct ns_dbversion {
-	dns_db_t *	 db;
+	dns_db_t	*db;
 	dns_dbversion_t *version;
 	bool		 acl_checked;
 	bool		 queryok;
@@ -38,14 +38,57 @@ typedef struct ns_dbversion {
 } ns_dbversion_t;
 
 /*%
+ * recursion type; various features can initiate recursion and this enum value
+ * allows common code paths to differentiate between them
+ */
+typedef enum {
+	RECTYPE_NORMAL,
+	RECTYPE_PREFETCH,
+	RECTYPE_RPZ,
+	RECTYPE_STALE_REFRESH,
+	RECTYPE_HOOK,
+	RECTYPE_COUNT,
+} ns_query_rectype_t;
+
+/*%
+ * Helper macros for accessing isc_nmhandle_t pointers for a specific recursion
+ * a given client is associated with.
+ */
+#define HANDLE_RECTYPE_NORMAL(client) \
+	((client)->query.recursions[RECTYPE_NORMAL].handle)
+#define HANDLE_RECTYPE_PREFETCH(client) \
+	((client)->query.recursions[RECTYPE_PREFETCH].handle)
+#define HANDLE_RECTYPE_RPZ(client) \
+	((client)->query.recursions[RECTYPE_RPZ].handle)
+#define HANDLE_RECTYPE_STALE_REFRESH(client) \
+	((client)->query.recursions[RECTYPE_STALE_REFRESH].handle)
+#define HANDLE_RECTYPE_HOOK(client) \
+	((client)->query.recursions[RECTYPE_HOOK].handle)
+
+/*%
+ * Helper macros for accessing dns_fetch_t pointers for a specific recursion a
+ * given client is associated with.
+ */
+#define FETCH_RECTYPE_NORMAL(client) \
+	((client)->query.recursions[RECTYPE_NORMAL].fetch)
+#define FETCH_RECTYPE_PREFETCH(client) \
+	((client)->query.recursions[RECTYPE_PREFETCH].fetch)
+#define FETCH_RECTYPE_RPZ(client) \
+	((client)->query.recursions[RECTYPE_RPZ].fetch)
+#define FETCH_RECTYPE_STALE_REFRESH(client) \
+	((client)->query.recursions[RECTYPE_STALE_REFRESH].fetch)
+#define FETCH_RECTYPE_HOOK(client) \
+	((client)->query.recursions[RECTYPE_HOOK].fetch)
+
+/*%
  * nameserver recursion parameters, to uniquely identify a recursion
  * query; this is used to detect a recursion loop
  */
 typedef struct ns_query_recparam {
 	dns_rdatatype_t qtype;
-	dns_name_t *	qname;
+	dns_name_t     *qname;
 	dns_fixedname_t fqname;
-	dns_name_t *	qdomain;
+	dns_name_t     *qdomain;
 	dns_fixedname_t fqdomain;
 } ns_query_recparam_t;
 
@@ -54,37 +97,35 @@ struct ns_query {
 	unsigned int	 attributes;
 	unsigned int	 restarts;
 	bool		 timerset;
-	dns_name_t *	 qname;
-	dns_name_t *	 origqname;
+	dns_name_t	*qname;
+	dns_name_t	*origqname;
 	dns_rdatatype_t	 qtype;
 	unsigned int	 dboptions;
 	unsigned int	 fetchoptions;
-	dns_db_t *	 gluedb;
-	dns_db_t *	 authdb;
-	dns_zone_t *	 authzone;
+	dns_db_t	*gluedb;
+	dns_db_t	*authdb;
+	dns_zone_t	*authzone;
 	bool		 authdbset;
 	bool		 isreferral;
 	isc_mutex_t	 fetchlock;
-	dns_fetch_t *	 fetch;
-	dns_fetch_t *	 prefetch;
-	ns_hookasync_t * hookactx;
-	dns_rpz_st_t *	 rpz_st;
+	ns_hookasync_t	*hookactx;
+	dns_rpz_st_t	*rpz_st;
 	isc_bufferlist_t namebufs;
 	ISC_LIST(ns_dbversion_t) activeversions;
 	ISC_LIST(ns_dbversion_t) freeversions;
 	dns_rdataset_t *dns64_aaaa;
 	dns_rdataset_t *dns64_sigaaaa;
-	bool *		dns64_aaaaok;
+	bool	       *dns64_aaaaok;
 	unsigned int	dns64_aaaaoklen;
 	unsigned int	dns64_options;
 	unsigned int	dns64_ttl;
 
 	struct {
-		dns_db_t *	db;
-		dns_zone_t *	zone;
-		dns_dbnode_t *	node;
+		dns_db_t       *db;
+		dns_zone_t     *zone;
+		dns_dbnode_t   *node;
 		dns_rdatatype_t qtype;
-		dns_name_t *	fname;
+		dns_name_t     *fname;
 		dns_fixedname_t fixed;
 		isc_result_t	result;
 		dns_rdataset_t *rdataset;
@@ -92,6 +133,11 @@ struct ns_query {
 		bool		authoritative;
 		bool		is_zone;
 	} redirect;
+
+	struct {
+		isc_nmhandle_t *handle;
+		dns_fetch_t    *fetch;
+	} recursions[RECTYPE_COUNT];
 
 	ns_query_recparam_t recparam;
 
@@ -126,8 +172,8 @@ typedef struct query_ctx query_ctx_t;
 /* query context structure */
 struct query_ctx {
 	isc_buffer_t *dbuf;	     /* name buffer */
-	dns_name_t *  fname;	     /* found name from DB lookup */
-	dns_name_t *  tname;	     /* temporary name, used
+	dns_name_t   *fname;	     /* found name from DB lookup */
+	dns_name_t   *tname;	     /* temporary name, used
 				      * when processing ANY
 				      * queries */
 	dns_rdataset_t *rdataset;    /* found rdataset */
@@ -147,6 +193,7 @@ struct query_ctx {
 	bool authoritative;		    /* authoritative query? */
 	bool want_restart;		    /* CNAME chain or other
 					     * restart needed */
+	bool		refresh_rrset;	    /* stale RRset refresh needed */
 	bool		need_wildcardproof; /* wildcard proof needed */
 	bool		nxrewrite;	    /* negative answer from RPZ */
 	bool		findcoveringnsec;   /* lookup covering NSEC */
@@ -157,21 +204,21 @@ struct query_ctx {
 	ns_client_t *client;	    /* client object */
 	bool	     detach_client; /* client needs detaching */
 
-	dns_fetchevent_t *event; /* recursion event */
+	dns_fetchresponse_t *fresp; /* recursion response */
 
-	dns_db_t *	 db;	  /* zone or cache database */
+	dns_db_t	*db;	  /* zone or cache database */
 	dns_dbversion_t *version; /* DB version */
-	dns_dbnode_t *	 node;	  /* DB node */
+	dns_dbnode_t	*node;	  /* DB node */
 
-	dns_db_t *	 zdb;	 /* zone DB values, saved */
-	dns_dbnode_t *	 znode;	 /* while searching cache */
-	dns_name_t *	 zfname; /* for a better answer */
+	dns_db_t	*zdb;	 /* zone DB values, saved */
+	dns_dbnode_t	*znode;	 /* while searching cache */
+	dns_name_t	*zfname; /* for a better answer */
 	dns_dbversion_t *zversion;
-	dns_rdataset_t * zrdataset;
-	dns_rdataset_t * zsigrdataset;
+	dns_rdataset_t	*zrdataset;
+	dns_rdataset_t	*zsigrdataset;
 
 	dns_rpz_st_t *rpz_st; /* RPZ state */
-	dns_zone_t *  zone;   /* zone to search */
+	dns_zone_t   *zone;   /* zone to search */
 
 	dns_view_t *view; /* client view */
 
@@ -179,9 +226,11 @@ struct query_ctx {
 	int	     line;   /* line to report error */
 };
 
-typedef isc_result_t (*ns_query_starthookasync_t)(
-	query_ctx_t *qctx, isc_mem_t *mctx, void *arg, isc_task_t *task,
-	isc_taskaction_t action, void *evarg, ns_hookasync_t **ctxp);
+typedef isc_result_t (*ns_query_starthookasync_t)(query_ctx_t *qctx,
+						  isc_mem_t *mctx, void *arg,
+						  isc_loop_t *loop,
+						  isc_job_cb cb, void *evarg,
+						  ns_hookasync_t **ctxp);
 
 /*
  * The following functions are expected to be used only within query.c
@@ -267,5 +316,3 @@ ns__query_start(query_ctx_t *qctx);
 /*%<
  * (Must not be used outside this module and its associated unit tests.)
  */
-
-#endif /* NS_QUERY_H */

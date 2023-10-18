@@ -1,5 +1,7 @@
 /*
- * Portions Copyright (C) Internet Systems Consortium, Inc. ("ISC")
+ * Copyright (C) Internet Systems Consortium, Inc. ("ISC")
+ *
+ * SPDX-License-Identifier: MPL-2.0 AND ISC
  *
  * This Source Code Form is subject to the terms of the Mozilla Public
  * License, v. 2.0. If a copy of the MPL was not distributed with this
@@ -7,8 +9,10 @@
  *
  * See the COPYRIGHT file distributed with this work for additional
  * information regarding copyright ownership.
- *
- * Portions Copyright (C) 2001 Nominum, Inc.
+ */
+
+/*
+ * Copyright (C) 2001 Nominum, Inc.
  *
  * Permission to use, copy, modify, and/or distribute this software for any
  * purpose with or without fee is hereby granted, provided that the above
@@ -25,15 +29,15 @@
 
 /*! \file */
 
-#include <ctype.h>
 #include <stdbool.h>
 #include <stdlib.h>
 
+#include <isc/ascii.h>
 #include <isc/assertions.h>
 #include <isc/magic.h>
+#include <isc/result.h>
 #include <isc/string.h>
 
-#include <isccc/result.h>
 #include <isccc/symtab.h>
 #include <isccc/util.h>
 
@@ -73,7 +77,7 @@ isccc_symtab_create(unsigned int size,
 	if (symtab == NULL) {
 		return (ISC_R_NOMEMORY);
 	}
-	symtab->table = malloc(size * sizeof(eltlist_t));
+	symtab->table = calloc(size, sizeof(eltlist_t));
 	if (symtab->table == NULL) {
 		free(symtab);
 		return (ISC_R_NOMEMORY);
@@ -92,7 +96,7 @@ isccc_symtab_create(unsigned int size,
 	return (ISC_R_SUCCESS);
 }
 
-static inline void
+static void
 free_elt(isccc_symtab_t *symtab, unsigned int bucket, elt_t *elt) {
 	ISC_LIST_UNLINK(symtab->table[bucket], elt, link);
 	if (symtab->undefine_action != NULL) {
@@ -115,7 +119,8 @@ isccc_symtab_destroy(isccc_symtab_t **symtabp) {
 
 	for (i = 0; i < symtab->size; i++) {
 		for (elt = ISC_LIST_HEAD(symtab->table[i]); elt != NULL;
-		     elt = nelt) {
+		     elt = nelt)
+		{
 			nelt = ISC_LIST_NEXT(elt, link);
 			free_elt(symtab, i, elt);
 		}
@@ -125,12 +130,11 @@ isccc_symtab_destroy(isccc_symtab_t **symtabp) {
 	free(symtab);
 }
 
-static inline unsigned int
+static unsigned int
 hash(const char *key, bool case_sensitive) {
 	const char *s;
 	unsigned int h = 0;
 	unsigned int g;
-	int c;
 
 	/*
 	 * P. J. Weinberger's hash function, adapted from p. 436 of
@@ -148,9 +152,7 @@ hash(const char *key, bool case_sensitive) {
 		}
 	} else {
 		for (s = key; *s != '\0'; s++) {
-			c = *s;
-			c = tolower((unsigned char)c);
-			h = (h << 4) + c;
+			h = (h << 4) + isc_ascii_tolower(*s);
 			if ((g = (h & 0xf0000000)) != 0) {
 				h = h ^ (g >> 24);
 				h = h ^ g;
@@ -165,14 +167,16 @@ hash(const char *key, bool case_sensitive) {
 	b = hash((k), (s)->case_sensitive) % (s)->size;           \
 	if ((s)->case_sensitive) {                                \
 		for (e = ISC_LIST_HEAD((s)->table[b]); e != NULL; \
-		     e = ISC_LIST_NEXT(e, link)) {                \
+		     e = ISC_LIST_NEXT(e, link))                  \
+		{                                                 \
 			if (((t) == 0 || e->type == (t)) &&       \
 			    strcmp(e->key, (k)) == 0)             \
 				break;                            \
 		}                                                 \
 	} else {                                                  \
 		for (e = ISC_LIST_HEAD((s)->table[b]); e != NULL; \
-		     e = ISC_LIST_NEXT(e, link)) {                \
+		     e = ISC_LIST_NEXT(e, link))                  \
+		{                                                 \
 			if (((t) == 0 || e->type == (t)) &&       \
 			    strcasecmp(e->key, (k)) == 0)         \
 				break;                            \
@@ -194,9 +198,7 @@ isccc_symtab_lookup(isccc_symtab_t *symtab, const char *key, unsigned int type,
 		return (ISC_R_NOTFOUND);
 	}
 
-	if (value != NULL) {
-		*value = elt->value;
-	}
+	SET_IF_NOT_NULL(value, elt->value);
 
 	return (ISC_R_SUCCESS);
 }
@@ -275,7 +277,8 @@ isccc_symtab_foreach(isccc_symtab_t *symtab, isccc_symtabforeachaction_t action,
 
 	for (i = 0; i < symtab->size; i++) {
 		for (elt = ISC_LIST_HEAD(symtab->table[i]); elt != NULL;
-		     elt = nelt) {
+		     elt = nelt)
+		{
 			nelt = ISC_LIST_NEXT(elt, link);
 			if ((action)(elt->key, elt->type, elt->value, arg)) {
 				free_elt(symtab, i, elt);

@@ -1,29 +1,17 @@
 #!/bin/sh
-#
+
 # Copyright (C) Internet Systems Consortium, Inc. ("ISC")
 #
+# SPDX-License-Identifier: MPL-2.0
+#
 # This Source Code Form is subject to the terms of the Mozilla Public
-# License, v. 2.0. If a copy of the MPL was not distributed with this
+# License, v. 2.0.  If a copy of the MPL was not distributed with this
 # file, you can obtain one at https://mozilla.org/MPL/2.0/.
 #
 # See the COPYRIGHT file distributed with this work for additional
 # information regarding copyright ownership.
 
 status=0
-
-#
-# Check for missing #include <isc/print.h> or "print_p.h"
-#
-list=`git grep -l snprintf lib bin |
-      grep '\.c$' |
-      grep -vE -e '(lib/bind|lib/dns/rdata|lib/dns/gen.c)' \
-	       -e '(dlzexternal/driver/driver.c)' |
-      xargs grep -EL "(isc/print.h|print_p.h)" 2> /dev/null`
-[ -n "$list" ] && {
-    status=1
-    echo 'Missing #include <isc/print.h> or #include "print_p.h":'
-    echo "$list"
-}
 
 #
 # Check for missing #include <isc/strerr.h>

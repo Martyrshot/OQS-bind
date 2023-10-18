@@ -1,6 +1,8 @@
 /*
  * Copyright (C) Internet Systems Consortium, Inc. ("ISC")
  *
+ * SPDX-License-Identifier: MPL-2.0
+ *
  * This Source Code Form is subject to the terms of the Mozilla Public
  * License, v. 2.0. If a copy of the MPL was not distributed with this
  * file, you can obtain one at https://mozilla.org/MPL/2.0/.
@@ -10,8 +12,7 @@
  */
 
 /* */
-#ifndef GENERIC_TXT_16_H
-#define GENERIC_TXT_16_H 1
+#pragma once
 
 typedef struct dns_rdata_txt_string {
 	uint8_t length;
@@ -40,5 +41,3 @@ dns_rdata_txt_next(dns_rdata_txt_t *);
 
 isc_result_t
 dns_rdata_txt_current(dns_rdata_txt_t *, dns_rdata_txt_string_t *);
-
-#endif /* GENERIC_TXT_16_H */

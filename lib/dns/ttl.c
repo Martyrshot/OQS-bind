@@ -1,6 +1,8 @@
 /*
  * Copyright (C) Internet Systems Consortium, Inc. ("ISC")
  *
+ * SPDX-License-Identifier: MPL-2.0
+ *
  * This Source Code Form is subject to the terms of the Mozilla Public
  * License, v. 2.0. If a copy of the MPL was not distributed with this
  * file, you can obtain one at https://mozilla.org/MPL/2.0/.
@@ -18,14 +20,14 @@
 #include <stdio.h>
 #include <stdlib.h>
 
+#include <isc/ascii.h>
 #include <isc/buffer.h>
 #include <isc/parseint.h>
-#include <isc/print.h>
 #include <isc/region.h>
+#include <isc/result.h>
 #include <isc/string.h>
 #include <isc/util.h>
 
-#include <dns/result.h>
 #include <dns/ttl.h>
 
 #define RETERR(x)                        \
@@ -71,7 +73,7 @@ ttlfmt(unsigned int t, const char *s, bool verbose, bool space,
  */
 isc_result_t
 dns_ttl_totext(uint32_t src, bool verbose, bool upcase, isc_buffer_t *target) {
-	unsigned secs, mins, hours, days, weeks, x;
+	unsigned int secs, mins, hours, days, weeks, x;
 
 	secs = src % 60;
 	src /= 60;
@@ -117,13 +119,10 @@ dns_ttl_totext(uint32_t src, bool verbose, bool upcase, isc_buffer_t *target) {
 		/*
 		 * The unit letter is the last character in the
 		 * used region of the buffer.
-		 *
-		 * toupper() does not need its argument to be masked of cast
-		 * here because region.base is type unsigned char *.
 		 */
 		isc_buffer_usedregion(target, &region);
 		region.base[region.length - 1] =
-			toupper(region.base[region.length - 1]);
+			isc_ascii_toupper(region.base[region.length - 1]);
 	}
 	return (ISC_R_SUCCESS);
 }

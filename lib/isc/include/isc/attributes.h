@@ -1,6 +1,8 @@
 /*
  * Copyright (C) Internet Systems Consortium, Inc. ("ISC")
  *
+ * SPDX-License-Identifier: MPL-2.0
+ *
  * This Source Code Form is subject to the terms of the Mozilla Public
  * License, v. 2.0. If a copy of the MPL was not distributed with this
  * file, you can obtain one at https://mozilla.org/MPL/2.0/.
@@ -11,10 +13,20 @@
 
 #pragma once
 
-#if HAVE_FUNC_ATTRIBUTE_NORETURN
-#define ISC_NORETURN __attribute__((noreturn))
+/***
+ *** Clang Compatibility Macros
+ ***/
+
+#if !defined(__has_c_attribute)
+#define __has_c_attribute(x) 0
+#endif /* if !defined(__has_c_attribute) */
+
+#ifdef HAVE_STDNORETURN_H
+#include <stdnoreturn.h>
+#elif HAVE_FUNC_ATTRIBUTE_NORETURN
+#define noreturn __attribute__((noreturn))
 #else
-#define ISC_NORETURN
+#define noreturn
 #endif
 
 #if HAVE_FUNC_ATTRIBUTE_RETURNS_NONNULL
@@ -76,3 +88,19 @@
 #define ISC_ATTR_MALLOC_DEALLOCATOR(deallocator)
 #define ISC_ATTR_MALLOC_DEALLOCATOR_IDX(deallocator, idx)
 #endif /* HAVE_FUNC_ATTRIBUTE_MALLOC */
+
+#if __has_c_attribute(fallthrough)
+#define FALLTHROUGH [[fallthrough]]
+#elif __GNUC__ >= 7 && !defined(__clang__)
+#define FALLTHROUGH __attribute__((fallthrough))
+#else
+/* clang-format off */
+#define FALLTHROUGH do {} while (0) /* FALLTHROUGH */
+/* clang-format on */
+#endif
+
+#if __has_c_attribute(maybe_unused)
+#define ISC_ATTR_UNUSED [[maybe_unused]]
+#else
+#define ISC_ATTR_UNUSED __attribute__((__unused__))
+#endif

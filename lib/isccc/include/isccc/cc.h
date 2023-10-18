@@ -1,5 +1,7 @@
 /*
- * Portions Copyright (C) Internet Systems Consortium, Inc. ("ISC")
+ * Copyright (C) Internet Systems Consortium, Inc. ("ISC")
+ *
+ * SPDX-License-Identifier: MPL-2.0 AND ISC
  *
  * This Source Code Form is subject to the terms of the Mozilla Public
  * License, v. 2.0. If a copy of the MPL was not distributed with this
@@ -7,8 +9,10 @@
  *
  * See the COPYRIGHT file distributed with this work for additional
  * information regarding copyright ownership.
- *
- * Portions Copyright (C) 2001 Nominum, Inc.
+ */
+
+/*
+ * Copyright (C) 2001 Nominum, Inc.
  *
  * Permission to use, copy, modify, and/or distribute this software for any
  * purpose with or without fee is hereby granted, provided that the above
@@ -23,8 +27,7 @@
  * OR IN CONNECTION WITH THE USE OR PERFORMANCE OF THIS SOFTWARE.
  */
 
-#ifndef ISCCC_CC_H
-#define ISCCC_CC_H 1
+#pragma once
 
 /*! \file isccc/cc.h */
 
@@ -34,19 +37,23 @@
 #include <isc/buffer.h>
 #include <isc/lang.h>
 
+#include <dst/dst.h>
+
 #include <isccc/types.h>
 
 ISC_LANG_BEGINDECLS
 
-/*% from lib/dns/include/dst/dst.h */
-
+/*%
+ * The HMAC algorithms supported by isccc_cc_fromwire and
+ * isccc_cc_towire as implemented in DST.
+ */
 #define ISCCC_ALG_UNKNOWN    0
-#define ISCCC_ALG_HMACMD5    157
-#define ISCCC_ALG_HMACSHA1   161
-#define ISCCC_ALG_HMACSHA224 162
-#define ISCCC_ALG_HMACSHA256 163
-#define ISCCC_ALG_HMACSHA384 164
-#define ISCCC_ALG_HMACSHA512 165
+#define ISCCC_ALG_HMACMD5    DST_ALG_HMACMD5
+#define ISCCC_ALG_HMACSHA1   DST_ALG_HMACSHA1
+#define ISCCC_ALG_HMACSHA224 DST_ALG_HMACSHA224
+#define ISCCC_ALG_HMACSHA256 DST_ALG_HMACSHA256
+#define ISCCC_ALG_HMACSHA384 DST_ALG_HMACSHA384
+#define ISCCC_ALG_HMACSHA512 DST_ALG_HMACSHA512
 
 /*% Maximum Datagram Package */
 // OQS updated from 4096 to 8192
@@ -124,5 +131,3 @@ isccc_cc_checkdup(isccc_symtab_t *symtab, isccc_sexpr_t *message,
 		  isccc_time_t now);
 
 ISC_LANG_ENDDECLS
-
-#endif /* ISCCC_CC_H */

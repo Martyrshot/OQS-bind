@@ -1,6 +1,8 @@
 /*
  * Copyright (C) Internet Systems Consortium, Inc. ("ISC")
  *
+ * SPDX-License-Identifier: MPL-2.0
+ *
  * This Source Code Form is subject to the terms of the Mozilla Public
  * License, v. 2.0. If a copy of the MPL was not distributed with this
  * file, you can obtain one at https://mozilla.org/MPL/2.0/.
@@ -9,8 +11,7 @@
  * information regarding copyright ownership.
  */
 
-#ifndef ISC_UTIL_H
-#define ISC_UTIL_H 1
+#pragma once
 
 #include <inttypes.h>
 
@@ -26,17 +27,29 @@
  * ISC_ or isc_ to the name.
  */
 
+#include <isc/attributes.h>
+
+/***
+ *** Clang Compatibility Macros
+ ***/
+
+#if !defined(__has_feature)
+#define __has_feature(x) 0
+#endif /* if !defined(__has_feature) */
+
 /***
  *** General Macros.
  ***/
 
 /*%
- * Use this to hide unused function arguments.
+ * Legacy way how to hide unused function arguments, don't use in
+ * the new code, rather use the ISC_ATTR_UNUSED macro that expands
+ * to either C23's [[maybe_unused]] or __attribute__((__unused__)).
+ *
  * \code
  * int
- * foo(char *bar)
- * {
- *	UNUSED(bar);
+ * foo(ISC_ATTR_UNUSED char *bar) {
+ *         ...;
  * }
  * \endcode
  */
@@ -67,24 +80,37 @@
 #define ISC_CLAMP(v, x, y) ((v) < (x) ? (x) : ((v) > (y) ? (y) : (v)))
 
 /*%
- * Use this to remove the const qualifier of a variable to assign it to
- * a non-const variable or pass it as a non-const function argument ...
- * but only when you are sure it won't then be changed!
- * This is necessary to sometimes shut up some compilers
- * (as with gcc -Wcast-qual) when there is just no other good way to avoid the
- * situation.
+ * The UNCONST() macro can be used to omit warnings produced by certain
+ * compilers when operating with pointers declared with the const type qual-
+ * ifier in a context without such qualifier.  Examples include passing a
+ * pointer declared with the const qualifier to a function without such
+ * qualifier, and variable assignment from a const pointer to a non-const
+ * pointer.
+ *
+ * As the macro may hide valid errors, their usage is not recommended
+ * unless there is a well-thought reason for a cast.  A typical use case for
+ * __UNCONST() involve an API that does not follow the so-called ``const
+ * correctness'' even if it would be appropriate.
  */
-#define DE_CONST(konst, var)           \
-	do {                           \
-		union {                \
-			const void *k; \
-			void *	    v; \
-		} _u;                  \
-		_u.k = konst;          \
-		var = _u.v;            \
-	} while (0)
+#define UNCONST(ptr) ((void *)(uintptr_t)(ptr))
 
 #define ARRAY_SIZE(x) (sizeof(x) / sizeof(x[0]))
+
+/*
+ * Optional return values, or out-arguments
+ */
+#define SET_IF_NOT_NULL(obj, val) \
+	if ((obj) != NULL) {      \
+		*(obj) = (val);   \
+	}
+
+/*%
+ * Get the allocation size for a struct with a flexible array member
+ * containing `count` elements. The struct is identified by a pointer,
+ * typically the one that points to (or will point to) the allocation.
+ */
+#define STRUCT_FLEX_SIZE(pointer, member, count) \
+	(sizeof(*(pointer)) + sizeof(*(pointer)->member) * (count))
 
 /*%
  * Use this in translation units that would otherwise be empty, to
@@ -95,8 +121,6 @@
 /*%
  * We use macros instead of calling the routines directly because
  * the capital letters make the locking stand out.
- * We RUNTIME_CHECK for success since in general there's no way
- * for us to continue if they fail.
  */
 
 #ifdef ISC_UTIL_TRACEON
@@ -108,43 +132,56 @@
 
 #include <isc/result.h> /* Contractual promise. */
 
+#define SPINLOCK(sp)                                                           \
+	{                                                                      \
+		ISC_UTIL_TRACE(fprintf(stderr, "SPINLOCKING %p %s %d\n", (sp), \
+				       __FILE__, __LINE__));                   \
+		isc_spinlock_lock((sp));                                       \
+		ISC_UTIL_TRACE(fprintf(stderr, "SPINLOCKED %p %s %d\n", (sp),  \
+				       __FILE__, __LINE__));                   \
+	}
+#define SPINUNLOCK(sp)                                                    \
+	{                                                                 \
+		isc_spinlock_unlock((sp));                                \
+		ISC_UTIL_TRACE(fprintf(stderr, "SPINUNLOCKED %p %s %d\n", \
+				       (sp), __FILE__, __LINE__));        \
+	}
+
 #define LOCK(lp)                                                           \
-	do {                                                               \
+	{                                                                  \
 		ISC_UTIL_TRACE(fprintf(stderr, "LOCKING %p %s %d\n", (lp), \
 				       __FILE__, __LINE__));               \
-		RUNTIME_CHECK(isc_mutex_lock((lp)) == ISC_R_SUCCESS);      \
+		isc_mutex_lock((lp));                                      \
 		ISC_UTIL_TRACE(fprintf(stderr, "LOCKED %p %s %d\n", (lp),  \
 				       __FILE__, __LINE__));               \
-	} while (0)
+	}
 #define UNLOCK(lp)                                                          \
-	do {                                                                \
-		RUNTIME_CHECK(isc_mutex_unlock((lp)) == ISC_R_SUCCESS);     \
+	{                                                                   \
+		isc_mutex_unlock((lp));                                     \
 		ISC_UTIL_TRACE(fprintf(stderr, "UNLOCKED %p %s %d\n", (lp), \
 				       __FILE__, __LINE__));                \
-	} while (0)
+	}
 
 #define BROADCAST(cvp)                                                        \
-	do {                                                                  \
+	{                                                                     \
 		ISC_UTIL_TRACE(fprintf(stderr, "BROADCAST %p %s %d\n", (cvp), \
 				       __FILE__, __LINE__));                  \
-		RUNTIME_CHECK(isc_condition_broadcast((cvp)) ==               \
-			      ISC_R_SUCCESS);                                 \
-	} while (0)
-#define SIGNAL(cvp)                                                          \
-	do {                                                                 \
-		ISC_UTIL_TRACE(fprintf(stderr, "SIGNAL %p %s %d\n", (cvp),   \
-				       __FILE__, __LINE__));                 \
-		RUNTIME_CHECK(isc_condition_signal((cvp)) == ISC_R_SUCCESS); \
-	} while (0)
+		isc_condition_broadcast((cvp));                               \
+	}
+#define SIGNAL(cvp)                                                        \
+	{                                                                  \
+		ISC_UTIL_TRACE(fprintf(stderr, "SIGNAL %p %s %d\n", (cvp), \
+				       __FILE__, __LINE__));               \
+		isc_condition_signal((cvp));                               \
+	}
 #define WAIT(cvp, lp)                                                         \
-	do {                                                                  \
+	{                                                                     \
 		ISC_UTIL_TRACE(fprintf(stderr, "WAIT %p LOCK %p %s %d\n",     \
 				       (cvp), (lp), __FILE__, __LINE__));     \
-		RUNTIME_CHECK(isc_condition_wait((cvp), (lp)) ==              \
-			      ISC_R_SUCCESS);                                 \
+		isc_condition_wait((cvp), (lp));                              \
 		ISC_UTIL_TRACE(fprintf(stderr, "WAITED %p LOCKED %p %s %d\n", \
 				       (cvp), (lp), __FILE__, __LINE__));     \
-	} while (0)
+	}
 
 /*
  * isc_condition_waituntil can return ISC_R_TIMEDOUT, so we
@@ -156,19 +193,38 @@
 #define WAITUNTIL(cvp, lp, tp) isc_condition_waituntil((cvp), (lp), (tp))
 
 #define RWLOCK(lp, t)                                                         \
-	do {                                                                  \
+	{                                                                     \
 		ISC_UTIL_TRACE(fprintf(stderr, "RWLOCK %p, %d %s %d\n", (lp), \
 				       (t), __FILE__, __LINE__));             \
-		RUNTIME_CHECK(isc_rwlock_lock((lp), (t)) == ISC_R_SUCCESS);   \
+		isc_rwlock_lock((lp), (t));                                   \
 		ISC_UTIL_TRACE(fprintf(stderr, "RWLOCKED %p, %d %s %d\n",     \
 				       (lp), (t), __FILE__, __LINE__));       \
-	} while (0)
-#define RWUNLOCK(lp, t)                                                       \
-	do {                                                                  \
-		ISC_UTIL_TRACE(fprintf(stderr, "RWUNLOCK %p, %d %s %d\n",     \
-				       (lp), (t), __FILE__, __LINE__));       \
-		RUNTIME_CHECK(isc_rwlock_unlock((lp), (t)) == ISC_R_SUCCESS); \
-	} while (0)
+	}
+#define RWUNLOCK(lp, t)                                                   \
+	{                                                                 \
+		ISC_UTIL_TRACE(fprintf(stderr, "RWUNLOCK %p, %d %s %d\n", \
+				       (lp), (t), __FILE__, __LINE__));   \
+		isc_rwlock_unlock((lp), (t));                             \
+	}
+
+#define RDLOCK(lp)   RWLOCK(lp, isc_rwlocktype_read)
+#define RDUNLOCK(lp) RWUNLOCK(lp, isc_rwlocktype_read)
+#define WRLOCK(lp)   RWLOCK(lp, isc_rwlocktype_write)
+#define WRUNLOCK(lp) RWUNLOCK(lp, isc_rwlocktype_write)
+
+#define UPGRADELOCK(lock, locktype)                                         \
+	{                                                                   \
+		if (locktype == isc_rwlocktype_read) {                      \
+			if (isc_rwlock_tryupgrade(lock) == ISC_R_SUCCESS) { \
+				locktype = isc_rwlocktype_write;            \
+			} else {                                            \
+				RWUNLOCK(lock, locktype);                   \
+				locktype = isc_rwlocktype_write;            \
+				RWLOCK(lock, locktype);                     \
+			}                                                   \
+		}                                                           \
+		INSIST(locktype == isc_rwlocktype_write);                   \
+	}
 
 /*
  * List Macros.
@@ -196,22 +252,17 @@
 /*%
  * Performance
  */
-#include <isc/likely.h>
-
-#ifdef HAVE_BUILTIN_UNREACHABLE
-#define ISC_UNREACHABLE() __builtin_unreachable();
-#else /* ifdef HAVE_BUILTIN_UNREACHABLE */
-#define ISC_UNREACHABLE()
-#endif /* ifdef HAVE_BUILTIN_UNREACHABLE */
-
-#if !defined(__has_feature)
-#define __has_feature(x) 0
-#endif /* if !defined(__has_feature) */
 
 /* GCC defines __SANITIZE_ADDRESS__, so reuse the macro for clang */
 #if __has_feature(address_sanitizer)
 #define __SANITIZE_ADDRESS__ 1
 #endif /* if __has_feature(address_sanitizer) */
+
+#if __SANITIZE_ADDRESS__
+#define ISC_NO_SANITIZE_ADDRESS __attribute__((no_sanitize("address")))
+#else /* if __SANITIZE_ADDRESS__ */
+#define ISC_NO_SANITIZE_ADDRESS
+#endif /* if __SANITIZE_ADDRESS__ */
 
 #if __has_feature(thread_sanitizer)
 #define __SANITIZE_THREAD__ 1
@@ -228,7 +279,12 @@
 #elif __has_feature(c_static_assert)
 #define STATIC_ASSERT(cond, msg) _Static_assert(cond, msg)
 #else /* if __GNUC__ > 4 || (__GNUC__ == 4 && __GNUC_MINOR >= 6) */
-#define STATIC_ASSERT(cond, msg) INSIST(cond)
+
+/* Courtesy of Joseph Quinsey: https://godbolt.org/z/K9RvWS */
+#define TOKENPASTE(a, b)	a##b /* "##" is the "Token Pasting Operator" */
+#define EXPAND_THEN_PASTE(a, b) TOKENPASTE(a, b) /* expand then paste */
+#define STATIC_ASSERT(x, msg) \
+	enum { EXPAND_THEN_PASTE(ASSERT_line_, __LINE__) = 1 / ((msg) && (x)) }
 #endif /* if __GNUC__ > 4 || (__GNUC__ == 4 && __GNUC_MINOR >= 6) */
 
 #ifdef UNIT_TESTING
@@ -257,15 +313,15 @@ mock_assert(const int result, const char *const expression,
 	((!(expression))                                                      \
 		 ? (mock_assert(0, #expression, __FILE__, __LINE__), abort()) \
 		 : (void)0)
+#define UNREACHABLE() \
+	(mock_assert(0, "unreachable", __FILE__, __LINE__), abort())
 #define _assert_true(c, e, f, l) \
 	((c) ? (void)0 : (_assert_true(0, e, f, l), abort()))
 #define _assert_int_equal(a, b, f, l) \
 	(((a) == (b)) ? (void)0 : (_assert_int_equal(a, b, f, l), abort()))
 #define _assert_int_not_equal(a, b, f, l) \
 	(((a) != (b)) ? (void)0 : (_assert_int_not_equal(a, b, f, l), abort()))
-#else /* UNIT_TESTING */
-
-#ifndef CPPCHECK
+#else			    /* UNIT_TESTING */
 
 /*
  * Assertions
@@ -281,65 +337,59 @@ mock_assert(const int result, const char *const expression,
 /*% Invariant Assertion */
 #define INVARIANT(e) ISC_INVARIANT(e)
 
-#else /* CPPCHECK */
-
-/*% Require Assertion */
-#define REQUIRE(e) \
-	if (!(e))  \
-	abort()
-/*% Ensure Assertion */
-#define ENSURE(e) \
-	if (!(e)) \
-	abort()
-/*% Insist Assertion */
-#define INSIST(e) \
-	if (!(e)) \
-	abort()
-/*% Invariant Assertion */
-#define INVARIANT(e) \
-	if (!(e))    \
-	abort()
-
-#endif /* CPPCHECK */
+#define UNREACHABLE() ISC_UNREACHABLE()
 
 #endif /* UNIT_TESTING */
 
 /*
  * Errors
  */
-#include <isc/error.h> /* Contractual promise. */
+#include <errno.h> /* for errno */
 
-/*% Unexpected Error */
-#define UNEXPECTED_ERROR isc_error_unexpected
-/*% Fatal Error */
-#define FATAL_ERROR isc_error_fatal
+#include <isc/error.h>	/* Contractual promise. */
+#include <isc/strerr.h> /* for ISC_STRERRORSIZE */
+
+#define UNEXPECTED_ERROR(...) \
+	isc_error_unexpected(__FILE__, __LINE__, __func__, __VA_ARGS__)
+
+#define FATAL_ERROR(...) \
+	isc_error_fatal(__FILE__, __LINE__, __func__, __VA_ARGS__)
+
+#define REPORT_SYSERROR(report, err, fmt, ...)                        \
+	{                                                             \
+		char strerr[ISC_STRERRORSIZE];                        \
+		strerror_r(err, strerr, sizeof(strerr));              \
+		report(__FILE__, __LINE__, __func__, fmt ": %s (%d)", \
+		       ##__VA_ARGS__, strerr, err);                   \
+	}
+
+#define UNEXPECTED_SYSERROR(err, ...) \
+	REPORT_SYSERROR(isc_error_unexpected, err, __VA_ARGS__)
+
+#define FATAL_SYSERROR(err, ...) \
+	REPORT_SYSERROR(isc_error_fatal, err, __VA_ARGS__)
 
 #ifdef UNIT_TESTING
 
-#define RUNTIME_CHECK(expression)                                             \
-	((!(expression))                                                      \
-		 ? (mock_assert(0, #expression, __FILE__, __LINE__), abort()) \
-		 : (void)0)
+#define RUNTIME_CHECK(cond) \
+	((cond) ? (void)0   \
+		: (mock_assert(0, #cond, __FILE__, __LINE__), abort()))
 
 #else /* UNIT_TESTING */
 
-#ifndef CPPCHECK
-/*% Runtime Check */
-#define RUNTIME_CHECK(cond) ISC_ERROR_RUNTIMECHECK(cond)
-#else /* ifndef CPPCHECK */
-#define RUNTIME_CHECK(e) \
-	if (!(e))        \
-	abort()
-#endif /* ifndef CPPCHECK */
+#define RUNTIME_CHECK(cond) \
+	((cond) ? (void)0 : FATAL_ERROR("RUNTIME_CHECK(%s) failed", #cond))
 
 #endif /* UNIT_TESTING */
 
 /*%
- * Time
+ * Runtime check which logs the error value returned by a POSIX Threads
+ * function and the error string that corresponds to it
  */
-#define TIME_NOW(tp) RUNTIME_CHECK(isc_time_now((tp)) == ISC_R_SUCCESS)
-#define TIME_NOW_HIRES(tp) \
-	RUNTIME_CHECK(isc_time_now_hires((tp)) == ISC_R_SUCCESS)
+#define PTHREADS_RUNTIME_CHECK(func, ret)           \
+	if ((ret) != 0) {                           \
+		FATAL_SYSERROR(ret, "%s()", #func); \
+	}
 
 /*%
  * Alignment
@@ -351,8 +401,11 @@ mock_assert(const int result, const char *const expression,
 #endif /* ifdef __GNUC__ */
 
 /*%
- * Misc
+ * Swap
  */
-#include <isc/deprecated.h>
-
-#endif /* ISC_UTIL_H */
+#define ISC_SWAP(a, b)                    \
+	{                                 \
+		typeof(a) __tmp_swap = a; \
+		a = b;                    \
+		b = __tmp_swap;           \
+	}

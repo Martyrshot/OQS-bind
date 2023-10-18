@@ -1,6 +1,8 @@
 /*
  * Copyright (C) Internet Systems Consortium, Inc. ("ISC")
  *
+ * SPDX-License-Identifier: MPL-2.0
+ *
  * This Source Code Form is subject to the terms of the Mozilla Public
  * License, v. 2.0. If a copy of the MPL was not distributed with this
  * file, you can obtain one at https://mozilla.org/MPL/2.0/.
@@ -9,8 +11,7 @@
  * information regarding copyright ownership.
  */
 
-#ifndef DNS_RBT_H
-#define DNS_RBT_H 1
+#pragma once
 
 /*! \file dns/rbt.h */
 
@@ -56,7 +57,6 @@ ISC_LANG_BEGINDECLS
  * appended to this structure.  Allocating a contiguous block of memory for
  * multiple dns_rbtnode structures will not work.
  */
-typedef struct dns_rbtnode dns_rbtnode_t;
 enum {
 	DNS_RBT_NSEC_NORMAL = 0,   /* in main tree */
 	DNS_RBT_NSEC_HAS_NSEC = 1, /* also has node in nsec tree */
@@ -70,9 +70,7 @@ struct dns_rbtnode {
 	/*@{*/
 	/*!
 	 * The following bitfields add up to a total bitwidth of 32.
-	 * The range of values necessary for each item is indicated,
-	 * but in the case of "attributes" the field is wider to accommodate
-	 * possible future expansion.
+	 * The range of values necessary for each item is indicated.
 	 *
 	 * In each case below the "range" indicated is what's _necessary_ for
 	 * the bitfield to hold, not what it actually _can_ hold.
@@ -91,31 +89,13 @@ struct dns_rbtnode {
 	unsigned int is_root	   : 1; /*%< range is 0..1 */
 	unsigned int color	   : 1; /*%< range is 0..1 */
 	unsigned int find_callback : 1; /*%< range is 0..1 */
-	unsigned int attributes	   : 3; /*%< range is 0..2 */
+	bool	     absolute	   : 1; /*%< node with absolute DNS name */
 	unsigned int nsec	   : 2; /*%< range is 0..3 */
 	unsigned int namelen	   : 8; /*%< range is 1..255 */
 	unsigned int offsetlen	   : 8; /*%< range is 1..128 */
 	unsigned int oldnamelen	   : 8; /*%< range is 1..255 */
+	unsigned int		   : 0; /* end of bitfields c/o tree lock */
 	/*@}*/
-
-	/* flags needed for serialization to file */
-	unsigned int is_mmapped		: 1;
-	unsigned int parent_is_relative : 1;
-	unsigned int left_is_relative	: 1;
-	unsigned int right_is_relative	: 1;
-	unsigned int down_is_relative	: 1;
-	unsigned int data_is_relative	: 1;
-
-	/*
-	 * full name length; set during serialization, and used
-	 * during deserialization to calculate database size.
-	 * should be cleared after use.
-	 */
-	unsigned int fullnamelen : 8; /*%< range is 1..255 */
-
-	/* node needs to be cleaned from rpz */
-	unsigned int rpz : 1;
-	unsigned int	 : 0; /* end of bitfields c/o tree lock */
 
 	/*%
 	 * These are needed for hashing. The 'uppernode' points to the
@@ -166,9 +146,9 @@ struct dns_rbtnode {
 	/*@}*/
 };
 
-typedef isc_result_t (*dns_rbtfindcallback_t)(dns_rbtnode_t *node,
-					      dns_name_t *   name,
-					      void *	     callback_arg);
+typedef isc_result_t (*dns_rbtfindcallback_t)(dns_rbtnode_t	*node,
+					      dns_name_t	*name,
+					      void *callback_arg DNS__DB_FLARG);
 
 typedef isc_result_t (*dns_rbtdatawriter_t)(FILE *file, unsigned char *data,
 					    void *arg, uint64_t *crc);
@@ -230,15 +210,13 @@ typedef void (*dns_rbtdeleter_t)(void *, void *);
  */
 
 /*%
- * The number of level blocks to allocate at a time.  Currently the maximum
- * number of levels is allocated directly in the structure, but future
- * revisions of this code might have a static initial block with dynamic
- * growth.  Allocating space for 256 levels when the tree is almost never that
- * deep is wasteful, but it's not clear that it matters, since the waste is
- * only 2MB for 1000 concurrently active chains on a system with 64-bit
- * pointers.
+ * The number of level blocks to allocate at a time, same as the maximum
+ * number of labels. Allocating space for 128 levels when the tree is
+ * almost never that deep is wasteful, but it's not clear that it matters,
+ * since the waste is only 1MB for 1000 concurrently active chains on a
+ * system with 64-bit pointers.
  */
-#define DNS_RBT_LEVELBLOCK 254
+#define DNS_RBT_LEVELBLOCK 127
 
 typedef struct dns_rbtnodechain {
 	unsigned int magic;
@@ -250,12 +228,9 @@ typedef struct dns_rbtnodechain {
 	 */
 	dns_rbtnode_t *end;
 	/*%
-	 * The maximum number of labels in a name is 128; bitstrings mean
-	 * a conceptually very large number (which I have not bothered to
-	 * compute) of logical levels because splitting can potentially occur
-	 * at each bit.  However, DNSSEC restricts the number of "logical"
-	 * labels in a name to 255, meaning only 254 pointers are needed
-	 * in the worst case.
+	 * Currently the maximum number of levels is allocated directly in
+	 * the structure, but future revisions of this code might have a
+	 * static initial block with dynamic growth.
 	 */
 	dns_rbtnode_t *levels[DNS_RBT_LEVELBLOCK];
 	/*%
@@ -384,9 +359,11 @@ dns_rbt_addnode(dns_rbt_t *rbt, const dns_name_t *name, dns_rbtnode_t **nodep);
  *\li   #ISC_R_NOMEMORY Resource Limit: Out of Memory
  */
 
+#define dns_rbt_findname(rbt, name, options, foundname, data) \
+	dns__rbt_findname(rbt, name, options, foundname, data DNS__DB_FILELINE)
 isc_result_t
-dns_rbt_findname(dns_rbt_t *rbt, const dns_name_t *name, unsigned int options,
-		 dns_name_t *foundname, void **data);
+dns__rbt_findname(dns_rbt_t *rbt, const dns_name_t *name, unsigned int options,
+		  dns_name_t *foundname, void **data DNS__DB_FLARG);
 /*%<
  * Get the data pointer associated with 'name'.
  *
@@ -423,11 +400,16 @@ dns_rbt_findname(dns_rbt_t *rbt, const dns_name_t *name, unsigned int options,
  *\li   #ISC_R_NOSPACE          Concatenating nodes to form foundname failed
  */
 
+#define dns_rbt_findnode(rbt, name, foundname, node, chain, options, callback, \
+			 callback_arg)                                         \
+	dns__rbt_findnode(rbt, name, foundname, node, chain, options,          \
+			  callback, callback_arg DNS__DB_FILELINE)
+
 isc_result_t
-dns_rbt_findnode(dns_rbt_t *rbt, const dns_name_t *name, dns_name_t *foundname,
-		 dns_rbtnode_t **node, dns_rbtnodechain_t *chain,
-		 unsigned int options, dns_rbtfindcallback_t callback,
-		 void *callback_arg);
+dns__rbt_findnode(dns_rbt_t *rbt, const dns_name_t *name, dns_name_t *foundname,
+		  dns_rbtnode_t **node, dns_rbtnodechain_t *chain,
+		  unsigned int options, dns_rbtfindcallback_t callback,
+		  void *callback_arg DNS__DB_FLARG);
 /*%<
  * Find the node for 'name'.
  *
@@ -528,8 +510,11 @@ dns_rbt_findnode(dns_rbt_t *rbt, const dns_name_t *name, dns_name_t *foundname,
  *\li   #ISC_R_NOSPACE Concatenating nodes to form foundname failed
  */
 
+#define dns_rbt_deletename(rbt, name, recurse) \
+	dns__rbt_deletename(rbt, name, recurse DNS__DB_FILELINE)
 isc_result_t
-dns_rbt_deletename(dns_rbt_t *rbt, const dns_name_t *name, bool recurse);
+dns__rbt_deletename(dns_rbt_t *rbt, const dns_name_t *name,
+		    bool recurse DNS__DB_FLARG);
 /*%<
  * Delete 'name' from the tree of trees.
  *
@@ -622,7 +607,7 @@ dns_rbt_namefromnode(dns_rbtnode_t *node, dns_name_t *name);
  * \li  name->offsets == NULL
  *
  * Ensures:
- * \li  'name' is DNS_NAMEATTR_READONLY.
+ * \li  'name' is readonly.
  *
  * \li  'name' will point directly to the labels stored after the
  *      dns_rbtnode_t struct.
@@ -685,17 +670,6 @@ dns_rbt_hashsize(dns_rbt_t *rbt);
  * \li  rbt is a valid rbt manager.
  */
 
-isc_result_t
-dns_rbt_adjusthashsize(dns_rbt_t *rbt, size_t size);
-/*%<
- * Adjust the number of buckets in the 'rbt' hash table, according to the
- * expected maximum size of the rbt database.
- *
- * Requires:
- * \li  rbt is a valid rbt manager.
- * \li  size is expected maximum memory footprint of rbt.
- */
-
 void
 dns_rbt_destroy(dns_rbt_t **rbtp);
 isc_result_t
@@ -722,45 +696,9 @@ dns_rbt_destroy2(dns_rbt_t **rbtp, unsigned int quantum);
  * \li  ISC_R_QUOTA if 'quantum' nodes have been destroyed.
  */
 
-off_t
-dns_rbt_serialize_align(off_t target);
-/*%<
- * Align the provided integer to a pointer-size boundary.
- * This should be used if, during serialization of data to a will-be
- * mmap()ed file, a pointer alignment is needed for some data.
- */
-
-isc_result_t
-dns_rbt_serialize_tree(FILE *file, dns_rbt_t *rbt,
-		       dns_rbtdatawriter_t datawriter, void *writer_arg,
-		       off_t *offset);
-/*%<
- * Write out the RBT structure and its data to a file.
- *
- * Notes:
- * \li  The file must be an actual file which allows seek() calls, so it cannot
- *      be a stream.  Returns ISC_R_INVALIDFILE if not.
- */
-
-isc_result_t
-dns_rbt_deserialize_tree(void *base_address, size_t filesize,
-			 off_t header_offset, isc_mem_t *mctx,
-			 dns_rbtdeleter_t deleter, void *deleter_arg,
-			 dns_rbtdatafixer_t datafixer, void *fixer_arg,
-			 dns_rbtnode_t **originp, dns_rbt_t **rbtp);
-/*%<
- * Read a RBT structure and its data from a file.
- *
- * If 'originp' is not NULL, then it is pointed to the root node of the RBT.
- *
- * Notes:
- * \li  The file must be an actual file which allows seek() calls, so it cannot
- *      be a stream.  This condition is not checked in the code.
- */
-
 void
 dns_rbt_printtext(dns_rbt_t *rbt, void (*data_printer)(FILE *, void *),
-		  FILE *     f);
+		  FILE	    *f);
 /*%<
  * Print an ASCII representation of the internal structure of the red-black
  * tree of trees to the passed stream.
@@ -1054,5 +992,3 @@ dns__rbtnode_namelen(dns_rbtnode_t *node);
  * and in unit tests.
  */
 ISC_LANG_ENDDECLS
-
-#endif /* DNS_RBT_H */

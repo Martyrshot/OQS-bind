@@ -1,6 +1,8 @@
 /*
  * Copyright (C) Internet Systems Consortium, Inc. ("ISC")
  *
+ * SPDX-License-Identifier: MPL-2.0
+ *
  * This Source Code Form is subject to the terms of the Mozilla Public
  * License, v. 2.0. If a copy of the MPL was not distributed with this
  * file, you can obtain one at https://mozilla.org/MPL/2.0/.
@@ -281,10 +283,6 @@ INT_FIELD_DEFS(recursiveclients)
 INT_FIELD_DEFS(minroots)
 INT_FIELD_DEFS(serialqueries)
 INT_FIELD_DEFS(sigvalidityinterval)
-INT_FIELD_DEFS(datasize)
-INT_FIELD_DEFS(stacksize)
-INT_FIELD_DEFS(coresize)
-INT_FIELD_DEFS(files)
 INT_FIELD_DEFS(maxcachesize)
 INT_FIELD_DEFS(maxncachettl)
 INT_FIELD_DEFS(maxcachettl)

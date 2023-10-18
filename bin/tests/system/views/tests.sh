@@ -1,9 +1,11 @@
 #!/bin/sh
-#
+
 # Copyright (C) Internet Systems Consortium, Inc. ("ISC")
 #
+# SPDX-License-Identifier: MPL-2.0
+#
 # This Source Code Form is subject to the terms of the Mozilla Public
-# License, v. 2.0. If a copy of the MPL was not distributed with this
+# License, v. 2.0.  If a copy of the MPL was not distributed with this
 # file, you can obtain one at https://mozilla.org/MPL/2.0/.
 #
 # See the COPYRIGHT file distributed with this work for additional
@@ -154,10 +156,9 @@ while [ $i -lt 50 ]; do
 	# Add a new zone to the configuration.
 	cat >> ns2/zones.conf <<-EOF
 	zone "${zone_name}" {
-	    type master;
+	    type primary;
 	    file "db.${zone_name}";
-	    dnssec-dnskey-kskonly yes;
-	    auto-dnssec maintain;
+	    dnssec-policy default;
 	    inline-signing yes;
 	};
 	EOF
@@ -176,7 +177,6 @@ while [ $i -lt 50 ]; do
 	localhost       IN      A       127.0.0.1
 	EOF
 
-	$KEYGEN -q -Kns2 -fk -aecdsa256 "${zone_name}" > /dev/null
 	$RNDCCMD 10.53.0.2 reconfig || ret=1
 	if [ $ret != 0 ]; then echo_i "failed"; break; fi
 	i=$((i + 1))

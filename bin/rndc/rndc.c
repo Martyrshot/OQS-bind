@@ -1,6 +1,8 @@
 /*
  * Copyright (C) Internet Systems Consortium, Inc. ("ISC")
  *
+ * SPDX-License-Identifier: MPL-2.0
+ *
  * This Source Code Form is subject to the terms of the Mozilla Public
  * License, v. 2.0. If a copy of the MPL was not distributed with this
  * file, you can obtain one at https://mozilla.org/MPL/2.0/.
@@ -15,28 +17,24 @@
 #include <stdbool.h>
 #include <stdlib.h>
 
-#include <isc/app.h>
-#include <isc/atomic.h>
 #include <isc/attributes.h>
 #include <isc/buffer.h>
 #include <isc/commandline.h>
 #include <isc/file.h>
+#include <isc/getaddresses.h>
 #include <isc/log.h>
+#include <isc/loop.h>
 #include <isc/managers.h>
 #include <isc/mem.h>
 #include <isc/net.h>
 #include <isc/netmgr.h>
-#include <isc/print.h>
 #include <isc/random.h>
 #include <isc/refcount.h>
-#include <isc/socket.h>
+#include <isc/result.h>
 #include <isc/stdtime.h>
 #include <isc/string.h>
-#include <isc/task.h>
 #include <isc/thread.h>
 #include <isc/util.h>
-
-#include <pk11/site.h>
 
 #include <dns/name.h>
 
@@ -44,25 +42,22 @@
 #include <isccc/base64.h>
 #include <isccc/cc.h>
 #include <isccc/ccmsg.h>
-#include <isccc/result.h>
 #include <isccc/sexpr.h>
 #include <isccc/types.h>
 #include <isccc/util.h>
 
 #include <isccfg/namedconf.h>
 
-#include <bind9/getaddresses.h>
-
 #include "util.h"
 
-#define SERVERADDRS 10
+#define SERVERADDRS  10
+#define RNDC_TIMEOUT 60 * 1000
 
 const char *progname = NULL;
 bool verbose;
 
 static isc_nm_t *netmgr = NULL;
-static isc_taskmgr_t *taskmgr = NULL;
-static isc_task_t *rndc_task = NULL;
+static isc_loopmgr_t *loopmgr = NULL;
 
 static const char *admin_conffile = NULL;
 static const char *admin_keyfile = NULL;
@@ -81,23 +76,18 @@ static isccc_region_t secret;
 static bool failed = false;
 static bool c_flag = false;
 static isc_mem_t *rndc_mctx = NULL;
-static atomic_uint_fast32_t sends = ATOMIC_VAR_INIT(0);
-static atomic_uint_fast32_t recvs = ATOMIC_VAR_INIT(0);
-static atomic_uint_fast32_t connects = ATOMIC_VAR_INIT(0);
 static char *command = NULL;
 static char *args = NULL;
 static char program[256];
 static uint32_t serial;
 static bool quiet = false;
 static bool showresult = false;
-static bool shuttingdown = false;
-static isc_nmhandle_t *recvdone_handle = NULL;
-static isc_nmhandle_t *recvnonce_handle = NULL;
+static int32_t timeout = RNDC_TIMEOUT;
 
 static void
 rndc_startconnect(isc_sockaddr_t *addr);
 
-ISC_NORETURN static void
+noreturn static void
 usage(int status);
 
 static void
@@ -126,7 +116,7 @@ command is one of the following:\n\
 		Requires the zone to have a dnssec-policy.\n\
   dnstap -reopen\n\
 		Close, truncate and re-open the DNSTAP output file.\n\
-  dnstap -roll count\n\
+  dnstap -roll [count]\n\
 		Close, rename and re-open the DNSTAP output file(s).\n\
   dumpdb [-all|-cache|-zones|-adb|-bad|-expired|-fail] [view ...]\n\
 		Dump cache(s) to the dump file (named_dump.db).\n\
@@ -222,10 +212,6 @@ command is one of the following:\n\
 		Enable updates to a frozen dynamic zone and reload it.\n\
   trace		Increment debugging level by one.\n\
   trace level	Change the debugging level.\n\
-  tsig-delete keyname [view]\n\
-		Delete a TKEY-negotiated TSIG key.\n\
-  tsig-list	List all currently active TSIG keys, including both statically\n\
-		configured and TKEY-negotiated keys.\n\
   validation [ on | off | status ] [view]\n\
 		Enable / disable DNSSEC validation.\n\
   zonestatus zone [class [view]]\n\
@@ -237,7 +223,7 @@ Version: %s\n",
 	exit(status);
 }
 
-#define CMDLINE_FLAGS "46b:c:hk:Mmp:qrs:Vy:"
+#define CMDLINE_FLAGS "46b:c:hk:Mmp:qrs:t:Vy:"
 
 static void
 preparse_args(int argc, char **argv) {
@@ -282,7 +268,7 @@ get_addresses(const char *host, in_port_t port) {
 		}
 	} else {
 		count = SERVERADDRS - nserveraddrs;
-		result = bind9_getaddresses(
+		result = isc_getaddresses(
 			host, port, &serveraddrs[nserveraddrs], count, &found);
 		nserveraddrs += found;
 	}
@@ -294,22 +280,10 @@ get_addresses(const char *host, in_port_t port) {
 }
 
 static void
-rndc_senddone(isc_nmhandle_t *handle, isc_result_t result, void *arg) {
-	isc_nmhandle_t *sendhandle = (isc_nmhandle_t *)arg;
-
+rndc_senddone(isc_nmhandle_t *handle ISC_ATTR_UNUSED, isc_result_t result,
+	      void *arg ISC_ATTR_UNUSED) {
 	if (result != ISC_R_SUCCESS) {
 		fatal("send failed: %s", isc_result_totext(result));
-	}
-
-	REQUIRE(sendhandle == handle);
-	isc_nmhandle_detach(&sendhandle);
-
-	if (atomic_fetch_sub_release(&sends, 1) == 1 &&
-	    atomic_load_acquire(&recvs) == 0)
-	{
-		shuttingdown = true;
-		isc_task_shutdown(rndc_task);
-		isc_app_shutdown();
 	}
 }
 
@@ -317,21 +291,15 @@ static void
 rndc_recvdone(isc_nmhandle_t *handle, isc_result_t result, void *arg) {
 	isccc_ccmsg_t *ccmsg = (isccc_ccmsg_t *)arg;
 	isccc_sexpr_t *response = NULL;
-	isccc_sexpr_t *data;
+	isccc_sexpr_t *data = NULL;
 	isccc_region_t source;
 	char *errormsg = NULL;
 	char *textmsg = NULL;
 
+	REQUIRE(handle != NULL);
 	REQUIRE(ccmsg != NULL);
 
-	if (shuttingdown && (result == ISC_R_EOF || result == ISC_R_CANCELED)) {
-		atomic_fetch_sub_release(&recvs, 1);
-		if (handle != NULL) {
-			REQUIRE(recvdone_handle == handle);
-			isc_nmhandle_detach(&recvdone_handle);
-		}
-		return;
-	} else if (result == ISC_R_EOF) {
+	if (result == ISC_R_EOF) {
 		fatal("connection to remote host closed.\n"
 		      "* This may indicate that the\n"
 		      "* remote server is using an older\n"
@@ -340,7 +308,7 @@ rndc_recvdone(isc_nmhandle_t *handle, isc_result_t result, void *arg) {
 		      "* the clocks are not synchronized,\n"
 		      "* the key signing algorithm is incorrect,\n"
 		      "* or the key is invalid.");
-	} else if (result != ISC_R_SUCCESS && result != ISC_R_CANCELED) {
+	} else if (result != ISC_R_SUCCESS) {
 		fatal("recv failed: %s", isc_result_totext(result));
 	}
 
@@ -387,42 +355,27 @@ rndc_recvdone(isc_nmhandle_t *handle, isc_result_t result, void *arg) {
 
 	isccc_sexpr_free(&response);
 
-	REQUIRE(recvdone_handle == handle);
-	isc_nmhandle_detach(&recvdone_handle);
-
-	if (atomic_load_acquire(&sends) == 0 &&
-	    atomic_fetch_sub_release(&recvs, 1) == 1)
-	{
-		shuttingdown = true;
-		isc_task_shutdown(rndc_task);
-		isc_app_shutdown();
-	}
+	isccc_ccmsg_invalidate(ccmsg);
+	isc_loopmgr_shutdown(loopmgr);
 }
 
 static void
-rndc_recvnonce(isc_nmhandle_t *handle, isc_result_t result, void *arg) {
+rndc_recvnonce(isc_nmhandle_t *handle ISC_ATTR_UNUSED, isc_result_t result,
+	       void *arg) {
 	isccc_ccmsg_t *ccmsg = (isccc_ccmsg_t *)arg;
 	isccc_sexpr_t *response = NULL;
-	isc_nmhandle_t *sendhandle = NULL;
 	isccc_sexpr_t *_ctrl = NULL;
 	isccc_region_t source;
 	uint32_t nonce;
 	isccc_sexpr_t *request = NULL;
-	isccc_time_t now;
+	isccc_time_t now = isc_stdtime_now();
 	isc_region_t r;
 	isccc_sexpr_t *data = NULL;
 	isc_buffer_t b;
 
 	REQUIRE(ccmsg != NULL);
 
-	if (shuttingdown && result == ISC_R_EOF) {
-		atomic_fetch_sub_release(&recvs, 1);
-		if (handle != NULL) {
-			REQUIRE(recvnonce_handle == handle);
-			isc_nmhandle_detach(&recvnonce_handle);
-		}
-		return;
-	} else if (result == ISC_R_EOF) {
+	if (result == ISC_R_EOF) {
 		fatal("connection to remote host closed.\n"
 		      "* This may indicate that the\n"
 		      "* remote server is using an older\n"
@@ -449,8 +402,6 @@ rndc_recvnonce(isc_nmhandle_t *handle, isc_result_t result, void *arg) {
 	if (isccc_cc_lookupuint32(_ctrl, "_nonce", &nonce) != ISC_R_SUCCESS) {
 		nonce = 0;
 	}
-
-	isc_stdtime_get(&now);
 
 	DO("create message", isccc_cc_createmessage(1, NULL, NULL, ++serial,
 						    now, now + 60, &request));
@@ -484,17 +435,8 @@ rndc_recvnonce(isc_nmhandle_t *handle, isc_result_t result, void *arg) {
 	r.base = databuf->base;
 	r.length = databuf->used;
 
-	isc_nmhandle_attach(handle, &recvdone_handle);
-	atomic_fetch_add_relaxed(&recvs, 1);
 	isccc_ccmsg_readmessage(ccmsg, rndc_recvdone, ccmsg);
-
-	isc_nmhandle_attach(handle, &sendhandle);
-	atomic_fetch_add_relaxed(&sends, 1);
-	isc_nm_send(handle, &r, rndc_senddone, sendhandle);
-
-	REQUIRE(recvnonce_handle == handle);
-	isc_nmhandle_detach(&recvnonce_handle);
-	atomic_fetch_sub_release(&recvs, 1);
+	isccc_ccmsg_sendmessage(ccmsg, &r, rndc_senddone, NULL);
 
 	isccc_sexpr_free(&response);
 	isccc_sexpr_free(&request);
@@ -507,16 +449,13 @@ rndc_connected(isc_nmhandle_t *handle, isc_result_t result, void *arg) {
 	char socktext[ISC_SOCKADDR_FORMATSIZE];
 	isccc_sexpr_t *request = NULL;
 	isccc_sexpr_t *data = NULL;
-	isccc_time_t now;
+	isccc_time_t now = isc_stdtime_now();
 	isc_region_t r;
 	isc_buffer_t b;
-	isc_nmhandle_t *connhandle = NULL;
-	isc_nmhandle_t *sendhandle = NULL;
 
 	REQUIRE(ccmsg != NULL);
 
 	if (result != ISC_R_SUCCESS) {
-		atomic_fetch_sub_release(&connects, 1);
 		isc_sockaddr_format(&serveraddrs[currentaddr], socktext,
 				    sizeof(socktext));
 		if (++currentaddr < nserveraddrs) {
@@ -530,9 +469,6 @@ rndc_connected(isc_nmhandle_t *handle, isc_result_t result, void *arg) {
 		      isc_result_totext(result));
 	}
 
-	isc_nmhandle_attach(handle, &connhandle);
-
-	isc_stdtime_get(&now);
 	DO("create message", isccc_cc_createmessage(1, NULL, NULL, ++serial,
 						    now, now + 60, &request));
 	data = isccc_alist_lookup(request, "_data");
@@ -556,19 +492,12 @@ rndc_connected(isc_nmhandle_t *handle, isc_result_t result, void *arg) {
 	r.base = databuf->base;
 	r.length = databuf->used;
 
+	/* isccc_ccmsg_init() attaches to the handle */
 	isccc_ccmsg_init(rndc_mctx, handle, ccmsg);
 	isccc_ccmsg_setmaxsize(ccmsg, 1024 * 1024);
 
-	isc_nmhandle_attach(handle, &recvnonce_handle);
-	atomic_fetch_add_relaxed(&recvs, 1);
 	isccc_ccmsg_readmessage(ccmsg, rndc_recvnonce, ccmsg);
-
-	isc_nmhandle_attach(handle, &sendhandle);
-	atomic_fetch_add_relaxed(&sends, 1);
-	isc_nm_send(handle, &r, rndc_senddone, sendhandle);
-
-	isc_nmhandle_detach(&connhandle);
-	atomic_fetch_sub_release(&connects, 1);
+	isccc_ccmsg_sendmessage(ccmsg, &r, rndc_senddone, NULL);
 
 	isccc_sexpr_free(&request);
 }
@@ -595,20 +524,16 @@ rndc_startconnect(isc_sockaddr_t *addr) {
 		 */
 		fatal("UNIX domain sockets not currently supported");
 	default:
-		INSIST(0);
-		ISC_UNREACHABLE();
+		UNREACHABLE();
 	}
 
-	atomic_fetch_add_relaxed(&connects, 1);
 	isc_nm_tcpconnect(netmgr, local, addr, rndc_connected, &rndc_ccmsg,
-			  60000, 0);
+			  timeout);
 }
 
 static void
-rndc_start(isc_task_t *task, isc_event_t *event) {
-	isc_event_free(&event);
-
-	UNUSED(task);
+rndc_start(void *arg) {
+	UNUSED(arg);
 
 	currentaddr = 0;
 	rndc_startconnect(&serveraddrs[currentaddr]);
@@ -691,7 +616,8 @@ parse_config(isc_mem_t *mctx, isc_log_t *log, const char *keyname,
 		(void)cfg_map_get(config, "server", &servers);
 		if (servers != NULL) {
 			for (elt = cfg_list_first(servers); elt != NULL;
-			     elt = cfg_list_next(elt)) {
+			     elt = cfg_list_next(elt))
+			{
 				const char *name = NULL;
 				server = cfg_listelt_value(elt);
 				name = cfg_obj_asstring(
@@ -728,7 +654,8 @@ parse_config(isc_mem_t *mctx, isc_log_t *log, const char *keyname,
 	} else {
 		DO("get config key list", cfg_map_get(config, "key", &keys));
 		for (elt = cfg_list_first(keys); elt != NULL;
-		     elt = cfg_list_next(elt)) {
+		     elt = cfg_list_next(elt))
+		{
 			const char *name = NULL;
 
 			key = cfg_listelt_value(elt);
@@ -901,7 +828,7 @@ main(int argc, char **argv) {
 	const char *keyname = NULL;
 	struct in_addr in;
 	struct in6_addr in6;
-	char *p;
+	char *p = NULL;
 	size_t argslen;
 	int ch;
 	int i;
@@ -917,11 +844,6 @@ main(int argc, char **argv) {
 
 	isc_sockaddr_any(&local4);
 	isc_sockaddr_any6(&local6);
-
-	result = isc_app_start();
-	if (result != ISC_R_SUCCESS) {
-		fatal("isc_app_start() failed: %s", isc_result_totext(result));
-	}
 
 	isc_commandline_errprint = false;
 
@@ -943,11 +865,13 @@ main(int argc, char **argv) {
 			break;
 		case 'b':
 			if (inet_pton(AF_INET, isc_commandline_argument, &in) ==
-			    1) {
+			    1)
+			{
 				isc_sockaddr_fromin(&local4, &in, 0);
 				local4set = true;
 			} else if (inet_pton(AF_INET6, isc_commandline_argument,
-					     &in6) == 1) {
+					     &in6) == 1)
+			{
 				isc_sockaddr_fromin6(&local6, &in6, 0);
 				local6set = true;
 			}
@@ -990,6 +914,15 @@ main(int argc, char **argv) {
 			servername = isc_commandline_argument;
 			break;
 
+		case 't':
+			timeout = strtol(isc_commandline_argument, &p, 10);
+			if (*p != '\0' || timeout < 0 || timeout > 86400) {
+				fatal("invalid timeout '%s'",
+				      isc_commandline_argument);
+			}
+			timeout *= 1000;
+			break;
+
 		case 'V':
 			verbose = true;
 			break;
@@ -1004,7 +937,7 @@ main(int argc, char **argv) {
 					program, isc_commandline_option);
 				usage(1);
 			}
-		/* FALLTHROUGH */
+			FALLTHROUGH;
 		case 'h':
 			usage(0);
 			break;
@@ -1030,9 +963,11 @@ main(int argc, char **argv) {
 
 	serial = isc_random32();
 
-	isc_mem_create(&rndc_mctx);
-	isc_managers_create(rndc_mctx, 1, 0, 0, &netmgr, &taskmgr, NULL, NULL);
-	DO("create task", isc_task_create(taskmgr, 0, &rndc_task));
+	isc_managers_create(&rndc_mctx, 1, &loopmgr, &netmgr);
+	isc_loopmgr_setup(loopmgr, rndc_start, NULL);
+
+	isc_nm_settimeouts(netmgr, timeout, timeout, timeout, 0);
+
 	isc_log_create(rndc_mctx, &log, &logconfig);
 	isc_log_setcontext(log);
 	isc_log_settag(logconfig, progname);
@@ -1047,8 +982,6 @@ main(int argc, char **argv) {
 	   isc_log_usechannel(logconfig, "stderr", NULL, NULL));
 
 	parse_config(rndc_mctx, log, keyname, &pctx, &config);
-
-	isccc_result_register();
 
 	isc_buffer_allocate(rndc_mctx, &databuf, 2048);
 
@@ -1080,23 +1013,7 @@ main(int argc, char **argv) {
 		get_addresses(servername, (in_port_t)remoteport);
 	}
 
-	DO("post event", isc_app_onrun(rndc_mctx, rndc_task, rndc_start, NULL));
-
-	result = isc_app_run();
-	if (result != ISC_R_SUCCESS) {
-		fatal("isc_app_run() failed: %s", isc_result_totext(result));
-	}
-
-	isc_task_detach(&rndc_task);
-	isc_managers_destroy(&netmgr, &taskmgr, NULL, NULL);
-
-	/*
-	 * Note: when TCP connections are shut down, there will be a final
-	 * call to the isccc callback routine with &rndc_ccmsg as its
-	 * argument. We therefore need to delay invalidating it until
-	 * after the netmgr is closed down.
-	 */
-	isccc_ccmsg_invalidate(&rndc_ccmsg);
+	isc_loopmgr_run(loopmgr);
 
 	isc_log_destroy(&log);
 	isc_log_setcontext(NULL);
@@ -1112,7 +1029,7 @@ main(int argc, char **argv) {
 		isc_mem_stats(rndc_mctx, stderr);
 	}
 
-	isc_mem_destroy(&rndc_mctx);
+	isc_managers_destroy(&rndc_mctx, &loopmgr, &netmgr);
 
 	if (failed) {
 		return (1);

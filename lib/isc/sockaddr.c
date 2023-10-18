@@ -1,6 +1,8 @@
 /*
  * Copyright (C) Internet Systems Consortium, Inc. ("ISC")
  *
+ * SPDX-License-Identifier: MPL-2.0
+ *
  * This Source Code Form is subject to the terms of the Mozilla Public
  * License, v. 2.0. If a copy of the MPL was not distributed with this
  * file, you can obtain one at https://mozilla.org/MPL/2.0/.
@@ -11,13 +13,13 @@
 
 /*! \file */
 
+#include <netdb.h>
 #include <stdbool.h>
 #include <stdio.h>
 
 #include <isc/buffer.h>
 #include <isc/hash.h>
 #include <isc/netaddr.h>
-#include <isc/print.h>
 #include <isc/region.h>
 #include <isc/sockaddr.h>
 #include <isc/string.h>
@@ -232,8 +234,7 @@ isc_sockaddr_hash(const isc_sockaddr_t *sockaddr, bool address_only) {
 		p = ntohs(sockaddr->type.sin6.sin6_port);
 		break;
 	default:
-		UNEXPECTED_ERROR(__FILE__, __LINE__,
-				 "unknown address family: %d",
+		UNEXPECTED_ERROR("unknown address family: %d",
 				 (int)sockaddr->type.sa.sa_family);
 		s = (const unsigned char *)&sockaddr->type;
 		length = sockaddr->length;
@@ -293,8 +294,7 @@ isc_sockaddr_anyofpf(isc_sockaddr_t *sockaddr, int pf) {
 		isc_sockaddr_any6(sockaddr);
 		break;
 	default:
-		INSIST(0);
-		ISC_UNREACHABLE();
+		UNREACHABLE();
 	}
 }
 
@@ -340,7 +340,7 @@ isc_sockaddr_pf(const isc_sockaddr_t *sockaddr) {
 	case AF_INET6:
 		return (PF_INET6);
 	default:
-		FATAL_ERROR(__FILE__, __LINE__, "unknown address family: %d",
+		FATAL_ERROR("unknown address family: %d",
 			    (int)sockaddr->type.sa.sa_family);
 	}
 #endif /* if (AF_INET == PF_INET && AF_INET6 == PF_INET6) */
@@ -364,8 +364,7 @@ isc_sockaddr_fromnetaddr(isc_sockaddr_t *sockaddr, const isc_netaddr_t *na,
 		sockaddr->type.sin6.sin6_port = htons(port);
 		break;
 	default:
-		INSIST(0);
-		ISC_UNREACHABLE();
+		UNREACHABLE();
 	}
 	ISC_LINK_INIT(sockaddr, link);
 }
@@ -380,7 +379,7 @@ isc_sockaddr_setport(isc_sockaddr_t *sockaddr, in_port_t port) {
 		sockaddr->type.sin6.sin6_port = htons(port);
 		break;
 	default:
-		FATAL_ERROR(__FILE__, __LINE__, "unknown address family: %d",
+		FATAL_ERROR("unknown address family: %d",
 			    (int)sockaddr->type.sa.sa_family);
 	}
 }
@@ -397,7 +396,7 @@ isc_sockaddr_getport(const isc_sockaddr_t *sockaddr) {
 		port = ntohs(sockaddr->type.sin6.sin6_port);
 		break;
 	default:
-		FATAL_ERROR(__FILE__, __LINE__, "unknown address family: %d",
+		FATAL_ERROR("unknown address family: %d",
 			    (int)sockaddr->type.sa.sa_family);
 	}
 
@@ -492,9 +491,9 @@ isc_sockaddr_fromsockaddr(isc_sockaddr_t *isa, const struct sockaddr *sa) {
 		return (ISC_R_NOTIMPLEMENTED);
 	}
 
-	memset(isa, 0, sizeof(isc_sockaddr_t));
+	*isa = (isc_sockaddr_t){ .length = length,
+				 .link = ISC_LINK_INITIALIZER };
 	memmove(isa, sa, length);
-	isa->length = length;
 
 	return (ISC_R_SUCCESS);
 }

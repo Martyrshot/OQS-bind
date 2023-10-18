@@ -1,13 +1,17 @@
 #!/bin/sh
-#
+
 # Copyright (C) Internet Systems Consortium, Inc. ("ISC")
 #
+# SPDX-License-Identifier: MPL-2.0
+#
 # This Source Code Form is subject to the terms of the Mozilla Public
-# License, v. 2.0. If a copy of the MPL was not distributed with this
+# License, v. 2.0.  If a copy of the MPL was not distributed with this
 # file, you can obtain one at https://mozilla.org/MPL/2.0/.
 #
 # See the COPYRIGHT file distributed with this work for additional
 # information regarding copyright ownership.
+
+set -e
 
 # shellcheck source=conf.sh
 . ../conf.sh
@@ -15,22 +19,12 @@
 status=0
 n=1
 
-ismap () {
-    # shellcheck disable=SC2016
-    $PERL -e 'binmode STDIN;
-	     read(STDIN, $input, 8);
-             ($style, $version) = unpack("NN", $input);
-             exit 1 if ($style != 3 || $version > 1);' < "$1"
-    return $?
-}
-
 israw () {
     # shellcheck disable=SC2016
     $PERL -e 'binmode STDIN;
              read(STDIN, $input, 8);
              ($style, $version) = unpack("NN", $input);
-             exit 1 if ($style != 2 || $version > 1);' < "$1"
-    return $?
+             exit 1 if ($style != 2 || $version > 1);' < "$1" || return $?
 }
 
 isfull () {
@@ -49,7 +43,7 @@ rawversion () {
              if (length($input) < 8) { print "not raw\n"; exit 0; };
              ($style, $version) = unpack("NN", $input);
              print ($style == 2 || $style == 3 ? "$version\n" :
-		"not raw or map\n");' < "$1"
+		"not raw\n");' < "$1"
 }
 
 sourceserial () {
@@ -80,7 +74,7 @@ stomp () {
 
 restart () {
     sleep 1
-    start_server --noclean --restart --port "${PORT}" masterformat ns3
+    start_server --noclean --restart --port "${PORT}" ns3
 }
 
 dig_with_opts() {
@@ -124,11 +118,9 @@ ret=0
 israw ns1/example.db.raw || ret=1
 israw ns1/example.db.raw1 || ret=1
 israw ns1/example.db.compat || ret=1
-ismap ns1/example.db.map || ret=1
 [ "$(rawversion ns1/example.db.raw)" -eq 1 ] || ret=1
 [ "$(rawversion ns1/example.db.raw1)" -eq 1 ] || ret=1
 [ "$(rawversion ns1/example.db.compat)" -eq 0 ] || ret=1
-[ "$(rawversion ns1/example.db.map)" -eq 1 ] || ret=1
 n=$((n+1))
 [ $ret -eq 0 ] || echo_i "failed"
 status=$((status+ret))
@@ -199,28 +191,17 @@ n=$((n+1))
 [ $ret -eq 0 ] || echo_i "failed"
 status=$((status+ret))
 
-echo_i "checking format transitions: text->raw->map->text ($n)"
+echo_i "checking format transitions: text->raw->text ($n)"
 ret=0
 $CHECKZONE -D -f text -F text -o baseline.txt example.nil ns1/example.db > /dev/null
 $CHECKZONE -D -f text -F raw -o raw.1 example.nil baseline.txt > /dev/null
-$CHECKZONE -D -f raw -F map -o map.1 example.nil raw.1 > /dev/null
-$CHECKZONE -D -f map -F text -o text.1 example.nil map.1 > /dev/null
+$CHECKZONE -D -f raw -F text -o text.1 example.nil raw.1 > /dev/null
 cmp -s baseline.txt text.1 || ret=0
 n=$((n+1))
 [ $ret -eq 0 ] || echo_i "failed"
 status=$((status+ret))
 
-echo_i "checking format transitions: text->map->raw->text ($n)"
-ret=0
-$CHECKZONE -D -f text -F map -o map.2 example.nil baseline.txt > /dev/null
-$CHECKZONE -D -f map -F raw -o raw.2 example.nil map.2 > /dev/null
-$CHECKZONE -D -f raw -F text -o text.2 example.nil raw.2 > /dev/null
-cmp -s baseline.txt text.2 || ret=0
-n=$((n+1))
-[ $ret -eq 0 ] || echo_i "failed"
-status=$((status+ret))
-
-echo_i "checking map format loading with journal file rollforward ($n)"
+echo_i "checking raw format loading with journal file rollforward ($n)"
 ret=0
 $NSUPDATE <<END > /dev/null || status=1
 server 10.53.0.3 ${PORT}
@@ -234,7 +215,7 @@ grep "added text" "dig.out.dynamic1.ns3.test$n" > /dev/null 2>&1 || ret=1
 dig_with_opts +comm @10.53.0.3 added.dynamic txt > "dig.out.dynamic2.ns3.test$n"
 grep "NXDOMAIN" "dig.out.dynamic2.ns3.test$n" > /dev/null 2>&1 || ret=1
 # using "rndc halt" ensures that we don't dump the zone file
-$PERL ../stop.pl --use-rndc --halt --port ${CONTROLPORT} masterformat ns3
+stop_server --use-rndc --halt --port ${CONTROLPORT} ns3
 restart
 check_added_text() {
 	dig_with_opts @10.53.0.3 newtext.dynamic txt > "dig.out.dynamic3.ns3.test$n" || return 1
@@ -248,7 +229,7 @@ n=$((n+1))
 [ $ret -eq 0 ] || echo_i "failed"
 status=$((status+ret))
 
-echo_i "checking map format file dumps correctly ($n)"
+echo_i "checking raw format file dumps correctly ($n)"
 ret=0
 $NSUPDATE <<END > /dev/null || status=1
 server 10.53.0.3 ${PORT}
@@ -259,7 +240,7 @@ END
 dig_with_opts @10.53.0.3 moretext.dynamic txt > "dig.out.dynamic1.ns3.test$n"
 grep "more text" "dig.out.dynamic1.ns3.test$n" > /dev/null 2>&1 || ret=1
 # using "rndc stop" will cause the zone file to flush before shutdown
-$PERL ../stop.pl --use-rndc --port ${CONTROLPORT} masterformat ns3
+stop_server --use-rndc --port ${CONTROLPORT} ns3
 rm ns3/*.jnl
 restart
 #shellcheck disable=SC2034
@@ -274,44 +255,7 @@ n=$((n+1))
 [ $ret -eq 0 ] || echo_i "failed"
 status=$((status+ret))
 
-# stomp on the file header
-echo_i "checking corrupt map files fail to load (bad file header) ($n)"
-ret=0
-$CHECKZONE -D -f text -F map -o map.5 example.nil baseline.txt > /dev/null
-cp map.5 badmap
-stomp badmap 0 32 99
-$CHECKZONE -D -f map -F text -o text.5 example.nil badmap > /dev/null
-[ $? = 1 ] || ret=1
-n=$((n+1))
-[ $ret -eq 0 ] || echo_i "failed"
-status=$((status+ret))
-
-# stomp on the file data so it hashes differently.
-# these are small and subtle changes, so that the resulting file
-# would appear to be a legitimate map file and would not trigger an
-# assertion failure if loaded into memory, but should still fail to
-# load because of a SHA1 hash mismatch.
-echo_i "checking corrupt map files fail to load (bad node header) ($n)"
-ret=0
-cp map.5 badmap
-stomp badmap 2754 2 99
-$CHECKZONE -D -f map -F text -o text.5 example.nil badmap > /dev/null
-[ $? = 1 ] || ret=1
-n=$((n+1))
-[ $ret -eq 0 ] || echo_i "failed"
-status=$((status+ret))
-
-echo_i "checking corrupt map files fail to load (bad node data) ($n)"
-ret=0
-cp map.5 badmap
-stomp badmap 2897 5 127
-$CHECKZONE -D -f map -F text -o text.5 example.nil badmap > /dev/null
-[ $? = 1 ] || ret=1
-n=$((n+1))
-[ $ret -eq 0 ] || echo_i "failed"
-status=$((status+ret))
-
-echo_i "checking map format zone is scheduled for resigning (compilezone) ($n)"
+echo_i "checking raw format zone is scheduled for resigning (compilezone) ($n)"
 ret=0
 rndccmd 10.53.0.1 zonestatus signed > rndc.out 2>&1 || ret=1
 grep 'next resign' rndc.out > /dev/null 2>&1 || ret=1
@@ -319,10 +263,10 @@ n=$((n+1))
 [ $ret -eq 0 ] || echo_i "failed"
 status=$((status+ret))
 
-echo_i "checking map format zone is scheduled for resigning (signzone) ($n)"
+echo_i "checking raw format zone is scheduled for resigning (signzone) ($n)"
 ret=0
 rndccmd 10.53.0.1 freeze signed > rndc.out 2>&1 || ret=1
-(cd ns1 || exit 1; $SIGNER -S -O map -f signed.db.map -o signed signed.db > /dev/null)
+(cd ns1 || exit 1; $SIGNER -S -O raw -f signed.db.raw -o signed signed.db > /dev/null)
 rndc_reload ns1 10.53.0.1 signed
 rndccmd 10.53.0.1 zonestatus signed > rndc.out 2>&1 || ret=1
 grep 'next resign' rndc.out > /dev/null 2>&1 || ret=1

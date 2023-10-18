@@ -1,6 +1,8 @@
 /*
  * Copyright (C) Internet Systems Consortium, Inc. ("ISC")
  *
+ * SPDX-License-Identifier: MPL-2.0
+ *
  * This Source Code Form is subject to the terms of the Mozilla Public
  * License, v. 2.0. If a copy of the MPL was not distributed with this
  * file, you can obtain one at https://mozilla.org/MPL/2.0/.
@@ -22,7 +24,7 @@
  * Check the wire format of the Regexp field.
  * Don't allow embedded NUL's.
  */
-static inline isc_result_t
+static isc_result_t
 txt_valid_regex(const unsigned char *txt) {
 	unsigned int nsub = 0;
 	char regex[256];
@@ -167,7 +169,7 @@ txt_valid_regex(const unsigned char *txt) {
 	return (ISC_R_SUCCESS);
 }
 
-static inline isc_result_t
+static isc_result_t
 fromtext_naptr(ARGS_FROMTEXT) {
 	isc_token_t token;
 	dns_name_t name;
@@ -237,12 +239,12 @@ fromtext_naptr(ARGS_FROMTEXT) {
 	return (ISC_R_SUCCESS);
 }
 
-static inline isc_result_t
+static isc_result_t
 totext_naptr(ARGS_TOTEXT) {
 	isc_region_t region;
 	dns_name_t name;
 	dns_name_t prefix;
-	bool sub;
+	unsigned int opts;
 	char buf[sizeof("64000")];
 	unsigned short num;
 
@@ -294,11 +296,12 @@ totext_naptr(ARGS_TOTEXT) {
 	 * Replacement.
 	 */
 	dns_name_fromregion(&name, &region);
-	sub = name_prefix(&name, tctx->origin, &prefix);
-	return (dns_name_totext(&prefix, sub, target));
+	opts = name_prefix(&name, tctx->origin, &prefix) ? DNS_NAME_OMITFINALDOT
+							 : 0;
+	return (dns_name_totext(&prefix, opts, target));
 }
 
-static inline isc_result_t
+static isc_result_t
 fromwire_naptr(ARGS_FROMWIRE) {
 	dns_name_t name;
 	isc_region_t sr;
@@ -309,7 +312,7 @@ fromwire_naptr(ARGS_FROMWIRE) {
 	UNUSED(type);
 	UNUSED(rdclass);
 
-	dns_decompress_setmethods(dctx, DNS_COMPRESS_NONE);
+	dctx = dns_decompress_setpermitted(dctx, false);
 
 	dns_name_init(&name, NULL);
 
@@ -343,10 +346,10 @@ fromwire_naptr(ARGS_FROMWIRE) {
 	/*
 	 * Replacement.
 	 */
-	return (dns_name_fromwire(&name, source, dctx, options, target));
+	return (dns_name_fromwire(&name, source, dctx, target));
 }
 
-static inline isc_result_t
+static isc_result_t
 towire_naptr(ARGS_TOWIRE) {
 	dns_name_t name;
 	dns_offsets_t offsets;
@@ -355,7 +358,7 @@ towire_naptr(ARGS_TOWIRE) {
 	REQUIRE(rdata->type == dns_rdatatype_naptr);
 	REQUIRE(rdata->length != 0);
 
-	dns_compress_setmethods(cctx, DNS_COMPRESS_NONE);
+	dns_compress_setpermitted(cctx, false);
 	/*
 	 * Order, preference.
 	 */
@@ -386,10 +389,10 @@ towire_naptr(ARGS_TOWIRE) {
 	 */
 	dns_name_init(&name, offsets);
 	dns_name_fromregion(&name, &sr);
-	return (dns_name_towire(&name, cctx, target));
+	return (dns_name_towire(&name, cctx, target, NULL));
 }
 
-static inline int
+static int
 compare_naptr(ARGS_COMPARE) {
 	dns_name_t name1;
 	dns_name_t name2;
@@ -461,7 +464,7 @@ compare_naptr(ARGS_COMPARE) {
 	return (dns_name_rdatacompare(&name1, &name2));
 }
 
-static inline isc_result_t
+static isc_result_t
 fromstruct_naptr(ARGS_FROMSTRUCT) {
 	dns_rdata_naptr_t *naptr = source;
 	isc_region_t region;
@@ -489,11 +492,10 @@ fromstruct_naptr(ARGS_FROMSTRUCT) {
 	return (isc_buffer_copyregion(target, &region));
 }
 
-static inline isc_result_t
+static isc_result_t
 tostruct_naptr(ARGS_TOSTRUCT) {
 	dns_rdata_naptr_t *naptr = target;
 	isc_region_t r;
-	isc_result_t result;
 	dns_name_t name;
 
 	REQUIRE(rdata->type == dns_rdatatype_naptr);
@@ -520,53 +522,29 @@ tostruct_naptr(ARGS_TOSTRUCT) {
 	isc_region_consume(&r, 1);
 	INSIST(naptr->flags_len <= r.length);
 	naptr->flags = mem_maybedup(mctx, r.base, naptr->flags_len);
-	if (naptr->flags == NULL) {
-		goto cleanup;
-	}
 	isc_region_consume(&r, naptr->flags_len);
 
 	naptr->service_len = uint8_fromregion(&r);
 	isc_region_consume(&r, 1);
 	INSIST(naptr->service_len <= r.length);
 	naptr->service = mem_maybedup(mctx, r.base, naptr->service_len);
-	if (naptr->service == NULL) {
-		goto cleanup;
-	}
 	isc_region_consume(&r, naptr->service_len);
 
 	naptr->regexp_len = uint8_fromregion(&r);
 	isc_region_consume(&r, 1);
 	INSIST(naptr->regexp_len <= r.length);
 	naptr->regexp = mem_maybedup(mctx, r.base, naptr->regexp_len);
-	if (naptr->regexp == NULL) {
-		goto cleanup;
-	}
 	isc_region_consume(&r, naptr->regexp_len);
 
 	dns_name_init(&name, NULL);
 	dns_name_fromregion(&name, &r);
 	dns_name_init(&naptr->replacement, NULL);
-	result = name_duporclone(&name, mctx, &naptr->replacement);
-	if (result != ISC_R_SUCCESS) {
-		goto cleanup;
-	}
+	name_duporclone(&name, mctx, &naptr->replacement);
 	naptr->mctx = mctx;
 	return (ISC_R_SUCCESS);
-
-cleanup:
-	if (mctx != NULL && naptr->flags != NULL) {
-		isc_mem_free(mctx, naptr->flags);
-	}
-	if (mctx != NULL && naptr->service != NULL) {
-		isc_mem_free(mctx, naptr->service);
-	}
-	if (mctx != NULL && naptr->regexp != NULL) {
-		isc_mem_free(mctx, naptr->regexp);
-	}
-	return (ISC_R_NOMEMORY);
 }
 
-static inline void
+static void
 freestruct_naptr(ARGS_FREESTRUCT) {
 	dns_rdata_naptr_t *naptr = source;
 
@@ -590,7 +568,7 @@ freestruct_naptr(ARGS_FREESTRUCT) {
 	naptr->mctx = NULL;
 }
 
-static inline isc_result_t
+static isc_result_t
 additionaldata_naptr(ARGS_ADDLDATA) {
 	dns_name_t name;
 	dns_offsets_t offsets;
@@ -600,6 +578,8 @@ additionaldata_naptr(ARGS_ADDLDATA) {
 	char *cp;
 
 	REQUIRE(rdata->type == dns_rdatatype_naptr);
+
+	UNUSED(owner);
 
 	/*
 	 * Order, preference.
@@ -642,13 +622,13 @@ additionaldata_naptr(ARGS_ADDLDATA) {
 	dns_name_fromregion(&name, &sr);
 
 	if (atype != 0) {
-		return ((add)(arg, &name, atype));
+		return ((add)(arg, &name, atype, NULL DNS__DB_FILELINE));
 	}
 
 	return (ISC_R_SUCCESS);
 }
 
-static inline isc_result_t
+static isc_result_t
 digest_naptr(ARGS_DIGEST) {
 	isc_region_t r1, r2;
 	unsigned int length, n;
@@ -707,7 +687,7 @@ digest_naptr(ARGS_DIGEST) {
 	return (dns_name_digest(&name, digest, arg));
 }
 
-static inline bool
+static bool
 checkowner_naptr(ARGS_CHECKOWNER) {
 	REQUIRE(type == dns_rdatatype_naptr);
 
@@ -719,7 +699,7 @@ checkowner_naptr(ARGS_CHECKOWNER) {
 	return (true);
 }
 
-static inline bool
+static bool
 checknames_naptr(ARGS_CHECKNAMES) {
 	REQUIRE(rdata->type == dns_rdatatype_naptr);
 
@@ -730,7 +710,7 @@ checknames_naptr(ARGS_CHECKNAMES) {
 	return (true);
 }
 
-static inline int
+static int
 casecompare_naptr(ARGS_COMPARE) {
 	return (compare_naptr(rdata1, rdata2));
 }

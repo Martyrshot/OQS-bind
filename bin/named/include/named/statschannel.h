@@ -1,6 +1,8 @@
 /*
  * Copyright (C) Internet Systems Consortium, Inc. ("ISC")
  *
+ * SPDX-License-Identifier: MPL-2.0
+ *
  * This Source Code Form is subject to the terms of the Mozilla Public
  * License, v. 2.0. If a copy of the MPL was not distributed with this
  * file, you can obtain one at https://mozilla.org/MPL/2.0/.
@@ -9,17 +11,17 @@
  * information regarding copyright ownership.
  */
 
-#ifndef NAMED_STATSCHANNEL_H
-#define NAMED_STATSCHANNEL_H 1
+#pragma once
 
 /*! \file
  * \brief
  * The statistics channels built-in the name server.
  */
 
+#include <isccc/types.h>
+
 #include <isccfg/aclconf.h>
 
-#include <isccc/types.h>
 #include <named/types.h>
 
 #define NAMED_STATSCHANNEL_HTTPPORT 80
@@ -48,5 +50,3 @@ named_stats_dump(named_server_t *server, FILE *fp);
 /*%<
  * Dump statistics counters managed by the server to the file fp.
  */
-
-#endif /* NAMED_STATSCHANNEL_H */

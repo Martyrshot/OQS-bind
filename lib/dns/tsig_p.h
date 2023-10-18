@@ -1,6 +1,8 @@
 /*
  * Copyright (C) Internet Systems Consortium, Inc. ("ISC")
  *
+ * SPDX-License-Identifier: MPL-2.0
+ *
  * This Source Code Form is subject to the terms of the Mozilla Public
  * License, v. 2.0. If a copy of the MPL was not distributed with this
  * file, you can obtain one at https://mozilla.org/MPL/2.0/.
@@ -9,8 +11,7 @@
  * information regarding copyright ownership.
  */
 
-#ifndef DNS_TSIG_P_H
-#define DNS_TSIG_P_H
+#pragma once
 
 /*! \file */
 
@@ -29,13 +30,7 @@ ISC_LANG_BEGINDECLS
 
 bool
 dns__tsig_algvalid(unsigned int alg);
-unsigned int
+dst_algorithm_t
 dns__tsig_algfromname(const dns_name_t *algorithm);
-const dns_name_t *
-dns__tsig_algnamefromname(const dns_name_t *algorithm);
-bool
-dns__tsig_algallocated(const dns_name_t *algorithm);
 
 ISC_LANG_ENDDECLS
-
-#endif /* DNS_TSIG_P_H */

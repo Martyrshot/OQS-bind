@@ -1,6 +1,8 @@
 /*
  * Copyright (C) Internet Systems Consortium, Inc. ("ISC")
  *
+ * SPDX-License-Identifier: MPL-2.0
+ *
  * This Source Code Form is subject to the terms of the Mozilla Public
  * License, v. 2.0. If a copy of the MPL was not distributed with this
  * file, you can obtain one at https://mozilla.org/MPL/2.0/.
@@ -27,16 +29,18 @@
 #include <isc/heap.h>
 #include <isc/list.h>
 #include <isc/mem.h>
-#include <isc/platform.h>
-#include <isc/print.h>
+#include <isc/result.h>
 #include <isc/string.h>
 #include <isc/time.h>
+#include <isc/tls.h>
+#include <isc/tm.h>
 #include <isc/util.h>
 
 #include <dns/db.h>
 #include <dns/dbiterator.h>
 #include <dns/dnssec.h>
 #include <dns/fixedname.h>
+#include <dns/journal.h>
 #include <dns/keyvalues.h>
 #include <dns/log.h>
 #include <dns/name.h>
@@ -47,7 +51,6 @@
 #include <dns/rdatasetiter.h>
 #include <dns/rdatastruct.h>
 #include <dns/rdatatype.h>
-#include <dns/result.h>
 #include <dns/secalg.h>
 #include <dns/time.h>
 
@@ -63,7 +66,8 @@ static const char *keystates[KEYSTATES_NVALUES] = {
 
 int verbose = 0;
 bool quiet = false;
-uint8_t dtype[8];
+const char *journal = NULL;
+dns_dsdigest_t dtype[8];
 
 static fatalcallback_t *fatalcallback = NULL;
 
@@ -79,6 +83,7 @@ fatal(const char *format, ...) {
 	if (fatalcallback != NULL) {
 		(*fatalcallback)();
 	}
+	isc__tls_setfatalmode();
 	exit(1);
 }
 
@@ -108,7 +113,7 @@ vbprintf(int level, const char *fmt, ...) {
 
 void
 version(const char *name) {
-	fprintf(stderr, "%s %s\n", name, PACKAGE_VERSION);
+	printf("%s %s\n", name, PACKAGE_VERSION);
 	exit(0);
 }
 
@@ -214,7 +219,7 @@ time_units(isc_stdtime_t offset, char *suffix, const char *str) {
 		default:
 			fatal("time value %s is invalid", str);
 		}
-		/* NOTREACHED */
+		UNREACHABLE();
 		break;
 	case 'W':
 	case 'w':
@@ -232,14 +237,15 @@ time_units(isc_stdtime_t offset, char *suffix, const char *str) {
 	default:
 		fatal("time value %s is invalid", str);
 	}
-	/* NOTREACHED */
+	UNREACHABLE();
 	return (0); /* silence compiler warning */
 }
 
-static inline bool
+static bool
 isnone(const char *str) {
 	return ((strcasecmp(str, "none") == 0) ||
-		(strcasecmp(str, "never") == 0));
+		(strcasecmp(str, "never") == 0) ||
+		(strcasecmp(str, "unset") == 0));
 }
 
 dns_ttl_t
@@ -272,7 +278,7 @@ strtokeystate(const char *str) {
 			return ((dst_key_state_t)i);
 		}
 	}
-	fatal("unknown key state");
+	fatal("unknown key state %s", str);
 }
 
 isc_stdtime_t
@@ -282,17 +288,14 @@ strtotime(const char *str, int64_t now, int64_t base, bool *setp) {
 	const char *orig = str;
 	char *endp;
 	size_t n;
+	struct tm tm;
 
 	if (isnone(str)) {
-		if (setp != NULL) {
-			*setp = false;
-		}
+		SET_IF_NOT_NULL(setp, false);
 		return ((isc_stdtime_t)0);
 	}
 
-	if (setp != NULL) {
-		*setp = true;
-	}
+	SET_IF_NOT_NULL(setp, true);
 
 	if ((str[0] == '0' || str[0] == '-') && str[1] == '\0') {
 		return ((isc_stdtime_t)0);
@@ -303,11 +306,14 @@ strtotime(const char *str, int64_t now, int64_t base, bool *setp) {
 	 *   now([+-]offset)
 	 *   YYYYMMDD([+-]offset)
 	 *   YYYYMMDDhhmmss([+-]offset)
+	 *   Day Mon DD HH:MM:SS YYYY([+-]offset)
+	 *   1234567890([+-]offset)
 	 *   [+-]offset
 	 */
 	n = strspn(str, "0123456789");
 	if ((n == 8u || n == 14u) &&
-	    (str[n] == '\0' || str[n] == '-' || str[n] == '+')) {
+	    (str[n] == '\0' || str[n] == '-' || str[n] == '+'))
+	{
 		char timestr[15];
 
 		strlcpy(timestr, str, sizeof(timestr));
@@ -322,9 +328,22 @@ strtotime(const char *str, int64_t now, int64_t base, bool *setp) {
 		}
 		base = val;
 		str += n;
+	} else if (n == 10u &&
+		   (str[n] == '\0' || str[n] == '-' || str[n] == '+'))
+	{
+		base = strtoll(str, &endp, 0);
+		str += 10;
 	} else if (strncmp(str, "now", 3) == 0) {
 		base = now;
 		str += 3;
+	} else if (str[0] >= 'A' && str[0] <= 'Z') {
+		/* parse ctime() format as written by `dnssec-settime -p` */
+		endp = isc_tm_strptime(str, "%a %b %d %H:%M:%S %Y", &tm);
+		if (endp != str + 24) {
+			fatal("time value %s is invalid", orig);
+		}
+		base = mktime(&tm);
+		str += 24;
 	}
 
 	if (str[0] == '\0') {
@@ -353,7 +372,7 @@ strtoclass(const char *str) {
 	if (str == NULL) {
 		return (dns_rdataclass_in);
 	}
-	DE_CONST(str, r.base);
+	r.base = UNCONST(str);
 	r.length = strlen(str);
 	result = dns_rdataclass_fromtext(&rdclass, &r);
 	if (result != ISC_R_SUCCESS) {
@@ -368,7 +387,7 @@ strtodsdigest(const char *str) {
 	dns_dsdigest_t alg;
 	isc_result_t result;
 
-	DE_CONST(str, r.base);
+	r.base = UNCONST(str);
 	r.length = strlen(str);
 	result = dns_dsdigest_fromtext(&alg, &r);
 	if (result != ISC_R_SUCCESS) {
@@ -386,7 +405,7 @@ cmp_dtype(const void *ap, const void *bp) {
 
 void
 add_dtype(unsigned int dt) {
-	unsigned i, n;
+	unsigned int i, n;
 
 	/* ensure there is space for a zero terminator */
 	n = sizeof(dtype) / sizeof(dtype[0]) - 1;
@@ -453,8 +472,7 @@ set_keyversion(dst_key_t *key) {
 	 * set the creation date
 	 */
 	if (major < 1 || (major == 1 && minor <= 2)) {
-		isc_stdtime_t now;
-		isc_stdtime_get(&now);
+		isc_stdtime_t now = isc_stdtime_now();
 		dst_key_settime(key, DST_TIME_CREATED, now);
 	}
 }
@@ -469,9 +487,7 @@ key_collision(dst_key_t *dstkey, dns_name_t *name, const char *dir,
 	uint16_t id, oldid;
 	uint32_t rid, roldid;
 	dns_secalg_t alg;
-	char filename[NAME_MAX];
-	isc_buffer_t fileb;
-	isc_stdtime_t now;
+	isc_stdtime_t now = isc_stdtime_now();
 
 	if (exact != NULL) {
 		*exact = false;
@@ -480,23 +496,8 @@ key_collision(dst_key_t *dstkey, dns_name_t *name, const char *dir,
 	id = dst_key_id(dstkey);
 	rid = dst_key_rid(dstkey);
 	alg = dst_key_alg(dstkey);
-	/*
-	 * For Diffie Hellman just check if there is a direct collision as
-	 * they can't be revoked.  Additionally dns_dnssec_findmatchingkeys
-	 * only handles DNSKEY which is not used for HMAC.
-	 */
-	if (alg == DST_ALG_DH) {
-		isc_buffer_init(&fileb, filename, sizeof(filename));
-		result = dst_key_buildfilename(dstkey, DST_TYPE_PRIVATE, dir,
-					       &fileb);
-		if (result != ISC_R_SUCCESS) {
-			return (true);
-		}
-		return (isc_file_exists(filename));
-	}
 
 	ISC_LIST_INIT(matchkeys);
-	isc_stdtime_get(&now);
 	result = dns_dnssec_findmatchingkeys(name, dir, now, mctx, &matchkeys);
 	if (result == ISC_R_NOTFOUND) {
 		return (false);
@@ -561,4 +562,42 @@ isoptarg(const char *arg, char **argv, void (*usage)(void)) {
 		return (true);
 	}
 	return (false);
+}
+
+void
+loadjournal(isc_mem_t *mctx, dns_db_t *db, const char *file) {
+	dns_journal_t *jnl = NULL;
+	isc_result_t result;
+
+	result = dns_journal_open(mctx, file, DNS_JOURNAL_READ, &jnl);
+	if (result == ISC_R_NOTFOUND) {
+		fprintf(stderr, "%s: journal file %s not found\n", program,
+			file);
+		goto cleanup;
+	} else if (result != ISC_R_SUCCESS) {
+		fatal("unable to open journal %s: %s\n", file,
+		      isc_result_totext(result));
+	}
+
+	if (dns_journal_empty(jnl)) {
+		dns_journal_destroy(&jnl);
+		return;
+	}
+
+	result = dns_journal_rollforward(jnl, db, 0);
+	switch (result) {
+	case ISC_R_SUCCESS:
+	case DNS_R_UPTODATE:
+		break;
+
+	case ISC_R_NOTFOUND:
+	case ISC_R_RANGE:
+		fatal("journal %s out of sync with zone", file);
+
+	default:
+		fatal("journal %s: %s\n", file, isc_result_totext(result));
+	}
+
+cleanup:
+	dns_journal_destroy(&jnl);
 }

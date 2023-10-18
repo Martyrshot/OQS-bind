@@ -1,6 +1,8 @@
 /*
  * Copyright (C) Internet Systems Consortium, Inc. ("ISC")
  *
+ * SPDX-License-Identifier: MPL-2.0
+ *
  * This Source Code Form is subject to the terms of the Mozilla Public
  * License, v. 2.0. If a copy of the MPL was not distributed with this
  * file, you can obtain one at https://mozilla.org/MPL/2.0/.
@@ -9,8 +11,7 @@
  * information regarding copyright ownership.
  */
 
-#ifndef ISC_STATS_H
-#define ISC_STATS_H 1
+#pragma once
 
 /*! \file isc/stats.h */
 
@@ -114,7 +115,7 @@ ISC_LANG_BEGINDECLS
  */
 typedef void (*isc_stats_dumper_t)(isc_statscounter_t, uint64_t, void *);
 
-isc_result_t
+void
 isc_stats_create(isc_mem_t *mctx, isc_stats_t **statsp, int ncounters);
 /*%<
  * Create a statistics counter structure of general type.  It counts a general
@@ -124,11 +125,6 @@ isc_stats_create(isc_mem_t *mctx, isc_stats_t **statsp, int ncounters);
  *\li	'mctx' must be a valid memory context.
  *
  *\li	'statsp' != NULL && '*statsp' == NULL.
- *
- * Returns:
- *\li	ISC_R_SUCCESS	-- all ok
- *
- *\li	anything else	-- failure
  */
 
 void
@@ -238,6 +234,15 @@ isc_stats_get_counter(isc_stats_t *stats, isc_statscounter_t counter);
  *	on creation.
  */
 
-ISC_LANG_ENDDECLS
+void
+isc_stats_resize(isc_stats_t **stats, int ncounters);
+/*%<
+ * Resize a statistics counter structure of general type. The new set of
+ * counters are indexed by an ID between 0 and ncounters -1.
+ *
+ * Requires:
+ *\li	'stats' is a valid isc_stats_t.
+ *\li	'ncounters' is a non-zero positive number.
+ */
 
-#endif /* ISC_STATS_H */
+ISC_LANG_ENDDECLS

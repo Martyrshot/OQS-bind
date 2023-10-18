@@ -1,6 +1,8 @@
 /*
  * Copyright (C) Internet Systems Consortium, Inc. ("ISC")
  *
+ * SPDX-License-Identifier: MPL-2.0
+ *
  * This Source Code Form is subject to the terms of the Mozilla Public
  * License, v. 2.0. If a copy of the MPL was not distributed with this
  * file, you can obtain one at https://mozilla.org/MPL/2.0/.
@@ -16,7 +18,7 @@
 
 #define RRTYPE_TKEY_ATTRIBUTES (DNS_RDATATYPEATTR_META)
 
-static inline isc_result_t
+static isc_result_t
 fromtext_tkey(ARGS_FROMTEXT) {
 	isc_token_t token;
 	dns_rcode_t rcode;
@@ -73,7 +75,8 @@ fromtext_tkey(ARGS_FROMTEXT) {
 	RETERR(isc_lex_getmastertoken(lexer, &token, isc_tokentype_string,
 				      false));
 	if (dns_tsigrcode_fromtext(&rcode, &token.value.as_textregion) !=
-	    ISC_R_SUCCESS) {
+	    ISC_R_SUCCESS)
+	{
 		i = strtol(DNS_AS_STR(token), &e, 10);
 		if (*e != 0) {
 			RETTOK(DNS_R_UNKNOWN);
@@ -116,14 +119,14 @@ fromtext_tkey(ARGS_FROMTEXT) {
 	return (isc_base64_tobuffer(lexer, target, (int)token.value.as_ulong));
 }
 
-static inline isc_result_t
+static isc_result_t
 totext_tkey(ARGS_TOTEXT) {
 	isc_region_t sr, dr;
 	char buf[sizeof("4294967295 ")];
 	unsigned long n;
 	dns_name_t name;
 	dns_name_t prefix;
-	bool sub;
+	unsigned int opts;
 
 	REQUIRE(rdata->type == dns_rdatatype_tkey);
 	REQUIRE(rdata->length != 0);
@@ -136,8 +139,9 @@ totext_tkey(ARGS_TOTEXT) {
 	dns_name_init(&name, NULL);
 	dns_name_init(&prefix, NULL);
 	dns_name_fromregion(&name, &sr);
-	sub = name_prefix(&name, tctx->origin, &prefix);
-	RETERR(dns_name_totext(&prefix, sub, target));
+	opts = name_prefix(&name, tctx->origin, &prefix) ? DNS_NAME_OMITFINALDOT
+							 : 0;
+	RETERR(dns_name_totext(&prefix, opts, target));
 	RETERR(str_totext(" ", target));
 	isc_region_consume(&sr, name_length(&name));
 
@@ -240,7 +244,7 @@ totext_tkey(ARGS_TOTEXT) {
 	return (ISC_R_SUCCESS);
 }
 
-static inline isc_result_t
+static isc_result_t
 fromwire_tkey(ARGS_FROMWIRE) {
 	isc_region_t sr;
 	unsigned long n;
@@ -251,13 +255,13 @@ fromwire_tkey(ARGS_FROMWIRE) {
 	UNUSED(type);
 	UNUSED(rdclass);
 
-	dns_decompress_setmethods(dctx, DNS_COMPRESS_NONE);
+	dctx = dns_decompress_setpermitted(dctx, false);
 
 	/*
 	 * Algorithm.
 	 */
 	dns_name_init(&name, NULL);
-	RETERR(dns_name_fromwire(&name, source, dctx, options, target));
+	RETERR(dns_name_fromwire(&name, source, dctx, target));
 
 	/*
 	 * Inception: 4
@@ -301,7 +305,7 @@ fromwire_tkey(ARGS_FROMWIRE) {
 	return (mem_tobuffer(target, sr.base, n + 2));
 }
 
-static inline isc_result_t
+static isc_result_t
 towire_tkey(ARGS_TOWIRE) {
 	isc_region_t sr;
 	dns_name_t name;
@@ -310,20 +314,20 @@ towire_tkey(ARGS_TOWIRE) {
 	REQUIRE(rdata->type == dns_rdatatype_tkey);
 	REQUIRE(rdata->length != 0);
 
-	dns_compress_setmethods(cctx, DNS_COMPRESS_NONE);
+	dns_compress_setpermitted(cctx, false);
 	/*
 	 * Algorithm.
 	 */
 	dns_rdata_toregion(rdata, &sr);
 	dns_name_init(&name, offsets);
 	dns_name_fromregion(&name, &sr);
-	RETERR(dns_name_towire(&name, cctx, target));
+	RETERR(dns_name_towire(&name, cctx, target, NULL));
 	isc_region_consume(&sr, name_length(&name));
 
 	return (mem_tobuffer(target, sr.base, sr.length));
 }
 
-static inline int
+static int
 compare_tkey(ARGS_COMPARE) {
 	isc_region_t r1;
 	isc_region_t r2;
@@ -354,7 +358,7 @@ compare_tkey(ARGS_COMPARE) {
 	return (isc_region_compare(&r1, &r2));
 }
 
-static inline isc_result_t
+static isc_result_t
 fromstruct_tkey(ARGS_FROMSTRUCT) {
 	dns_rdata_tkey_t *tkey = source;
 
@@ -412,7 +416,7 @@ fromstruct_tkey(ARGS_FROMSTRUCT) {
 	return (mem_tobuffer(target, tkey->other, tkey->otherlen));
 }
 
-static inline isc_result_t
+static isc_result_t
 tostruct_tkey(ARGS_TOSTRUCT) {
 	dns_rdata_tkey_t *tkey = target;
 	dns_name_t alg;
@@ -434,7 +438,7 @@ tostruct_tkey(ARGS_TOSTRUCT) {
 	dns_name_init(&alg, NULL);
 	dns_name_fromregion(&alg, &sr);
 	dns_name_init(&tkey->algorithm, NULL);
-	RETERR(name_duporclone(&alg, mctx, &tkey->algorithm));
+	name_duporclone(&alg, mctx, &tkey->algorithm);
 	isc_region_consume(&sr, name_length(&tkey->algorithm));
 
 	/*
@@ -472,9 +476,6 @@ tostruct_tkey(ARGS_TOSTRUCT) {
 	 */
 	INSIST(tkey->keylen + 2U <= sr.length);
 	tkey->key = mem_maybedup(mctx, sr.base, tkey->keylen);
-	if (tkey->key == NULL) {
-		goto cleanup;
-	}
 	isc_region_consume(&sr, tkey->keylen);
 
 	/*
@@ -488,24 +489,11 @@ tostruct_tkey(ARGS_TOSTRUCT) {
 	 */
 	INSIST(tkey->otherlen <= sr.length);
 	tkey->other = mem_maybedup(mctx, sr.base, tkey->otherlen);
-	if (tkey->other == NULL) {
-		goto cleanup;
-	}
-
 	tkey->mctx = mctx;
 	return (ISC_R_SUCCESS);
-
-cleanup:
-	if (mctx != NULL) {
-		dns_name_free(&tkey->algorithm, mctx);
-	}
-	if (mctx != NULL && tkey->key != NULL) {
-		isc_mem_free(mctx, tkey->key);
-	}
-	return (ISC_R_NOMEMORY);
 }
 
-static inline void
+static void
 freestruct_tkey(ARGS_FREESTRUCT) {
 	dns_rdata_tkey_t *tkey = (dns_rdata_tkey_t *)source;
 
@@ -525,18 +513,19 @@ freestruct_tkey(ARGS_FREESTRUCT) {
 	tkey->mctx = NULL;
 }
 
-static inline isc_result_t
+static isc_result_t
 additionaldata_tkey(ARGS_ADDLDATA) {
+	REQUIRE(rdata->type == dns_rdatatype_tkey);
+
 	UNUSED(rdata);
+	UNUSED(owner);
 	UNUSED(add);
 	UNUSED(arg);
-
-	REQUIRE(rdata->type == dns_rdatatype_tkey);
 
 	return (ISC_R_SUCCESS);
 }
 
-static inline isc_result_t
+static isc_result_t
 digest_tkey(ARGS_DIGEST) {
 	UNUSED(rdata);
 	UNUSED(digest);
@@ -547,7 +536,7 @@ digest_tkey(ARGS_DIGEST) {
 	return (ISC_R_NOTIMPLEMENTED);
 }
 
-static inline bool
+static bool
 checkowner_tkey(ARGS_CHECKOWNER) {
 	REQUIRE(type == dns_rdatatype_tkey);
 
@@ -559,7 +548,7 @@ checkowner_tkey(ARGS_CHECKOWNER) {
 	return (true);
 }
 
-static inline bool
+static bool
 checknames_tkey(ARGS_CHECKNAMES) {
 	REQUIRE(rdata->type == dns_rdatatype_tkey);
 
@@ -570,7 +559,7 @@ checknames_tkey(ARGS_CHECKNAMES) {
 	return (true);
 }
 
-static inline int
+static int
 casecompare_tkey(ARGS_COMPARE) {
 	return (compare_tkey(rdata1, rdata2));
 }

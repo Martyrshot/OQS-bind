@@ -1,6 +1,8 @@
 /*
  * Copyright (C) Internet Systems Consortium, Inc. ("ISC")
  *
+ * SPDX-License-Identifier: MPL-2.0
+ *
  * This Source Code Form is subject to the terms of the Mozilla Public
  * License, v. 2.0. If a copy of the MPL was not distributed with this
  * file, you can obtain one at https://mozilla.org/MPL/2.0/.
@@ -17,8 +19,7 @@
 #include <dns/db.h>
 #include <dns/types.h>
 
-#ifndef DNS_PRIVATE_H
-#define DNS_PRIVATE_H
+#pragma once
 
 ISC_LANG_BEGINDECLS
 
@@ -63,5 +64,3 @@ dns_private_totext(dns_rdata_t *privaterdata, isc_buffer_t *buffer);
  */
 
 ISC_LANG_ENDDECLS
-
-#endif /* ifndef DNS_PRIVATE_H */

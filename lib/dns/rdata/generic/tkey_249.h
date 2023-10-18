@@ -1,6 +1,8 @@
 /*
  * Copyright (C) Internet Systems Consortium, Inc. ("ISC")
  *
+ * SPDX-License-Identifier: MPL-2.0
+ *
  * This Source Code Form is subject to the terms of the Mozilla Public
  * License, v. 2.0. If a copy of the MPL was not distributed with this
  * file, you can obtain one at https://mozilla.org/MPL/2.0/.
@@ -9,8 +11,7 @@
  * information regarding copyright ownership.
  */
 
-#ifndef GENERIC_TKEY_249_H
-#define GENERIC_TKEY_249_H 1
+#pragma once
 
 /*!
  *  \brief Per draft-ietf-dnsind-tkey-00.txt */
@@ -28,5 +29,3 @@ typedef struct dns_rdata_tkey {
 	uint16_t otherlen;
 	unsigned char *other;
 } dns_rdata_tkey_t;
-
-#endif /* GENERIC_TKEY_249_H */

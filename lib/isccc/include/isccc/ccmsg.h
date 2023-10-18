@@ -1,5 +1,7 @@
 /*
- * Portions Copyright (C) Internet Systems Consortium, Inc. ("ISC")
+ * Copyright (C) Internet Systems Consortium, Inc. ("ISC")
+ *
+ * SPDX-License-Identifier: MPL-2.0 AND ISC
  *
  * This Source Code Form is subject to the terms of the Mozilla Public
  * License, v. 2.0. If a copy of the MPL was not distributed with this
@@ -7,8 +9,10 @@
  *
  * See the COPYRIGHT file distributed with this work for additional
  * information regarding copyright ownership.
- *
- * Portions Copyright (C) 2001 Nominum, Inc.
+ */
+
+/*
+ * Copyright (C) 2001 Nominum, Inc.
  *
  * Permission to use, copy, modify, and/or distribute this software for any
  * purpose with or without fee is hereby granted, provided that the above
@@ -23,8 +27,7 @@
  * OR IN CONNECTION WITH THE USE OR PERFORMANCE OF THIS SOFTWARE.
  */
 
-#ifndef ISCCC_CCMSG_H
-#define ISCCC_CCMSG_H 1
+#pragma once
 
 /*! \file isccc/ccmsg.h */
 
@@ -35,21 +38,23 @@
 #include <isc/netmgr.h>
 #include <isc/sockaddr.h>
 
+#include <isccc/types.h>
+
 /*% ISCCC Message Structure */
 typedef struct isccc_ccmsg {
 	/* private (don't touch!) */
 	unsigned int	magic;
 	uint32_t	size;
 	bool		length_received;
-	isc_buffer_t *	buffer;
+	isc_buffer_t   *buffer;
 	unsigned int	maxsize;
-	isc_mem_t *	mctx;
+	isc_mem_t      *mctx;
 	isc_nmhandle_t *handle;
-	isc_nm_cb_t	cb;
-	void *		cbarg;
+	isc_nm_cb_t	recv_cb;
+	void	       *recv_cbarg;
+	isc_nm_cb_t	send_cb;
+	void	       *send_cbarg;
 	bool		reading;
-	/* public (read-only) */
-	isc_result_t result;
 } isccc_ccmsg_t;
 
 ISC_LANG_BEGINDECLS
@@ -106,14 +111,12 @@ isccc_ccmsg_readmessage(isccc_ccmsg_t *ccmsg, isc_nm_cb_t cb, void *cbarg);
  */
 
 void
-isccc_ccmsg_cancelread(isccc_ccmsg_t *ccmsg);
+isccc_ccmsg_sendmessage(isccc_ccmsg_t *ccmsg, isc_region_t *region,
+			isc_nm_cb_t cb, void *cbarg);
 /*%
- * Cancel a readmessage() call.  The event will still be posted with a
- * CANCELED result code.
+ * Sends region over the command channel message.
  *
- * Requires:
- *
- *\li	"ccmsg" be valid.
+ * CAVEAT: Only a single send message can be scheduled at the time.
  */
 
 void
@@ -131,6 +134,7 @@ isccc_ccmsg_invalidate(isccc_ccmsg_t *ccmsg);
  *	sockets, etc.
  */
 
-ISC_LANG_ENDDECLS
+void
+isccc_ccmsg_toregion(isccc_ccmsg_t *ccmsg, isccc_region_t *ccregion);
 
-#endif /* ISCCC_CCMSG_H */
+ISC_LANG_ENDDECLS

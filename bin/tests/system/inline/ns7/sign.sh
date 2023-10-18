@@ -1,9 +1,11 @@
 #!/bin/sh -e
-#
+
 # Copyright (C) Internet Systems Consortium, Inc. ("ISC")
 #
+# SPDX-License-Identifier: MPL-2.0
+#
 # This Source Code Form is subject to the terms of the Mozilla Public
-# License, v. 2.0. If a copy of the MPL was not distributed with this
+# License, v. 2.0.  If a copy of the MPL was not distributed with this
 # file, you can obtain one at https://mozilla.org/MPL/2.0/.
 #
 # See the COPYRIGHT file distributed with this work for additional
@@ -17,6 +19,6 @@
 zone=nsec3-loop
 rm -f K${zone}.+*+*.key
 rm -f K${zone}.+*+*.private
-keyname=`$KEYGEN -q -a NSEC3RSASHA1 -b 1024 -n zone $zone`
-keyname=`$KEYGEN -q -a NSEC3RSASHA1 -b 1024 -n zone $zone`
-keyname=`$KEYGEN -q -a NSEC3RSASHA1 -b 1024 -n zone -f KSK $zone`
+keyname=$($KEYGEN -q -a RSASHA256 -b 4096 -n zone $zone)
+keyname=$($KEYGEN -q -a RSASHA256 -b 2048 -n zone $zone)
+keyname=$($KEYGEN -q -a RSASHA256 -b 2048 -n zone -f KSK $zone)

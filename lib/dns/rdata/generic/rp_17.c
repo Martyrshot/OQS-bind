@@ -1,6 +1,8 @@
 /*
  * Copyright (C) Internet Systems Consortium, Inc. ("ISC")
  *
+ * SPDX-License-Identifier: MPL-2.0
+ *
  * This Source Code Form is subject to the terms of the Mozilla Public
  * License, v. 2.0. If a copy of the MPL was not distributed with this
  * file, you can obtain one at https://mozilla.org/MPL/2.0/.
@@ -16,7 +18,7 @@
 
 #define RRTYPE_RP_ATTRIBUTES (0)
 
-static inline isc_result_t
+static isc_result_t
 fromtext_rp(ARGS_FROMTEXT) {
 	isc_token_t token;
 	dns_name_t name;
@@ -55,13 +57,13 @@ fromtext_rp(ARGS_FROMTEXT) {
 	return (ISC_R_SUCCESS);
 }
 
-static inline isc_result_t
+static isc_result_t
 totext_rp(ARGS_TOTEXT) {
 	isc_region_t region;
 	dns_name_t rmail;
 	dns_name_t email;
 	dns_name_t prefix;
-	bool sub;
+	unsigned int opts;
 
 	REQUIRE(rdata->type == dns_rdatatype_rp);
 	REQUIRE(rdata->length != 0);
@@ -78,16 +80,20 @@ totext_rp(ARGS_TOTEXT) {
 	dns_name_fromregion(&email, &region);
 	isc_region_consume(&region, email.length);
 
-	sub = name_prefix(&rmail, tctx->origin, &prefix);
-	RETERR(dns_name_totext(&prefix, sub, target));
+	opts = name_prefix(&rmail, tctx->origin, &prefix)
+		       ? DNS_NAME_OMITFINALDOT
+		       : 0;
+	RETERR(dns_name_totext(&prefix, opts, target));
 
 	RETERR(str_totext(" ", target));
 
-	sub = name_prefix(&email, tctx->origin, &prefix);
-	return (dns_name_totext(&prefix, sub, target));
+	opts = name_prefix(&email, tctx->origin, &prefix)
+		       ? DNS_NAME_OMITFINALDOT
+		       : 0;
+	return (dns_name_totext(&prefix, opts, target));
 }
 
-static inline isc_result_t
+static isc_result_t
 fromwire_rp(ARGS_FROMWIRE) {
 	dns_name_t rmail;
 	dns_name_t email;
@@ -97,16 +103,16 @@ fromwire_rp(ARGS_FROMWIRE) {
 	UNUSED(type);
 	UNUSED(rdclass);
 
-	dns_decompress_setmethods(dctx, DNS_COMPRESS_NONE);
+	dctx = dns_decompress_setpermitted(dctx, false);
 
 	dns_name_init(&rmail, NULL);
 	dns_name_init(&email, NULL);
 
-	RETERR(dns_name_fromwire(&rmail, source, dctx, options, target));
-	return (dns_name_fromwire(&email, source, dctx, options, target));
+	RETERR(dns_name_fromwire(&rmail, source, dctx, target));
+	return (dns_name_fromwire(&email, source, dctx, target));
 }
 
-static inline isc_result_t
+static isc_result_t
 towire_rp(ARGS_TOWIRE) {
 	isc_region_t region;
 	dns_name_t rmail;
@@ -117,7 +123,7 @@ towire_rp(ARGS_TOWIRE) {
 	REQUIRE(rdata->type == dns_rdatatype_rp);
 	REQUIRE(rdata->length != 0);
 
-	dns_compress_setmethods(cctx, DNS_COMPRESS_NONE);
+	dns_compress_setpermitted(cctx, false);
 	dns_name_init(&rmail, roffsets);
 	dns_name_init(&email, eoffsets);
 
@@ -126,15 +132,15 @@ towire_rp(ARGS_TOWIRE) {
 	dns_name_fromregion(&rmail, &region);
 	isc_region_consume(&region, rmail.length);
 
-	RETERR(dns_name_towire(&rmail, cctx, target));
+	RETERR(dns_name_towire(&rmail, cctx, target, NULL));
 
 	dns_name_fromregion(&rmail, &region);
 	isc_region_consume(&region, rmail.length);
 
-	return (dns_name_towire(&rmail, cctx, target));
+	return (dns_name_towire(&rmail, cctx, target, NULL));
 }
 
-static inline int
+static int
 compare_rp(ARGS_COMPARE) {
 	isc_region_t region1;
 	isc_region_t region2;
@@ -174,7 +180,7 @@ compare_rp(ARGS_COMPARE) {
 	return (dns_name_rdatacompare(&name1, &name2));
 }
 
-static inline isc_result_t
+static isc_result_t
 fromstruct_rp(ARGS_FROMSTRUCT) {
 	dns_rdata_rp_t *rp = source;
 	isc_region_t region;
@@ -193,9 +199,8 @@ fromstruct_rp(ARGS_FROMSTRUCT) {
 	return (isc_buffer_copyregion(target, &region));
 }
 
-static inline isc_result_t
+static isc_result_t
 tostruct_rp(ARGS_TOSTRUCT) {
-	isc_result_t result;
 	isc_region_t region;
 	dns_rdata_rp_t *rp = target;
 	dns_name_t name;
@@ -212,26 +217,16 @@ tostruct_rp(ARGS_TOSTRUCT) {
 	dns_rdata_toregion(rdata, &region);
 	dns_name_fromregion(&name, &region);
 	dns_name_init(&rp->mail, NULL);
-	RETERR(name_duporclone(&name, mctx, &rp->mail));
+	name_duporclone(&name, mctx, &rp->mail);
 	isc_region_consume(&region, name_length(&name));
 	dns_name_fromregion(&name, &region);
 	dns_name_init(&rp->text, NULL);
-	result = name_duporclone(&name, mctx, &rp->text);
-	if (result != ISC_R_SUCCESS) {
-		goto cleanup;
-	}
-
+	name_duporclone(&name, mctx, &rp->text);
 	rp->mctx = mctx;
 	return (ISC_R_SUCCESS);
-
-cleanup:
-	if (mctx != NULL) {
-		dns_name_free(&rp->mail, mctx);
-	}
-	return (ISC_R_NOMEMORY);
 }
 
-static inline void
+static void
 freestruct_rp(ARGS_FREESTRUCT) {
 	dns_rdata_rp_t *rp = source;
 
@@ -247,18 +242,19 @@ freestruct_rp(ARGS_FREESTRUCT) {
 	rp->mctx = NULL;
 }
 
-static inline isc_result_t
+static isc_result_t
 additionaldata_rp(ARGS_ADDLDATA) {
 	REQUIRE(rdata->type == dns_rdatatype_rp);
 
 	UNUSED(rdata);
+	UNUSED(owner);
 	UNUSED(add);
 	UNUSED(arg);
 
 	return (ISC_R_SUCCESS);
 }
 
-static inline isc_result_t
+static isc_result_t
 digest_rp(ARGS_DIGEST) {
 	isc_region_t r;
 	dns_name_t name;
@@ -278,7 +274,7 @@ digest_rp(ARGS_DIGEST) {
 	return (dns_name_digest(&name, digest, arg));
 }
 
-static inline bool
+static bool
 checkowner_rp(ARGS_CHECKOWNER) {
 	REQUIRE(type == dns_rdatatype_rp);
 
@@ -290,7 +286,7 @@ checkowner_rp(ARGS_CHECKOWNER) {
 	return (true);
 }
 
-static inline bool
+static bool
 checknames_rp(ARGS_CHECKNAMES) {
 	isc_region_t region;
 	dns_name_t name;
@@ -311,7 +307,7 @@ checknames_rp(ARGS_CHECKNAMES) {
 	return (true);
 }
 
-static inline int
+static int
 casecompare_rp(ARGS_COMPARE) {
 	return (compare_rp(rdata1, rdata2));
 }

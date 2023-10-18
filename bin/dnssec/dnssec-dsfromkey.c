@@ -1,6 +1,8 @@
 /*
  * Copyright (C) Internet Systems Consortium, Inc. ("ISC")
  *
+ * SPDX-License-Identifier: MPL-2.0
+ *
  * This Source Code Form is subject to the terms of the Mozilla Public
  * License, v. 2.0. If a copy of the MPL was not distributed with this
  * file, you can obtain one at https://mozilla.org/MPL/2.0/.
@@ -18,9 +20,10 @@
 #include <isc/attributes.h>
 #include <isc/buffer.h>
 #include <isc/commandline.h>
+#include <isc/dir.h>
 #include <isc/hash.h>
 #include <isc/mem.h>
-#include <isc/print.h>
+#include <isc/result.h>
 #include <isc/string.h>
 #include <isc/util.h>
 
@@ -38,13 +41,8 @@
 #include <dns/rdataset.h>
 #include <dns/rdatasetiter.h>
 #include <dns/rdatatype.h>
-#include <dns/result.h>
 
 #include <dst/dst.h>
-
-#if USE_PKCS11
-#include <pk11/result.h>
-#endif /* if USE_PKCS11 */
 
 #include "dnssectool.h"
 
@@ -263,6 +261,10 @@ emit(dns_dsdigest_t dt, bool showall, bool cds, dns_rdata_t *rdata) {
 		fatal("can't convert DNSKEY");
 	}
 
+	if ((dnskey.flags & DNS_KEYFLAG_REVOKE) != 0) {
+		return;
+	}
+
 	if ((dnskey.flags & DNS_KEYFLAG_KSK) == 0 && !showall) {
 		return;
 	}
@@ -272,7 +274,7 @@ emit(dns_dsdigest_t dt, bool showall, bool cds, dns_rdata_t *rdata) {
 		fatal("can't build record");
 	}
 
-	result = dns_name_totext(name, false, &nameb);
+	result = dns_name_totext(name, 0, &nameb);
 	if (result != ISC_R_SUCCESS) {
 		fatal("can't print name");
 	}
@@ -311,7 +313,7 @@ emit(dns_dsdigest_t dt, bool showall, bool cds, dns_rdata_t *rdata) {
 
 static void
 emits(bool showall, bool cds, dns_rdata_t *rdata) {
-	unsigned i, n;
+	unsigned int i, n;
 
 	n = sizeof(dtype) / sizeof(dtype[0]);
 	for (i = 0; i < n; i++) {
@@ -321,7 +323,7 @@ emits(bool showall, bool cds, dns_rdata_t *rdata) {
 	}
 }
 
-ISC_NORETURN static void
+noreturn static void
 usage(void);
 
 static void
@@ -375,11 +377,6 @@ main(int argc, char **argv) {
 	}
 
 	isc_mem_create(&mctx);
-
-#if USE_PKCS11
-	pk11_result_register();
-#endif /* if USE_PKCS11 */
-	dns_result_register();
 
 	isc_commandline_errprint = false;
 
@@ -436,14 +433,14 @@ main(int argc, char **argv) {
 			}
 			break;
 		case 'F':
-		/* Reserved for FIPS mode */
-		/* FALLTHROUGH */
+			/* Reserved for FIPS mode */
+			FALLTHROUGH;
 		case '?':
 			if (isc_commandline_option != '?') {
 				fprintf(stderr, "%s: invalid argument -%c\n",
 					program, isc_commandline_option);
 			}
-		/* FALLTHROUGH */
+			FALLTHROUGH;
 		case 'h':
 			/* Does not return. */
 			usage();

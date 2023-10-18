@@ -1,6 +1,8 @@
 /*
  * Copyright (C) Internet Systems Consortium, Inc. ("ISC")
  *
+ * SPDX-License-Identifier: MPL-2.0
+ *
  * This Source Code Form is subject to the terms of the Mozilla Public
  * License, v. 2.0. If a copy of the MPL was not distributed with this
  * file, you can obtain one at https://mozilla.org/MPL/2.0/.
@@ -18,6 +20,7 @@
 #include <isc/iterated_hash.h>
 #include <isc/md.h>
 #include <isc/nonce.h>
+#include <isc/result.h>
 #include <isc/safe.h>
 #include <isc/string.h>
 #include <isc/util.h>
@@ -34,7 +37,6 @@
 #include <dns/rdataset.h>
 #include <dns/rdatasetiter.h>
 #include <dns/rdatastruct.h>
-#include <dns/result.h>
 #include <dns/zone.h>
 
 #include <dst/dst.h>
@@ -116,7 +118,7 @@ dns_nsec3_buildrdata(dns_db_t *db, dns_dbversion_t *version, dns_dbnode_t *node,
 	}
 	dns_rdataset_init(&rdataset);
 	rdsiter = NULL;
-	result = dns_db_allrdatasets(db, node, version, 0, &rdsiter);
+	result = dns_db_allrdatasets(db, node, version, 0, 0, &rdsiter);
 	if (result != ISC_R_SUCCESS) {
 		return (result);
 	}
@@ -143,7 +145,8 @@ dns_nsec3_buildrdata(dns_db_t *db, dns_dbversion_t *version, dns_dbnode_t *node,
 			 *    a NS record but do have other data.
 			 */
 			if (rdataset.type == dns_rdatatype_soa ||
-			    rdataset.type == dns_rdatatype_ds) {
+			    rdataset.type == dns_rdatatype_ds)
+			{
 				need_rrsig = true;
 			} else if (rdataset.type == dns_rdatatype_ns) {
 				found_ns = true;
@@ -168,7 +171,8 @@ dns_nsec3_buildrdata(dns_db_t *db, dns_dbversion_t *version, dns_dbnode_t *node,
 	{
 		for (i = 0; i <= max_type; i++) {
 			if (dns_nsec_isset(bm, i) &&
-			    !dns_rdatatype_iszonecutauth((dns_rdatatype_t)i)) {
+			    !dns_rdatatype_iszonecutauth((dns_rdatatype_t)i))
+			{
 				dns_nsec_setbit(bm, i, 0);
 			}
 		}
@@ -267,9 +271,7 @@ dns_nsec3_hashname(dns_fixedname_t *result,
 		return (DNS_R_BADALG);
 	}
 
-	if (hash_length != NULL) {
-		*hash_length = len;
-	}
+	SET_IF_NOT_NULL(hash_length, len);
 
 	/* convert the hash to base32hex non-padded */
 	region.base = rethash;
@@ -361,7 +363,7 @@ name_exists(dns_db_t *db, dns_dbversion_t *version, const dns_name_t *name,
 		return (result);
 	}
 
-	result = dns_db_allrdatasets(db, node, version, (isc_stdtime_t)0,
+	result = dns_db_allrdatasets(db, node, version, 0, (isc_stdtime_t)0,
 				     &iter);
 	if (result != ISC_R_SUCCESS) {
 		goto cleanup_node;
@@ -484,7 +486,8 @@ better_param(dns_rdataset_t *nsec3paramset, dns_rdata_t *param) {
 			dns_rdata_t tmprdata = DNS_RDATA_INIT;
 			dns_rdataset_current(&rdataset, &tmprdata);
 			if (!dns_nsec3param_fromprivate(&tmprdata, &rdata, buf,
-							sizeof(buf))) {
+							sizeof(buf)))
+			{
 				continue;
 			}
 		} else {
@@ -969,7 +972,6 @@ failure:
 bool
 dns_nsec3param_fromprivate(dns_rdata_t *src, dns_rdata_t *target,
 			   unsigned char *buf, size_t buflen) {
-	dns_decompress_t dctx;
 	isc_result_t result;
 	isc_buffer_t buf1;
 	isc_buffer_t buf2;
@@ -986,11 +988,9 @@ dns_nsec3param_fromprivate(dns_rdata_t *src, dns_rdata_t *target,
 	isc_buffer_add(&buf1, src->length - 1);
 	isc_buffer_setactive(&buf1, src->length - 1);
 	isc_buffer_init(&buf2, buf, (unsigned int)buflen);
-	dns_decompress_init(&dctx, -1, DNS_DECOMPRESS_NONE);
 	result = dns_rdata_fromwire(target, src->rdclass,
-				    dns_rdatatype_nsec3param, &buf1, &dctx, 0,
-				    &buf2);
-	dns_decompress_invalidate(&dctx);
+				    dns_rdatatype_nsec3param, &buf1,
+				    DNS_DECOMPRESS_NEVER, &buf2);
 
 	return (result == ISC_R_SUCCESS);
 }
@@ -1309,7 +1309,8 @@ try_private:
 
 		dns_rdataset_current(&prdataset, &rdata1);
 		if (!dns_nsec3param_fromprivate(&rdata1, &rdata2, buf,
-						sizeof(buf))) {
+						sizeof(buf)))
+		{
 			continue;
 		}
 		CHECK(dns_rdata_tostruct(&rdata2, &nsec3param, NULL));
@@ -1437,7 +1438,7 @@ dns_nsec3_delnsec3(dns_db_t *db, dns_dbversion_t *version,
 
 	result = dns_dbiterator_seek(dbit, hashname);
 	if (result == ISC_R_NOTFOUND || result == DNS_R_PARTIALMATCH) {
-		goto success;
+		goto cleanup_orphaned_ents;
 	}
 	if (result != ISC_R_SUCCESS) {
 		goto failure;
@@ -1449,7 +1450,7 @@ dns_nsec3_delnsec3(dns_db_t *db, dns_dbversion_t *version,
 				     (isc_stdtime_t)0, &rdataset, NULL);
 	dns_db_detachnode(db, &node);
 	if (result == ISC_R_NOTFOUND) {
-		goto success;
+		goto cleanup_orphaned_ents;
 	}
 	if (result != ISC_R_SUCCESS) {
 		goto failure;
@@ -1534,6 +1535,7 @@ dns_nsec3_delnsec3(dns_db_t *db, dns_dbversion_t *version,
 	/*
 	 *  Delete NSEC3 records for now non active nodes.
 	 */
+cleanup_orphaned_ents:
 	dns_name_init(&empty, NULL);
 	dns_name_clone(name, &empty);
 	do {
@@ -1738,7 +1740,8 @@ try_private:
 
 		dns_rdataset_current(&rdataset, &rdata1);
 		if (!dns_nsec3param_fromprivate(&rdata1, &rdata2, buf,
-						sizeof(buf))) {
+						sizeof(buf)))
+		{
 			continue;
 		}
 		CHECK(dns_rdata_tostruct(&rdata2, &nsec3param, NULL));
@@ -1831,6 +1834,7 @@ dns_nsec3_activex(dns_db_t *db, dns_dbversion_t *version, bool complete,
 
 try_private:
 	if (privatetype == 0 || complete) {
+		dns_db_detachnode(db, &node);
 		*answer = false;
 		return (ISC_R_SUCCESS);
 	}
@@ -1855,7 +1859,8 @@ try_private:
 
 		dns_rdataset_current(&rdataset, &rdata1);
 		if (!dns_nsec3param_fromprivate(&rdata1, &rdata2, buf,
-						sizeof(buf))) {
+						sizeof(buf)))
+		{
 			continue;
 		}
 		result = dns_rdata_tostruct(&rdata2, &nsec3param, NULL);
@@ -1963,7 +1968,8 @@ dns_nsec3_noexistnodata(dns_rdatatype_t type, const dns_name_t *name,
 	 * Is this zone the same or deeper than the current zone?
 	 */
 	if (dns_name_countlabels(zonename) == 0 ||
-	    dns_name_issubdomain(zone, zonename)) {
+	    dns_name_issubdomain(zone, zonename))
+	{
 		dns_name_copy(zone, zonename);
 	}
 

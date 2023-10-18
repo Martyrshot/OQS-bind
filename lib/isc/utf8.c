@@ -1,6 +1,8 @@
 /*
  * Copyright (C) Internet Systems Consortium, Inc. ("ISC")
  *
+ * SPDX-License-Identifier: MPL-2.0
+ *
  * This Source Code Form is subject to the terms of the Mozilla Public
  * License, v. 2.0. If a copy of the MPL was not distributed with this
  * file, you can obtain one at https://mozilla.org/MPL/2.0/.
@@ -35,7 +37,8 @@ isc_utf8_valid(const unsigned char *buf, size_t len) {
 			continue;
 		}
 		if ((i + 1) < len && (buf[i] & 0xe0) == 0xc0 &&
-		    (buf[i + 1] & 0xc0) == 0x80) {
+		    (buf[i + 1] & 0xc0) == 0x80)
+		{
 			unsigned int w;
 			w = (buf[i] & 0x1f) << 6;
 			w |= (buf[++i] & 0x3f);

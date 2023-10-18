@@ -1,13 +1,16 @@
 <!--
- - Copyright (C) Internet Systems Consortium, Inc. ("ISC")
- -
- - This Source Code Form is subject to the terms of the Mozilla Public
- - License, v. 2.0. If a copy of the MPL was not distributed with this
- - file, You can obtain one at http://mozilla.org/MPL/2.0/.
- -
- - See the COPYRIGHT file distributed with this work for additional
- - information regarding copyright ownership.
+Copyright (C) Internet Systems Consortium, Inc. ("ISC")
+
+SPDX-License-Identifier: MPL-2.0
+
+This Source Code Form is subject to the terms of the Mozilla Public
+License, v. 2.0.  If a copy of the MPL was not distributed with this
+file, you can obtain one at https://mozilla.org/MPL/2.0/.
+
+See the COPYRIGHT file distributed with this work for additional
+information regarding copyright ownership.
 -->
+
 ## BIND Developer Information
 
 ### Contents
@@ -29,7 +32,7 @@
     * [Iterators](#iterators)
     * [Logging](#logging)
     * [Adding a new RR type](#rrtype)
-    * [Task and timer model](#tasks)
+    * [Asynchronous operations](#async)
 
 ### <a name="reviews"></a>The code review process
 
@@ -44,7 +47,7 @@ particular, a full regression test (`make` `check`) must be run for every
 modification so that unexpected side-effects are identified.
 
 When a problem or concern is found by the reviewer, these comments are
-placed on the RT ticket so the author can respond.
+placed on the merge request in GitLab so the author can respond.
 
 #### What is reviewed:
 
@@ -80,7 +83,7 @@ comments; they must be clearly written and consistent with existing style.
 * Read the diff
 * Read accompanying notes in the ticket
 * Apply the diff to the appropriate branch
-* Run `configure` (using at least `--enable-developer --with-atf`)
+* Run `configure` (using at least `--enable-developer`)
 * Build
 * Read the documentation, if any
 * Read the tests
@@ -105,9 +108,7 @@ comments; they must be clearly written and consistent with existing style.
 * Copies of code that could be unified in a helper function
 * Premature optimizations
 * Compiler warnings introduced
-* Portability issues:
- * Use of non-POSIX library calls or options
- * API changes correctly reflected in Windows `*.def` files
+* Portability issues, such as the use of non-POSIX library calls or options
 * DNS/protocol problems
 * Cut/pasted code that may have been modified in one place but needs to be modified in other places as well
 * No tests or inadequate tests
@@ -136,11 +137,11 @@ interfaces (as root):
         $ sudo sh ifconfig.sh up
         $ cd ../../..
 
-To run the tests, build BIND (be sure to use --with-atf to run unit
+To run the tests, build BIND (be sure to use --with-cmocka to run unit
 tests), then run `make` `check`.  An easy way to check the results:
 
         $ make check 2>&1 | tee /tmp/check.out
-        $ grep '^R:' /tmp/check.out | sort | uniq -c
+        $ grep -A 10 'Testsuite summary' /tmp/check.out
 
 This will show all of the test results. One or two "R:SKIPPED" is okay; if
 there are a lot of them, then you probably forgot to create the loopback
@@ -150,8 +151,7 @@ unit tests, so you can't rely on it to catch everything.)
 
 To run only the system tests, omitting unit tests:
 
-        $ cd bin/tests/system
-        $ sh runall.sh
+	$ make test
 
 To run an individual system test:
 
@@ -202,7 +202,7 @@ points to `rndc`, `SIGNZONE` to `dnssec-signzone`, etc.
 
 #### <a name="unittest"></a> Building unit tests
 
-BIND uses the cmocka, unit testing framework.
+BIND uses the cmocka unit testing framework.
 
 To build BIND with unit tests, run `configure` with the `--with-cmocka`
 option.  This requires cmocka >= 1.0.0 to be installed in the system.
@@ -218,9 +218,9 @@ in `rbt.c`.  (There are exceptions to this rule, though; for instance,
 different files in `lib/isc`.)
 
 When BIND is built with unit tests, they will be run as part of
-`make` `check`.  But if you want to run *only* the ATF unit tests:
+`make` `check`.  But if you want to run *only* the unit tests:
 
-        $ sh unit/unittest.sh
+        $ make unit
 
 You can also run the unit tests for only one library:
 
@@ -268,15 +268,10 @@ libraries.
     * `bind9/lib/dns`: implements higher-level DNS functionality:
       red-black trees, rdatasets, views, zones, ACLs, resolver, validator, etc
         * `bind9/lib/dns/tests`: unit tests for libdns
-    * `bind9/lib/bind9`: library implementing bind9-specific functionality,
-      principally configuration validity checking (used in `named` and
-      `named-checkconf` when reading `named.conf`).
     * `bind9/lib/isccfg`: library implementing the `named.conf`
-      configuration parser.
+      configuration parser and checker.
     * `bind9/lib/isccc`: library implementing the control channel used
       by `rndc`
-    * `bind9/lib/irs`: provides mechanisms for reading `/etc/resolv.conf`
-      and other configuration files.
 
 #### Namespace
 
@@ -402,12 +397,11 @@ A result code can be converted to a human-readable error message by
 calling `isc_result_totext(result)`.
 
 Many result codes have been defined and can be found in the source tree
-in header files called `result.h` (for example, the result codes defined
-for the ISC library are in `lib/isc/include/isc/result.h`.
+in `lib/isc/include/isc/result.h`.
 
 ISC library result codes (many of which are generically useful elsewhere)
 begin with `ISC_R`: examples include `ISC_R_SUCCESS`, `ISC_R_FAILURE`,
-`ISC_R_NOMEMORY`, etc. 
+`ISC_R_NOMEMORY`, etc.
 
 DNS library result codes begin with `DNS_R`: `DNS_R_SERVFAIL`, `DNS_R_NXRRSET`,
 etc).  Other sets of result codes are defined for crypto functions (`DST_R`
@@ -433,7 +427,7 @@ into 'consumed' and 'remaining'.
 
 When parsing a message, the message to be parsed in in the 'used'
 part of the buffer.  As the message is parsed, the 'consumed'
-subregion grows and the 'remaining' subregion shrinks. 
+subregion grows and the 'remaining' subregion shrinks.
 
 When creating a message, data is written into the 'available'
 subregion, which then becomes part of 'used'.
@@ -493,10 +487,12 @@ or simply by running `isc_buffer_init()` on the region's base pointer.
 
 #### <a name="mem"></a>Memory management
 
-BIND manages its own memory internally via "memory contexts".  Multiple
+BIND tracks its memory usage internally via "memory contexts".  Multiple
 separate memory contexts can be created for the use of different modules or
 subcomponents, and each can have its own size limits and tuning parameters
-and maintain its own statistics, allocations and free lists.
+and maintain its own statistics, allocations and free lists.  Memory
+allocation is based on the `jemalloc` library on platforms where the library
+is available.
 
 The memory system helps with diagnosis of common coding errors such as
 memory leaks and use after free. Newly allocated memory is populated with
@@ -508,13 +504,6 @@ To create a basic memory context, use:
 
         isc_mem_t *mctx = NULL;
         isc_mem_create(&mctx);
-
-(The zeroes are tuning parameters, `max_size` and `target_size`: Any
-allocations smaller than `max_size` will be satisfied by getting
-blocks of size `target_size` from the operating system's memory
-allocator and breaking them up into pieces, while larger allocations
-will call the system allocator directly. These parameters are rarely
-used.)
 
 When holding a persistent reference to a memory context it is advisable to
 increment its reference counter using `isc_mem_attach()`.  Do not just
@@ -539,7 +528,7 @@ memory context is freed before all references have been cleaned up.
                 /* Populate other isc_foo members here */
 
                 foo->magic = ISC_FOO_MAGIC;
-                
+
                 *foop = foo;
                 return (ISC_R_SUCCESS);
         }
@@ -577,16 +566,27 @@ The function `isc_mem_strdup()` -- a version of `strdup()` that uses memory
 contexts -- will also return memory that can be freed with
 `isc_mem_free()`.
 
-Every allocation and deallocation requires a memory context lock to be
-acquired.  This will cause performance problems if you write code that
-allocates and deallocates memory frequently.  Whenever possible,
-inner loop functions should be passed static buffers rather than allocating
-memory.
-
 In cases where small fixed-size blocks of memory may be needed frequently,
 the `isc_mempool` API can be used.  This creates a standing pool of blocks
 of a specified size which can be passed out and returned without the need
-for locking the entire memory context.
+for a new memory allocation; this can improve performance in tight inner
+loops.
+
+None of these allocation functions, including `isc_mempool_get()`, can
+fail.  If no memory is available for allocation, the program will abort.
+
+The memory context can be set to check if all memory allocated via the said
+memory context was freed before the memory context was destroyed by calling
+`isc_mem_checkdestroyed()`.  This could lead to false positives on abnormal
+shutdowns, so the checking is only enabled in `dig` and `named` applications on
+normal shutdown.
+
+The memory context are normally used only for internal allocations, but several
+external libraries allow replacing their allocators (namely libxml2, libuv and
+OpenSSL).  As there has been known memory leak in the OpenSSL when
+`engine_pkcs11` is loaded, memory checking at destroy is disabled by default in
+the memory contexts used for external libraries and it needs to be enabled with
+a `--enable-leak-detection` autoconf option.
 
 #### <a name="lists"></a>Lists
 
@@ -644,7 +644,7 @@ More macros are provided for iterating the list:
 
         isc_foo_t *foo;
         for (foo = ISC_LIST_HEAD(foolist);
-             foo != NULL; 
+             foo != NULL;
              foo = ISC_LIST_NEXT(foo, link))
         {
                 /* do things */
@@ -813,7 +813,7 @@ The return value may be:
 * `dns_name_commonancestor`: name1 and name2 share some labels
 * `dns_name_equal`: name1 and name2 are the same
 
-Some simpler comparison functions are provided for convenience when 
+Some simpler comparison functions are provided for convenience when
 not all of this information is required:
 
 * `dns_name_compare()`: returns the sort order of two names but
@@ -884,7 +884,7 @@ sets have been defined:
 
 Each of these has a `first()`, `next()` and `current()` function; for
 example, `dns_rdataset_first()`, `dns_rdataset_next()`, and
-`dns_rdataset_current()`. 
+`dns_rdataset_current()`.
 
 The `first()` and `next()` functions move the iterator's cursor and so that
 the data at a new location can be retrieved.  (Most of these can only step
@@ -1005,9 +1005,9 @@ the program.  File descriptor destinations are never closed, have no
 maximum size limit, and do not do version control.
 
 Syslog destinations are associated with the standard syslog facilities
-available on your system: generally `syslogd` on UNIX and Linux systems
-and the Application log in the Event Viewer on Windows systems.  They too
-have no maximum size limit and do no version control.
+available on your system: generally `syslogd` on UNIX and Linux
+systems. They too have no maximum size limit and do no version
+control.
 
 Since null channels go nowhere, no additional destination
 specification is necessary.
@@ -1033,7 +1033,7 @@ messages up to the current debugging level are written to the channel.
 
 These objects -- the category, module, and channel -- direct hessages
 to desired destinations.  Each category/module pair can be associated
-with a specific channel, and the correct destination will be used 
+with a specific channel, and the correct destination will be used
 when a message is logged by `isc_log_write()`.
 
 In `isc_log_write()`, the logging system first looks up a list that
@@ -1166,7 +1166,7 @@ to control the closing of log files.
 
         void isc_log_setdebuglevel(isc_log_t *lctx, unsigned int level);
         unsigned int isc_log_getdebuglevel(isc_log_t *lctx);
-        
+
 These set and retrieve the current debugging level of the program.
 `isc_log_getdebuglevel()` can be used so that you need not keep track of
 the level yourself in another variable.
@@ -1364,111 +1364,10 @@ In nearly all cases, this is simply a wrapper around the `compare()`
 function, except where DNSSEC comparisons are specified as
 case-sensitive. Unknown RR types are always compared case-sensitively.
 
-#### <a name="tasks"></a>Task and timer model
+#### <a name="async"></a>Asynchronous operations
 
-The BIND task/timer management system can be thought of as comparable to a
-simple non-preemptive multitasking operating system.
-
-In this model, what BIND calls a "task" (or an `isc_task_t` object) is the
-equivalent of what is usually called a "process" in an operating system:
-a persistent execution context in which functions run when action is
-required.  When the action is complete, the task goes to sleep, and
-wakes up again when more work arrives.  A "worker thread" is comparable
-to an operating system's CPU; when a task is ready to run, a worker
-thread will run it.  By default, BIND creates one worker thread for each
-system CPU.
-
-An "event" object can be associated with a task, and triggered when a a
-specific condition occurs.  Each event object contains a pointer to a
-specific function and arguments to be passed to it.  When the event
-triggers, the task is placed onto a "ready queue" in the task manager.  As
-each running task finishes, the worker threads pull new tasks off the ready
-queue.  When the task associated with a given event reaches the head of the
-queue, the specified function will be called.
-
-Examples:
-
-`isc_socket_recv()` calls the `recv()` system call asynchronously: rather
-than waiting for data, it returns immediately, but it sets up an event to
-be triggered when the `recv()` call completes; BIND can now do other work
-instead of waiting for I/O.  Once the `recv()` is finished, the
-associated event is triggered.
-
-
-        /*
-         * Function to handle a completed recv()
-         */
-        static void
-        recvdone(isc_task_t *task, isc_event_t *event) {
-                /* Arguments are in event->ev_arg. */
-        }
-
-        ...
-
-        /*
-         * Call recv() on socket 'sock', put results into 'region',
-         * minimum read size 1, and call recvdone() with NULL as
-         * argument.  (Note: 'sock' is already associated with a
-         * particular task, so that doesn't need to be specified
-         * here.)
-         */
-        isc_socket_recv(sock, &region, 1, recvdone, NULL);
-
-A timer is set for a specified time in the future, and the event will
-be triggered at that time.
-
-        /*
-         * Function to handle a timeout
-         */
-        static void
-        timeout(isc_task_t *task, isc_event_t *event) {
-               /* do things */
-         }
-
-         ...
-
-         /*
-          * Set up a timer in timer manager 'timermgr', to run
-          * once, with a NULL expiration time, after 'interval'
-          * has passed; it will run the function 'timeout' with
-          * 'arg' as its argument in task 'task'.
-          */
-         isc_timer_t *timer = NULL;
-         result = isc_timer_create(timermgr, isc_timertype_once, NULL,
-                                   interval, task, timeout, arg, &timer);
-
-An event can also be explicitly triggered via `isc_task_send()`.  
-
-        static void
-        do_things(isc_task_t *task, isc_event_t *event) {
-                /* this function does things */
-        }
-
-        ...
-
-        /*
-         * Allocate an event that calls 'do_things' with a 
-         * NULL argument, using 'myself' as ev_sender.
-         *
-         * DNS_EVENT_DOTHINGS must be defined in <dns/events.h>.
-         *
-         * (Note that 'size' must be specified because there are
-         * event objects that inherit from isc_event_t, incorporating
-         * common members via the ISC_EVENT_COMMON member and then
-         * following them with other members.)
-         */
-        isc_event_t *event;
-        event = isc_event_allocate(mctx, myself, DNS_EVENT_DOTHINGS,
-                                   do_things, NULL, sizeof(isc_event_t));
-        if (event == NULL)
-                return (ISC_R_NOMEMORY);
-
-        ...
-
-        /*
-         * Send the allocated event to task 'task'
-         */
-        isc_task_send(task, event);
+Asynchronous operations are processed using the event loop manager;
+see the [Loop Manager](loopmgr.md) document for details.
 
 #### More...
 

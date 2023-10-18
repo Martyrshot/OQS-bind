@@ -1,6 +1,8 @@
 /*
  * Copyright (C) Internet Systems Consortium, Inc. ("ISC")
  *
+ * SPDX-License-Identifier: MPL-2.0
+ *
  * This Source Code Form is subject to the terms of the Mozilla Public
  * License, v. 2.0. If a copy of the MPL was not distributed with this
  * file, you can obtain one at https://mozilla.org/MPL/2.0/.
@@ -9,8 +11,7 @@
  * information regarding copyright ownership.
  */
 
-#ifndef DNS_RDATASETITER_H
-#define DNS_RDATASETITER_H 1
+#pragma once
 
 /*****
 ***** Module Info
@@ -66,10 +67,11 @@ ISC_LANG_BEGINDECLS
 *****/
 
 typedef struct dns_rdatasetitermethods {
-	void (*destroy)(dns_rdatasetiter_t **iteratorp);
-	isc_result_t (*first)(dns_rdatasetiter_t *iterator);
-	isc_result_t (*next)(dns_rdatasetiter_t *iterator);
-	void (*current)(dns_rdatasetiter_t *iterator, dns_rdataset_t *rdataset);
+	void (*destroy)(dns_rdatasetiter_t **iteratorp DNS__DB_FLARG);
+	isc_result_t (*first)(dns_rdatasetiter_t *iterator DNS__DB_FLARG);
+	isc_result_t (*next)(dns_rdatasetiter_t *iterator DNS__DB_FLARG);
+	void (*current)(dns_rdatasetiter_t	*iterator,
+			dns_rdataset_t *rdataset DNS__DB_FLARG);
 } dns_rdatasetitermethods_t;
 
 #define DNS_RDATASETITER_MAGIC	  ISC_MAGIC('D', 'N', 'S', 'i')
@@ -88,14 +90,17 @@ struct dns_rdatasetiter {
 	/* Unlocked. */
 	unsigned int		   magic;
 	dns_rdatasetitermethods_t *methods;
-	dns_db_t *		   db;
-	dns_dbnode_t *		   node;
-	dns_dbversion_t *	   version;
+	dns_db_t		  *db;
+	dns_dbnode_t		  *node;
+	dns_dbversion_t		  *version;
 	isc_stdtime_t		   now;
+	unsigned int		   options;
 };
 
+#define dns_rdatasetiter_destroy(iteratorp) \
+	dns__rdatasetiter_destroy(iteratorp DNS__DB_FILELINE)
 void
-dns_rdatasetiter_destroy(dns_rdatasetiter_t **iteratorp);
+dns__rdatasetiter_destroy(dns_rdatasetiter_t **iteratorp DNS__DB_FLARG);
 /*%<
  * Destroy '*iteratorp'.
  *
@@ -110,8 +115,10 @@ dns_rdatasetiter_destroy(dns_rdatasetiter_t **iteratorp);
  *\li	*iteratorp == NULL.
  */
 
+#define dns_rdatasetiter_first(iterator) \
+	dns__rdatasetiter_first(iterator DNS__DB_FILELINE)
 isc_result_t
-dns_rdatasetiter_first(dns_rdatasetiter_t *iterator);
+dns__rdatasetiter_first(dns_rdatasetiter_t *iterator DNS__DB_FLARG);
 /*%<
  * Move the rdataset cursor to the first rdataset at the node (if any).
  *
@@ -125,8 +132,10 @@ dns_rdatasetiter_first(dns_rdatasetiter_t *iterator);
  *\li	Other results are possible, depending on the DB implementation.
  */
 
+#define dns_rdatasetiter_next(iterator) \
+	dns__rdatasetiter_next(iterator DNS__DB_FILELINE)
 isc_result_t
-dns_rdatasetiter_next(dns_rdatasetiter_t *iterator);
+dns__rdatasetiter_next(dns_rdatasetiter_t *iterator DNS__DB_FLARG);
 /*%<
  * Move the rdataset cursor to the next rdataset at the node (if any).
  *
@@ -141,9 +150,11 @@ dns_rdatasetiter_next(dns_rdatasetiter_t *iterator);
  *\li	Other results are possible, depending on the DB implementation.
  */
 
+#define dns_rdatasetiter_current(iterator, rdataset) \
+	dns__rdatasetiter_current(iterator, rdataset DNS__DB_FILELINE)
 void
-dns_rdatasetiter_current(dns_rdatasetiter_t *iterator,
-			 dns_rdataset_t *    rdataset);
+dns__rdatasetiter_current(dns_rdatasetiter_t	  *iterator,
+			  dns_rdataset_t *rdataset DNS__DB_FLARG);
 /*%<
  * Return the current rdataset.
  *
@@ -157,5 +168,3 @@ dns_rdatasetiter_current(dns_rdatasetiter_t *iterator,
  */
 
 ISC_LANG_ENDDECLS
-
-#endif /* DNS_RDATASETITER_H */

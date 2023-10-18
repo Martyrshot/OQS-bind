@@ -1,9 +1,11 @@
 #!/usr/bin/perl
-#
+
 # Copyright (C) Internet Systems Consortium, Inc. ("ISC")
 #
+# SPDX-License-Identifier: MPL-2.0
+#
 # This Source Code Form is subject to the terms of the Mozilla Public
-# License, v. 2.0. If a copy of the MPL was not distributed with this
+# License, v. 2.0.  If a copy of the MPL was not distributed with this
 # file, you can obtain one at https://mozilla.org/MPL/2.0/.
 #
 # See the COPYRIGHT file distributed with this work for additional
@@ -14,7 +16,7 @@
 # the standard input, in the form of a series of bytes in hexadecimal.
 # Whitespace is ignored, as is anything following a '#' symbol.
 #
-# For example, the following input would generate normal query for 
+# For example, the following input would generate normal query for
 # isc.org/NS/IN":
 #
 #     # QID:

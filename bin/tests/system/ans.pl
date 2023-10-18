@@ -1,9 +1,11 @@
 #!/usr/bin/perl
-#
+
 # Copyright (C) Internet Systems Consortium, Inc. ("ISC")
 #
+# SPDX-License-Identifier: MPL-2.0
+#
 # This Source Code Form is subject to the terms of the Mozilla Public
-# License, v. 2.0. If a copy of the MPL was not distributed with this
+# License, v. 2.0.  If a copy of the MPL was not distributed with this
 # file, you can obtain one at https://mozilla.org/MPL/2.0/.
 #
 # See the COPYRIGHT file distributed with this work for additional
@@ -93,6 +95,8 @@ my $mainport = int($ENV{'PORT'});
 if (!$mainport) { $mainport = 5300; }
 my $ctrlport = int($ENV{'EXTRAPORT1'});
 if (!$ctrlport) { $ctrlport = 5301; }
+my $hmac_algorithm = $ENV{'DEFAULT_HMAC'};
+if (!defined($hmac_algorithm)) { $hmac_algorithm = "hmac-sha256"; }
 
 # XXX: we should also be able to set the port numbers to listen on.
 my $ctlsock = IO::Socket::INET->new(LocalAddr => "$server_addr",
@@ -172,6 +176,7 @@ sub handleUDP {
 				} else {
 					$tsig = Net::DNS::RR->new(
 							name => $key_name,
+							algorithm => $hmac_algorithm,
 							type => 'TSIG',
 							key  => $key_data);
 				}
@@ -200,7 +205,7 @@ sub handleUDP {
 							 $prev_tsig->mac);
 					}
 				}
-				
+
 				$packet->sign_tsig($tsig);
 			}
 			last;
@@ -248,7 +253,7 @@ sub packetlen {
 	} else {
 		($header, $offset) = Net::DNS::Header->parse(\$data);
 	}
-		
+
 	for (1 .. $header->qdcount) {
 		if ($decode) {
 			($q, $offset) =
@@ -334,7 +339,7 @@ sub handleTCP {
 		($request, $err) = new Net::DNS::Packet(\$buf, 0);
 		$err and die $err;
 	}
-	
+
 	my @questions = $request->question;
 	my $qname = $questions[0]->qname;
 	my $qtype = $questions[0]->qtype;
@@ -382,12 +387,13 @@ sub handleTCP {
 			if (defined($key_name) && defined($key_data)) {
 				my $tsig;
 				# sign the packet
-				print "  Signing the data with " . 
+				print "  Signing the data with " .
 				      "$key_name/$key_data\n";
 
 				if ($Net::DNS::VERSION < 0.69) {
 					$tsig = Net::DNS::RR->new(
 						   "$key_name TSIG $key_data");
+					$tsig->algorithm = $hmac_algorithm;
 				} elsif ($Net::DNS::VERSION >= 0.81 &&
 					 $continuation) {
 				} elsif ($Net::DNS::VERSION >= 0.75 &&
@@ -396,6 +402,7 @@ sub handleTCP {
 				} else {
 					$tsig = Net::DNS::RR->new(
 							name => $key_name,
+							algorithm => $hmac_algorithm,
 							type => 'TSIG',
 							key  => $key_data);
 				}
@@ -424,7 +431,7 @@ sub handleTCP {
 							 $prev_tsig->mac);
 					}
 				}
-				
+
 				$tsig->sign_func($signer) if defined($signer);
 				$tsig->continuation($continuation) if
 					 ($Net::DNS::VERSION >= 0.71 &&

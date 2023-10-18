@@ -1,12 +1,13 @@
-.. 
-   Copyright (C) Internet Systems Consortium, Inc. ("ISC")
-   
-   This Source Code Form is subject to the terms of the Mozilla Public
-   License, v. 2.0. If a copy of the MPL was not distributed with this
-   file, you can obtain one at https://mozilla.org/MPL/2.0/.
-   
-   See the COPYRIGHT file distributed with this work for additional
-   information regarding copyright ownership.
+.. Copyright (C) Internet Systems Consortium, Inc. ("ISC")
+..
+.. SPDX-License-Identifier: MPL-2.0
+..
+.. This Source Code Form is subject to the terms of the Mozilla Public
+.. License, v. 2.0.  If a copy of the MPL was not distributed with this
+.. file, you can obtain one at https://mozilla.org/MPL/2.0/.
+..
+.. See the COPYRIGHT file distributed with this work for additional
+.. information regarding copyright ownership.
 
 .. _dnssec_guide_introduction:
 
@@ -40,7 +41,7 @@ Who May Not Want to Read this Guide?
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
 If you are already operating a DNSSEC-signed zone, you may not learn
-much from the first half of this document, and you may want to start with 
+much from the first half of this document, and you may want to start with
 :ref:`dnssec_advanced_discussions`. If you want to
 learn about details of the protocol extension, such as data fields and flags,
 or the new record types, this document can help you get started but it
@@ -218,9 +219,9 @@ trust one key: the root key.
 .. _dnssec_12_steps:
 
 The 12-Step DNSSEC Validation Process (Simplified)
-^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
-The following example shows the 12 steps of the DNSSEC validating process 
+The following example shows the 12 steps of the DNSSEC validating process
 at a very high level, looking up the name ``www.isc.org`` :
 
 .. figure:: ../dnssec-guide/img/dnssec-12-steps.png
@@ -249,7 +250,7 @@ at a very high level, looking up the name ``www.isc.org`` :
 
     Let's take a quick break here and look at what we've got so far...
     how can our server trust this answer? If a clever attacker had taken over
-    the ``isc.org`` name server(s), or course she would send matching
+    the ``isc.org`` name server(s), of course she would send matching
     keys and signatures. We need to ask someone else to have confidence
     that we are really talking to the real ``isc.org`` name server. This
     is a critical part of DNSSEC: at some point, the DNS administrators
@@ -305,7 +306,7 @@ at a very high level, looking up the name ``www.isc.org`` :
 .. _chain_of_trust:
 
 Chain of Trust
-^^^^^^^^^^^^^^
+~~~~~~~~~~~~~~
 
 But what about the root server itself? Who do we go to verify root's
 keys? There's no parent zone for root. In security, you have to trust

@@ -1,6 +1,8 @@
 /*
  * Copyright (C) Internet Systems Consortium, Inc. ("ISC")
  *
+ * SPDX-License-Identifier: MPL-2.0
+ *
  * This Source Code Form is subject to the terms of the Mozilla Public
  * License, v. 2.0. If a copy of the MPL was not distributed with this
  * file, you can obtain one at https://mozilla.org/MPL/2.0/.
@@ -9,15 +11,13 @@
  * information regarding copyright ownership.
  */
 
-#ifndef DNSSECTOOL_H
-#define DNSSECTOOL_H 1
+#pragma once
 
 #include <inttypes.h>
 #include <stdbool.h>
 
 #include <isc/attributes.h>
 #include <isc/log.h>
-#include <isc/platform.h>
 #include <isc/stdtime.h>
 
 #include <dns/rdatastruct.h>
@@ -32,6 +32,9 @@ extern bool quiet;
 /*! program name, statically initialized in each program */
 extern const char *program;
 
+/*! journal file */
+extern const char *journal;
+
 /*!
  * List of DS digest types used by dnssec-cds and dnssec-dsfromkey,
  * defined in dnssectool.c. Filled in by add_dtype() from -a
@@ -43,12 +46,8 @@ extern uint8_t dtype[8];
 
 typedef void(fatalcallback_t)(void);
 
-#ifndef CPPCHECK
-ISC_NORETURN void
+noreturn void
 fatal(const char *format, ...) ISC_FORMAT_PRINTF(1, 2);
-#else /* CPPCHECK */
-#define fatal(...) exit(1)
-#endif
 
 void
 setfatalcallback(fatalcallback_t *callback);
@@ -59,7 +58,7 @@ check_result(isc_result_t result, const char *message);
 void
 vbprintf(int level, const char *fmt, ...) ISC_FORMAT_PRINTF(2, 3);
 
-ISC_NORETURN void
+noreturn void
 version(const char *program);
 
 void
@@ -107,4 +106,5 @@ key_collision(dst_key_t *key, dns_name_t *name, const char *dir,
 bool
 isoptarg(const char *arg, char **argv, void (*usage)(void));
 
-#endif /* DNSSEC_DNSSECTOOL_H */
+void
+loadjournal(isc_mem_t *mctx, dns_db_t *db, const char *journal);

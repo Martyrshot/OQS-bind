@@ -1,6 +1,8 @@
 /*
  * Copyright (C) Internet Systems Consortium, Inc. ("ISC")
  *
+ * SPDX-License-Identifier: MPL-2.0
+ *
  * This Source Code Form is subject to the terms of the Mozilla Public
  * License, v. 2.0. If a copy of the MPL was not distributed with this
  * file, you can obtain one at https://mozilla.org/MPL/2.0/.
@@ -17,10 +19,10 @@
 #include <stdbool.h>
 #include <string.h>
 
+#include <isc/async.h>
 #include <isc/buffer.h>
 #include <isc/hash.h>
 #include <isc/ht.h>
-#include <isc/lib.h>
 #include <isc/log.h>
 #include <isc/mem.h>
 #include <isc/netaddr.h>
@@ -28,10 +30,7 @@
 #include <isc/types.h>
 #include <isc/util.h>
 
-#include <dns/result.h>
-
 #include <ns/client.h>
-#include <ns/events.h>
 #include <ns/hooks.h>
 #include <ns/log.h>
 #include <ns/query.h>
@@ -53,7 +52,6 @@
 typedef struct async_instance {
 	ns_plugin_t *module;
 	isc_mem_t *mctx;
-	isc_mempool_t *datapool;
 	isc_ht_t *ht;
 	isc_mutex_t hlock;
 	isc_log_t *lctx;
@@ -61,7 +59,7 @@ typedef struct async_instance {
 
 typedef struct state {
 	bool async;
-	ns_hook_resevent_t *rev;
+	ns_hook_resume_t *rev;
 	ns_hookpoint_t hookpoint;
 	isc_result_t origresult;
 } state_t;
@@ -131,7 +129,6 @@ plugin_register(const char *parameters, const void *cfg, const char *cfg_file,
 		unsigned long cfg_line, isc_mem_t *mctx, isc_log_t *lctx,
 		void *actx, ns_hooktable_t *hooktable, void **instp) {
 	async_instance_t *inst = NULL;
-	isc_result_t result;
 
 	UNUSED(parameters);
 	UNUSED(cfg);
@@ -146,8 +143,7 @@ plugin_register(const char *parameters, const void *cfg, const char *cfg_file,
 	*inst = (async_instance_t){ .mctx = NULL };
 	isc_mem_attach(mctx, &inst->mctx);
 
-	isc_mempool_create(mctx, sizeof(state_t), &inst->datapool);
-	CHECK(isc_ht_init(&inst->ht, mctx, 16));
+	isc_ht_init(&inst->ht, mctx, 1, ISC_HT_CASE_SENSITIVE);
 	isc_mutex_init(&inst->hlock);
 
 	/*
@@ -158,13 +154,6 @@ plugin_register(const char *parameters, const void *cfg, const char *cfg_file,
 	*instp = inst;
 
 	return (ISC_R_SUCCESS);
-
-cleanup:
-	if (result != ISC_R_SUCCESS) {
-		plugin_destroy((void **)&inst);
-	}
-
-	return (result);
 }
 
 isc_result_t
@@ -193,9 +182,6 @@ plugin_destroy(void **instp) {
 	if (inst->ht != NULL) {
 		isc_ht_destroy(&inst->ht);
 		isc_mutex_destroy(&inst->hlock);
-	}
-	if (inst->datapool != NULL) {
-		isc_mempool_destroy(&inst->datapool);
 	}
 
 	isc_mem_putanddetach(&inst->mctx, inst, sizeof(*inst));
@@ -230,10 +216,8 @@ client_state_create(const query_ctx_t *qctx, async_instance_t *inst) {
 	state_t *state = NULL;
 	isc_result_t result;
 
-	state = isc_mempool_get(inst->datapool);
-	if (state == NULL) {
-		return;
-	}
+	state = isc_mem_get(inst->mctx, sizeof(*state));
+	*state = (state_t){ .async = false };
 
 	LOCK(&inst->hlock);
 	result = isc_ht_add(inst->ht, (const unsigned char *)&qctx->client,
@@ -257,7 +241,7 @@ client_state_destroy(const query_ctx_t *qctx, async_instance_t *inst) {
 	UNLOCK(&inst->hlock);
 	RUNTIME_CHECK(result == ISC_R_SUCCESS);
 
-	isc_mempool_put(inst->datapool, state);
+	isc_mem_put(inst->mctx, state, sizeof(*state));
 }
 
 static ns_hookresult_t
@@ -293,29 +277,31 @@ destroyasync(ns_hookasync_t **ctxp) {
 }
 
 static isc_result_t
-doasync(query_ctx_t *qctx, isc_mem_t *mctx, void *arg, isc_task_t *task,
-	isc_taskaction_t action, void *evarg, ns_hookasync_t **ctxp) {
-	ns_hook_resevent_t *rev = (ns_hook_resevent_t *)isc_event_allocate(
-		mctx, task, NS_EVENT_HOOKASYNCDONE, action, evarg,
-		sizeof(*rev));
+doasync(query_ctx_t *qctx, isc_mem_t *mctx, void *arg, isc_loop_t *loop,
+	isc_job_cb cb, void *evarg, ns_hookasync_t **ctxp) {
+	ns_hook_resume_t *rev = isc_mem_get(mctx, sizeof(*rev));
 	ns_hookasync_t *ctx = isc_mem_get(mctx, sizeof(*ctx));
 	state_t *state = (state_t *)arg;
 
 	logmsg("doasync");
-	*ctx = (ns_hookasync_t){ .mctx = NULL };
+	*ctx = (ns_hookasync_t){
+		.cancel = cancelasync,
+		.destroy = destroyasync,
+	};
 	isc_mem_attach(mctx, &ctx->mctx);
-	ctx->cancel = cancelasync;
-	ctx->destroy = destroyasync;
 
-	rev->hookpoint = state->hookpoint;
-	rev->origresult = state->origresult;
 	qctx->result = DNS_R_NOTIMP;
-	rev->saved_qctx = qctx;
-	rev->ctx = ctx;
+	*rev = (ns_hook_resume_t){
+		.hookpoint = state->hookpoint,
+		.origresult = qctx->result,
+		.saved_qctx = qctx,
+		.ctx = ctx,
+		.arg = evarg,
+	};
 
 	state->rev = rev;
 
-	isc_task_send(task, (isc_event_t **)&rev);
+	isc_async_run(loop, cb, rev);
 
 	*ctxp = ctx;
 	return (ISC_R_SUCCESS);

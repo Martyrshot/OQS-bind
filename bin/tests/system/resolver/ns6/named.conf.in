@@ -1,9 +1,11 @@
 /*
  * Copyright (C) Internet Systems Consortium, Inc. ("ISC")
  *
+ * SPDX-License-Identifier: MPL-2.0
+ *
  * This Source Code Form is subject to the terms of the Mozilla Public
- * License, v. 2.0. If a copy of the MPL was not distributed with this
- * file, You can obtain one at http://mozilla.org/MPL/2.0/.
+ * License, v. 2.0.  If a copy of the MPL was not distributed with this
+ * file, you can obtain one at https://mozilla.org/MPL/2.0/.
  *
  * See the COPYRIGHT file distributed with this work for additional
  * information regarding copyright ownership.
@@ -12,22 +14,18 @@
 // NS6
 
 options {
-	query-source address 10.53.0.6 dscp 10;
-	notify-source 10.53.0.6 dscp 11;
-	transfer-source 10.53.0.6 dscp 12;
+	query-source address 10.53.0.6;
+	notify-source 10.53.0.6;
+	transfer-source 10.53.0.6;
 	port @PORT@;
 	pid-file "named.pid";
 	listen-on { 10.53.0.6; };
-	listen-on-v6 { none; };
+	listen-on-v6 { fd92:7065:b8e:ffff::6; };
 	recursion no;
 	dnssec-validation no;
 	querylog yes;
 	statistics-file "named.stats";
-	/*
-	 * test that named loads with root-delegation-only that
-	 * has a exclude list.
-	 */
-	root-delegation-only exclude { "a"; };
+	max-udp-size 4096;
 };
 
 zone "." {
@@ -59,14 +57,19 @@ zone "broken" {
 	allow-update { any; };
 };
 
+zone "redirect.com" {
+	type primary;
+	file "redirect.com.db";
+};
+
+zone "tld1" {
+	type primary;
+	file "tld1.db";
+};
+
 zone "no-edns-version.tld" {
 	type primary;
 	file "no-edns-version.tld.db";
-};
-
-zone "delegation-only" {
-	type primary;
-	file "delegation-only.db";
 };
 
 zone "fetch.tld" {
@@ -81,7 +84,7 @@ zone "targetns" {
 
 key rndc_key {
         secret "1234abcd8765";
-        algorithm hmac-sha256;
+        algorithm @DEFAULT_HMAC@;
 };
 
 controls {

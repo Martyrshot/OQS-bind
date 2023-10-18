@@ -1,6 +1,8 @@
 /*
  * Copyright (C) Internet Systems Consortium, Inc. ("ISC")
  *
+ * SPDX-License-Identifier: MPL-2.0
+ *
  * This Source Code Form is subject to the terms of the Mozilla Public
  * License, v. 2.0. If a copy of the MPL was not distributed with this
  * file, you can obtain one at https://mozilla.org/MPL/2.0/.
@@ -23,17 +25,15 @@
 #include <sys/types.h>
 #include <unistd.h>
 
+#include <isc/loop.h>
 #include <isc/managers.h>
 #include <isc/mem.h>
 #include <isc/netaddr.h>
 #include <isc/netmgr.h>
 #include <isc/os.h>
-#include <isc/print.h>
 #include <isc/sockaddr.h>
 #include <isc/string.h>
 #include <isc/util.h>
-
-#define DEFAULT_DOH_PATH "/dns-query"
 
 typedef enum {
 	UDP,
@@ -51,6 +51,7 @@ static const char *protocols[] = { "udp",	    "tcp",
 				   "http-plain-get" };
 
 static isc_mem_t *mctx = NULL;
+static isc_loopmgr_t *loopmgr = NULL;
 static isc_nm_t *netmgr = NULL;
 
 static protocol_t protocol;
@@ -232,7 +233,7 @@ parse_options(int argc, char **argv) {
 			break;
 
 		default:
-			INSIST(0);
+			UNREACHABLE();
 		}
 	}
 
@@ -284,31 +285,8 @@ parse_options(int argc, char **argv) {
 }
 
 static void
-_signal(int sig, void (*handler)(int)) {
-	struct sigaction sa = { .sa_handler = handler };
-
-	RUNTIME_CHECK(sigfillset(&sa.sa_mask) == 0);
-	RUNTIME_CHECK(sigaction(sig, &sa, NULL) >= 0);
-}
-
-static void
 setup(void) {
-	sigset_t sset;
-
-	_signal(SIGPIPE, SIG_IGN);
-	_signal(SIGHUP, SIG_DFL);
-	_signal(SIGTERM, SIG_DFL);
-	_signal(SIGINT, SIG_DFL);
-
-	RUNTIME_CHECK(sigemptyset(&sset) == 0);
-	RUNTIME_CHECK(sigaddset(&sset, SIGHUP) == 0);
-	RUNTIME_CHECK(sigaddset(&sset, SIGINT) == 0);
-	RUNTIME_CHECK(sigaddset(&sset, SIGTERM) == 0);
-	RUNTIME_CHECK(pthread_sigmask(SIG_BLOCK, &sset, NULL) == 0);
-
-	isc_mem_create(&mctx);
-
-	isc_managers_create(mctx, workers, 0, 0, &netmgr, NULL, NULL, NULL);
+	isc_managers_create(&mctx, workers, &loopmgr, &netmgr);
 }
 
 static void
@@ -317,11 +295,11 @@ teardown(void) {
 		close(out);
 	}
 
-	isc_managers_destroy(&netmgr, NULL, NULL, NULL);
-	isc_mem_destroy(&mctx);
 	if (tls_ctx) {
 		isc_tlsctx_free(&tls_ctx);
 	}
+
+	isc_managers_destroy(&mctx, &loopmgr, &netmgr);
 }
 
 static void
@@ -393,50 +371,26 @@ connect_cb(isc_nmhandle_t *handle, isc_result_t eresult, void *cbarg) {
 }
 
 static void
-sockaddr_to_url(isc_sockaddr_t *sa, const bool https, char *outbuf,
-		size_t outbuf_len, const char *append) {
-	uint16_t sa_port;
-	char saddr[INET6_ADDRSTRLEN] = { 0 };
-	int sa_family;
-
-	if (sa == NULL || outbuf == NULL || outbuf_len == 0) {
-		return;
-	}
-
-	sa_family = ((struct sockaddr *)&sa->type.sa)->sa_family;
-
-	sa_port = ntohs(sa_family == AF_INET ? sa->type.sin.sin_port
-					     : sa->type.sin6.sin6_port);
-	inet_ntop(sa_family,
-		  sa_family == AF_INET
-			  ? (struct sockaddr *)&sa->type.sin.sin_addr
-			  : (struct sockaddr *)&sa->type.sin6.sin6_addr,
-		  saddr, sizeof(saddr));
-
-	snprintf(outbuf, outbuf_len, "%s://%s%s%s:%u%s",
-		 https ? "https" : "http", sa_family == AF_INET ? "" : "[",
-		 saddr, sa_family == AF_INET ? "" : "]", sa_port,
-		 append ? append : "");
-}
-
-static void
 run(void) {
 	switch (protocol) {
 	case UDP:
 		isc_nm_udpconnect(netmgr, &sockaddr_local, &sockaddr_remote,
-				  connect_cb, NULL, timeout, 0);
+				  connect_cb, NULL, timeout);
 		break;
 	case TCP:
-		isc_nm_tcpdnsconnect(netmgr, &sockaddr_local, &sockaddr_remote,
-				     connect_cb, NULL, timeout, 0);
+		isc_nm_streamdnsconnect(netmgr, &sockaddr_local,
+					&sockaddr_remote, connect_cb, NULL,
+					timeout, NULL, NULL);
 		break;
 	case DOT: {
 		isc_tlsctx_createclient(&tls_ctx);
 
-		isc_nm_tlsdnsconnect(netmgr, &sockaddr_local, &sockaddr_remote,
-				     connect_cb, NULL, timeout, 0, tls_ctx);
+		isc_nm_streamdnsconnect(netmgr, &sockaddr_local,
+					&sockaddr_remote, connect_cb, NULL,
+					timeout, tls_ctx, NULL);
 		break;
 	}
+#if HAVE_LIBNGHTTP2
 	case HTTP_GET:
 	case HTTPS_GET:
 	case HTTPS_POST:
@@ -446,18 +400,19 @@ run(void) {
 		bool is_post = (protocol == HTTPS_POST ||
 				protocol == HTTP_POST);
 		char req_url[256];
-		sockaddr_to_url(&sockaddr_remote, is_https, req_url,
-				sizeof(req_url), DEFAULT_DOH_PATH);
+		isc_nm_http_makeuri(is_https, &sockaddr_remote, NULL, 0,
+				    ISC_NM_HTTP_DEFAULT_PATH, req_url,
+				    sizeof(req_url));
 		if (is_https) {
 			isc_tlsctx_createclient(&tls_ctx);
 		}
 		isc_nm_httpconnect(netmgr, &sockaddr_local, &sockaddr_remote,
 				   req_url, is_post, connect_cb, NULL, tls_ctx,
-				   timeout, 0);
+				   NULL, timeout);
 	} break;
+#endif
 	default:
-		INSIST(0);
-		ISC_UNREACHABLE();
+		UNREACHABLE();
 	}
 
 	waitforsignal();

@@ -1,9 +1,11 @@
 #!/usr/bin/perl
-#
+
 # Copyright (C) Internet Systems Consortium, Inc. ("ISC")
 #
+# SPDX-License-Identifier: MPL-2.0
+#
 # This Source Code Form is subject to the terms of the Mozilla Public
-# License, v. 2.0. If a copy of the MPL was not distributed with this
+# License, v. 2.0.  If a copy of the MPL was not distributed with this
 # file, you can obtain one at https://mozilla.org/MPL/2.0/.
 #
 # See the COPYRIGHT file distributed with this work for additional
@@ -29,7 +31,7 @@ print"\$TTL 300	; 5 minutes
 			NS	ns
 ns			A	10.53.0.3\n";
 
-srand; 
+srand;
 for (my $i = 0; $i < $nrecords; $i++) {
         my $name = "";
         for (my $j = 0; $j < 8; $j++) {

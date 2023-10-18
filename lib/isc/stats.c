@@ -1,6 +1,8 @@
 /*
  * Copyright (C) Internet Systems Consortium, Inc. ("ISC")
  *
+ * SPDX-License-Identifier: MPL-2.0
+ *
  * This Source Code Form is subject to the terms of the Mozilla Public
  * License, v. 2.0. If a copy of the MPL was not distributed with this
  * file, you can obtain one at https://mozilla.org/MPL/2.0/.
@@ -18,8 +20,6 @@
 #include <isc/buffer.h>
 #include <isc/magic.h>
 #include <isc/mem.h>
-#include <isc/platform.h>
-#include <isc/print.h>
 #include <isc/refcount.h>
 #include <isc/stats.h>
 #include <isc/util.h>
@@ -36,29 +36,6 @@ struct isc_stats {
 	int ncounters;
 	isc__atomic_statcounter_t *counters;
 };
-
-static isc_result_t
-create_stats(isc_mem_t *mctx, int ncounters, isc_stats_t **statsp) {
-	isc_stats_t *stats;
-	size_t counters_alloc_size;
-
-	REQUIRE(statsp != NULL && *statsp == NULL);
-
-	stats = isc_mem_get(mctx, sizeof(*stats));
-	counters_alloc_size = sizeof(isc__atomic_statcounter_t) * ncounters;
-	stats->counters = isc_mem_get(mctx, counters_alloc_size);
-	isc_refcount_init(&stats->references, 1);
-	for (int i = 0; i < ncounters; i++) {
-		atomic_init(&stats->counters[i], 0);
-	}
-	stats->mctx = NULL;
-	isc_mem_attach(mctx, &stats->mctx);
-	stats->ncounters = ncounters;
-	stats->magic = ISC_STATS_MAGIC;
-	*statsp = stats;
-
-	return (ISC_R_SUCCESS);
-}
 
 void
 isc_stats_attach(isc_stats_t *stats, isc_stats_t **statsp) {
@@ -80,9 +57,8 @@ isc_stats_detach(isc_stats_t **statsp) {
 
 	if (isc_refcount_decrement(&stats->references) == 1) {
 		isc_refcount_destroy(&stats->references);
-		isc_mem_put(stats->mctx, stats->counters,
-			    sizeof(isc__atomic_statcounter_t) *
-				    stats->ncounters);
+		isc_mem_cput(stats->mctx, stats->counters, stats->ncounters,
+			     sizeof(isc__atomic_statcounter_t));
 		isc_mem_putanddetach(&stats->mctx, stats, sizeof(*stats));
 	}
 }
@@ -94,11 +70,23 @@ isc_stats_ncounters(isc_stats_t *stats) {
 	return (stats->ncounters);
 }
 
-isc_result_t
+void
 isc_stats_create(isc_mem_t *mctx, isc_stats_t **statsp, int ncounters) {
 	REQUIRE(statsp != NULL && *statsp == NULL);
 
-	return (create_stats(mctx, ncounters, statsp));
+	isc_stats_t *stats = isc_mem_get(mctx, sizeof(*stats));
+	size_t counters_alloc_size = sizeof(isc__atomic_statcounter_t) *
+				     ncounters;
+	stats->counters = isc_mem_get(mctx, counters_alloc_size);
+	isc_refcount_init(&stats->references, 1);
+	for (int i = 0; i < ncounters; i++) {
+		atomic_init(&stats->counters[i], 0);
+	}
+	stats->mctx = NULL;
+	isc_mem_attach(mctx, &stats->mctx);
+	stats->ncounters = ncounters;
+	stats->magic = ISC_STATS_MAGIC;
+	*statsp = stats;
 }
 
 void
@@ -113,7 +101,11 @@ void
 isc_stats_decrement(isc_stats_t *stats, isc_statscounter_t counter) {
 	REQUIRE(ISC_STATS_VALID(stats));
 	REQUIRE(counter < stats->ncounters);
+#if ISC_STATS_CHECKUNDERFLOW
+	REQUIRE(atomic_fetch_sub_release(&stats->counters[counter], 1) > 0);
+#else
 	atomic_fetch_sub_release(&stats->counters[counter], 1);
+#endif
 }
 
 void
@@ -162,4 +154,36 @@ isc_stats_get_counter(isc_stats_t *stats, isc_statscounter_t counter) {
 	REQUIRE(counter < stats->ncounters);
 
 	return (atomic_load_acquire(&stats->counters[counter]));
+}
+
+void
+isc_stats_resize(isc_stats_t **statsp, int ncounters) {
+	isc_stats_t *stats;
+	size_t counters_alloc_size;
+	isc__atomic_statcounter_t *newcounters;
+
+	REQUIRE(statsp != NULL && *statsp != NULL);
+	REQUIRE(ISC_STATS_VALID(*statsp));
+	REQUIRE(ncounters > 0);
+
+	stats = *statsp;
+	if (stats->ncounters >= ncounters) {
+		/* We already have enough counters. */
+		return;
+	}
+
+	/* Grow number of counters. */
+	counters_alloc_size = sizeof(isc__atomic_statcounter_t) * ncounters;
+	newcounters = isc_mem_get(stats->mctx, counters_alloc_size);
+	for (int i = 0; i < ncounters; i++) {
+		atomic_init(&newcounters[i], 0);
+	}
+	for (int i = 0; i < stats->ncounters; i++) {
+		uint32_t counter = atomic_load_acquire(&stats->counters[i]);
+		atomic_store_release(&newcounters[i], counter);
+	}
+	isc_mem_cput(stats->mctx, stats->counters, stats->ncounters,
+		     sizeof(isc__atomic_statcounter_t));
+	stats->counters = newcounters;
+	stats->ncounters = ncounters;
 }

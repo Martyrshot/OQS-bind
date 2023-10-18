@@ -1,9 +1,11 @@
 /*
  * Copyright (C) Internet Systems Consortium, Inc. ("ISC")
  *
+ * SPDX-License-Identifier: MPL-2.0
+ *
  * This Source Code Form is subject to the terms of the Mozilla Public
- * License, v. 2.0. If a copy of the MPL was not distributed with this
- * file, You can obtain one at http://mozilla.org/MPL/2.0/.
+ * License, v. 2.0.  If a copy of the MPL was not distributed with this
+ * file, you can obtain one at https://mozilla.org/MPL/2.0/.
  *
  * See the COPYRIGHT file distributed with this work for additional
  * information regarding copyright ownership.
@@ -20,15 +22,23 @@ options {
 	notify no;
 	session-keyfile "session.key";
 	servfail-ttl 0;
+	dnssec-validation no;
 };
 
 key rndc_key {
 	secret "1234abcd8765";
-	algorithm hmac-sha256;
+	algorithm @DEFAULT_HMAC@;
 };
 
 controls {
 	inet 10.53.0.1 port @CONTROLPORT@ allow { any; } keys { rndc_key; };
+};
+
+dnssec-policy "masterformat" {
+	keys {
+		ksk key-directory lifetime unlimited algorithm @DEFAULT_ALGORITHM@;
+		zsk key-directory lifetime unlimited algorithm @DEFAULT_ALGORITHM@;
+	};
 };
 
 zone "example" {
@@ -77,9 +87,9 @@ zone "large" {
 
 zone "signed" {
 	type primary;
-	file "signed.db.map";
-	masterfile-format map;
+	file "signed.db.raw";
+	masterfile-format raw;
 	allow-transfer { any; };
 	update-policy local;
-	auto-dnssec maintain;
+	dnssec-policy masterformat;
 };

@@ -1,13 +1,17 @@
 #!/bin/sh
-#
+
 # Copyright (C) Internet Systems Consortium, Inc. ("ISC")
 #
+# SPDX-License-Identifier: MPL-2.0
+#
 # This Source Code Form is subject to the terms of the Mozilla Public
-# License, v. 2.0. If a copy of the MPL was not distributed with this
+# License, v. 2.0.  If a copy of the MPL was not distributed with this
 # file, you can obtain one at https://mozilla.org/MPL/2.0/.
 #
 # See the COPYRIGHT file distributed with this work for additional
 # information regarding copyright ownership.
+
+set -e
 
 . ../conf.sh
 
@@ -25,7 +29,7 @@ $DIG $DIGOPTS a.good. @10.53.0.3 a > dig.out.good || ret=1
 grep "status: NOERROR" dig.out.good > /dev/null || ret=1
 grep "flags:[^;]* ad[ ;]" dig.out.good > /dev/null || ret=1
 if [ $ret != 0 ]; then echo_i "failed"; fi
-status=`expr $status + $ret`
+status=$((status + ret))
 
 # Check the bad. domain
 
@@ -34,7 +38,7 @@ ret=0
 $DIG $DIGOPTS a.bad. @10.53.0.3 a > dig.out.bad || ret=1
 grep "SERVFAIL" dig.out.bad > /dev/null || ret=1
 if [ $ret != 0 ]; then echo_i "failed"; fi
-status=`expr $status + $ret`
+status=$((status + ret))
 
 echo_i "checking that validation with no supported digest algorithms results in insecure"
 ret=0
@@ -45,7 +49,7 @@ $DIG $DIGOPTS a.bad. @10.53.0.4 a > dig.out.insecure || ret=1
 grep "NOERROR" dig.out.insecure > /dev/null || ret=1
 grep "flags:[^;]* ad[ ;]" dig.out.insecure > /dev/null && ret=1
 if [ $ret != 0 ]; then echo_i "failed"; fi
-status=`expr $status + $ret`
+status=$((status + ret))
 echo_i "exit status: $status"
 
 [ $status -eq 0 ] || exit 1

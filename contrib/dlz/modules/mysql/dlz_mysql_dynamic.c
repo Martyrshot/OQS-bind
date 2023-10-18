@@ -1,45 +1,30 @@
 /*
- * Copyright (C) 2002 Stichting NLnet, Netherlands, stichting@nlnet.nl.
+ * Copyright (C) Internet Systems Consortium, Inc. ("ISC")
  *
- * Permission to use, copy, modify, and distribute this software for any
- * purpose with or without fee is hereby granted, provided that the
- * above copyright notice and this permission notice appear in all
- * copies.
- *
- * THE SOFTWARE IS PROVIDED "AS IS" AND STICHTING NLNET
- * DISCLAIMS ALL WARRANTIES WITH REGARD TO THIS SOFTWARE INCLUDING ALL
- * IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS. IN NO EVENT SHALL
- * STICHTING NLNET BE LIABLE FOR ANY SPECIAL, DIRECT, INDIRECT, OR
- * CONSEQUENTIAL DAMAGES OR ANY DAMAGES WHATSOEVER RESULTING FROM LOSS
- * OF USE, DATA OR PROFITS, WHETHER IN AN ACTION OF CONTRACT, NEGLIGENCE
- * OR OTHER TORTIOUS ACTION, ARISING OUT OF OR IN CONNECTION WITH THE
- * USE OR PERFORMANCE OF THIS SOFTWARE.
- *
- * The development of Dynamically Loadable Zones (DLZ) for BIND 9 was
- * conceived and contributed by Rob Butler.
- *
- * Permission to use, copy, modify, and distribute this software for any
- * purpose with or without fee is hereby granted, provided that the
- * above copyright notice and this permission notice appear in all
- * copies.
- *
- * THE SOFTWARE IS PROVIDED "AS IS" AND ROB BUTLER
- * DISCLAIMS ALL WARRANTIES WITH REGARD TO THIS SOFTWARE INCLUDING ALL
- * IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS. IN NO EVENT SHALL
- * ROB BUTLER BE LIABLE FOR ANY SPECIAL, DIRECT, INDIRECT, OR
- * CONSEQUENTIAL DAMAGES OR ANY DAMAGES WHATSOEVER RESULTING FROM LOSS
- * OF USE, DATA OR PROFITS, WHETHER IN AN ACTION OF CONTRACT, NEGLIGENCE
- * OR OTHER TORTIOUS ACTION, ARISING OUT OF OR IN CONNECTION WITH THE
- * USE OR PERFORMANCE OF THIS SOFTWARE.
- */
-
-/*
- * Copyright (C) 1999-2001, 2013, 2016  Internet Systems Consortium, Inc.
- * ("ISC")
+ * SPDX-License-Identifier: MPL-2.0 and ISC
  *
  * This Source Code Form is subject to the terms of the Mozilla Public
  * License, v. 2.0. If a copy of the MPL was not distributed with this
- * file, You can obtain one at http://mozilla.org/MPL/2.0/.
+ * file, you can obtain one at https://mozilla.org/MPL/2.0/.
+ */
+
+/*
+ * Copyright (C) 2002 Stichting NLnet, Netherlands, stichting@nlnet.nl.
+ *
+ * The development of Dynamically Loadable Zones (DLZ) for Bind 9 was
+ * conceived and contributed by Rob Butler.
+ *
+ * Permission to use, copy, modify, and distribute this software for any purpose
+ * with or without fee is hereby granted, provided that the above copyright
+ * notice and this permission notice appear in all copies.
+ *
+ * THE SOFTWARE IS PROVIDED "AS IS" AND THE AUTHOR DISCLAIMS ALL WARRANTIES WITH
+ * REGARD TO THIS SOFTWARE INCLUDING ALL IMPLIED WARRANTIES OF MERCHANTABILITY
+ * AND FITNESS. IN NO EVENT SHALL THE AUTHOR BE LIABLE FOR ANY SPECIAL, DIRECT,
+ * INDIRECT, OR CONSEQUENTIAL DAMAGES OR ANY DAMAGES WHATSOEVER RESULTING FROM
+ * LOSS OF USE, DATA OR PROFITS, WHETHER IN AN ACTION OF CONTRACT, NEGLIGENCE OR
+ * OTHER TORTIOUS ACTION, ARISING OUT OF OR IN CONNECTION WITH THE USE OR
+ * PERFORMANCE OF THIS SOFTWARE.
  */
 
 /*
@@ -59,9 +44,9 @@
 #include <dlz_minimal.h>
 #include <dlz_pthread.h>
 
-#if !defined(LIBMARIADB) && MYSQL_VERSION_ID >= 80000
+#if !defined(MARIADB_BASE_VERSION) && MYSQL_VERSION_ID >= 80000
 typedef bool my_bool;
-#endif /* !defined(LIBMARIADB) && MYSQL_VERSION_ID >= 80000 */
+#endif /* !defined(MARIADB_BASE_VERSION) && MYSQL_VERSION_ID >= 80000 */
 
 #define dbc_search_limit 30
 #define ALLNODES	 1
@@ -79,12 +64,8 @@ typedef bool my_bool;
  * many separate instances.
  */
 typedef struct {
-#if PTHREADS
 	db_list_t *db; /*%< handle to a list of DB */
 	int dbcount;
-#else  /* if PTHREADS */
-	dbinstance_t *db; /*%< handle to DB */
-#endif /* if PTHREADS */
 
 	unsigned int flags;
 	char *dbname;
@@ -116,8 +97,8 @@ b9_add_helper(mysql_instance_t *db, const char *helper_name, void *ptr);
  * Private methods
  */
 
-void
-mysql_destroy(dbinstance_t *db) {
+static void
+dlz_mysql_destroy(dbinstance_t *db) {
 	/* release DB connection */
 	if (db->dbconn != NULL) {
 		mysql_close((MYSQL *)db->dbconn);
@@ -127,14 +108,13 @@ mysql_destroy(dbinstance_t *db) {
 	destroy_dbinstance(db);
 }
 
-#if PTHREADS
 /*%
  * Properly cleans up a list of database instances.
  * This function is only used when the module is compiled for
  * multithreaded operation.
  */
 static void
-mysql_destroy_dblist(db_list_t *dblist) {
+dlz_mysql_destroy_dblist(db_list_t *dblist) {
 	dbinstance_t *ndbi = NULL;
 	dbinstance_t *dbi = NULL;
 
@@ -143,7 +123,7 @@ mysql_destroy_dblist(db_list_t *dblist) {
 		dbi = ndbi;
 		ndbi = DLZ_LIST_NEXT(dbi, link);
 
-		mysql_destroy(dbi);
+		dlz_mysql_destroy(dbi);
 	}
 
 	/* release memory for the list structure */
@@ -190,7 +170,6 @@ mysql_find_avail_conn(mysql_instance_t *mysql) {
 		   count);
 	return (NULL);
 }
-#endif /* PTHREADS */
 
 /*%
  * Allocates memory for a new string, and then constructs the new
@@ -239,16 +218,8 @@ mysql_get_resultset(const char *zone, const char *record, const char *client,
 	unsigned int j = 0;
 	int qres = 0;
 
-#if PTHREADS
 	/* find an available DBI from the list */
 	dbi = mysql_find_avail_conn(db);
-#else  /* PTHREADS */
-	/*
-	 * only 1 DBI - no need to lock instance lock either
-	 * only 1 thread in the whole process, no possible contention.
-	 */
-	dbi = (dbinstance_t *)(db->db);
-#endif /* PTHREADS */
 
 	if (dbi == NULL) {
 		return (ISC_R_FAILURE);
@@ -497,8 +468,9 @@ mysql_process_rs(mysql_instance_t *db, dns_sdlzlookup_t *lookup,
 			 * ones together.  figure out how long to make
 			 * string.
 			 */
-			for (j = 2; j < fields; j++)
+			for (j = 2; j < fields; j++) {
 				len += strlen(safeGet(row[j])) + 1;
+			}
 
 			/*
 			 * allocate string memory, allow for NULL to
@@ -697,8 +669,9 @@ dlz_allnodes(const char *zone, void *dbdata, dns_sdlzallnodes_t *allnodes) {
 			 * more than 4 fields, concatenate the last
 			 * ones together.
 			 */
-			for (j = 3; j < fields; j++)
+			for (j = 3; j < fields; j++) {
 				len += strlen(safeGet(row[j])) + 1;
+			}
 
 			tmpString = malloc(len + 1);
 			if (tmpString == NULL) {
@@ -813,13 +786,9 @@ dlz_create(const char *dlzname, unsigned int argc, char *argv[], void **dbdata,
 	dbinstance_t *dbi = NULL;
 	MYSQL *dbc;
 	char *tmp = NULL;
-	char *endp;
-	int j;
+	char *endp = NULL;
 	const char *helper_name;
-#if PTHREADS
-	int dbcount;
-	int i;
-#endif /* PTHREADS */
+	int dbcount, i, j;
 	va_list ap;
 
 	UNUSED(dlzname);
@@ -838,13 +807,8 @@ dlz_create(const char *dlzname, unsigned int argc, char *argv[], void **dbdata,
 	}
 	va_end(ap);
 
-#if PTHREADS
 	/* if debugging, let user know we are multithreaded. */
 	mysql->log(ISC_LOG_DEBUG(1), "MySQL module running multithreaded");
-#else  /* PTHREADS */
-	/* if debugging, let user know we are single threaded. */
-	mysql->log(ISC_LOG_DEBUG(1), "MySQL module running single threaded");
-#endif /* PTHREADS */
 
 	/* verify we have at least 4 arg's passed to the module */
 	if (argc < 4) {
@@ -916,7 +880,6 @@ dlz_create(const char *dlzname, unsigned int argc, char *argv[], void **dbdata,
 		free(tmp);
 	}
 
-#if PTHREADS
 	/* multithreaded build can have multiple DB connections */
 	tmp = get_parameter_value(argv[1], "threads=");
 	if (tmp == NULL) {
@@ -949,7 +912,6 @@ dlz_create(const char *dlzname, unsigned int argc, char *argv[], void **dbdata,
 	 * append each new DBI to the end of the list
 	 */
 	for (i = 0; i < dbcount; i++) {
-#endif /* PTHREADS */
 		switch (argc) {
 		case 4:
 			result = build_dbinstance(NULL, NULL, NULL, argv[2],
@@ -988,17 +950,9 @@ dlz_create(const char *dlzname, unsigned int argc, char *argv[], void **dbdata,
 			goto cleanup;
 		}
 
-#if PTHREADS
 		/* when multithreaded, build a list of DBI's */
 		DLZ_LINK_INIT(dbi, link);
 		DLZ_LIST_APPEND(*(mysql->db), dbi, link);
-#else  /* if PTHREADS */
-	/*
-	 * when single threaded, hold onto the one connection
-	 * instance.
-	 */
-	mysql->db = dbi;
-#endif /* if PTHREADS */
 
 		/* create and set db connection */
 		dbi->dbconn = mysql_init(NULL);
@@ -1044,11 +998,9 @@ dlz_create(const char *dlzname, unsigned int argc, char *argv[], void **dbdata,
 			goto cleanup;
 		}
 
-#if PTHREADS
 		/* set DBI = null for next loop through. */
 		dbi = NULL;
 	}
-#endif /* PTHREADS */
 
 	*dbdata = mysql;
 
@@ -1066,14 +1018,11 @@ cleanup:
 void
 dlz_destroy(void *dbdata) {
 	mysql_instance_t *db = (mysql_instance_t *)dbdata;
-#if PTHREADS
+
 	/* cleanup the list of DBI's */
 	if (db->db != NULL) {
-		mysql_destroy_dblist((db_list_t *)(db->db));
+		dlz_mysql_destroy_dblist((db_list_t *)(db->db));
 	}
-#else  /* PTHREADS */
-	mysql_destroy(db);
-#endif /* PTHREADS */
 
 	if (db->dbname != NULL) {
 		free(db->dbname);

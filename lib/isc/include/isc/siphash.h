@@ -1,6 +1,8 @@
 /*
  * Copyright (C) Internet Systems Consortium, Inc. ("ISC")
  *
+ * SPDX-License-Identifier: MPL-2.0
+ *
  * This Source Code Form is subject to the terms of the Mozilla Public
  * License, v. 2.0. If a copy of the MPL was not distributed with this
  * file, you can obtain one at https://mozilla.org/MPL/2.0/.
@@ -14,7 +16,6 @@
 #pragma once
 
 #include <isc/lang.h>
-#include <isc/platform.h>
 #include <isc/types.h>
 
 #define ISC_SIPHASH24_KEY_LENGTH 128 / 8
@@ -27,9 +28,9 @@ ISC_LANG_BEGINDECLS
 
 void
 isc_siphash24(const uint8_t *key, const uint8_t *in, const size_t inlen,
-	      uint8_t *out);
+	      bool case_sensitive, uint8_t *out);
 void
 isc_halfsiphash24(const uint8_t *key, const uint8_t *in, const size_t inlen,
-		  uint8_t *out);
+		  bool case_sensitive, uint8_t *out);
 
 ISC_LANG_ENDDECLS

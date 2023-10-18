@@ -1,9 +1,11 @@
 /*
  * Copyright (C) Internet Systems Consortium, Inc. ("ISC")
  *
+ * SPDX-License-Identifier: MPL-2.0
+ *
  * This Source Code Form is subject to the terms of the Mozilla Public
- * License, v. 2.0. If a copy of the MPL was not distributed with this
- * file, You can obtain one at http://mozilla.org/MPL/2.0/.
+ * License, v. 2.0.  If a copy of the MPL was not distributed with this
+ * file, you can obtain one at https://mozilla.org/MPL/2.0/.
  *
  * See the COPYRIGHT file distributed with this work for additional
  * information regarding copyright ownership.
@@ -29,6 +31,7 @@ options {
 	notify yes;
 	notify-delay 0;
 	allow-new-zones yes;
+	dnssec-validation no;
 };
 
 zone "bits" {
@@ -44,30 +47,10 @@ zone "retransfer" {
 	notify no;
 };
 
-zone "retransfer3" {
-	type primary;
-	file "retransfer3.db";
-	allow-update { any; };
-	allow-transfer { none; };	// changed dynamically by tests.sh
-	notify no;
-};
-
 zone "nsec3-loop" {
 	type primary;
 	file "nsec3-loop.db";
 	notify no;
-};
-
-zone "inactiveksk" {
-	type primary;
-	file "inactiveksk.db";
-	allow-update { any; };
-};
-
-zone "inactivezsk" {
-	type primary;
-	file "inactivezsk.db";
-	allow-update { any; };
 };
 
 zone "nokeys" {

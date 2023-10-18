@@ -1,6 +1,8 @@
 /*
  * Copyright (C) Internet Systems Consortium, Inc. ("ISC")
  *
+ * SPDX-License-Identifier: MPL-2.0
+ *
  * This Source Code Form is subject to the terms of the Mozilla Public
  * License, v. 2.0. If a copy of the MPL was not distributed with this
  * file, you can obtain one at https://mozilla.org/MPL/2.0/.
@@ -9,16 +11,15 @@
  * information regarding copyright ownership.
  */
 
-#ifndef ISC_FILE_H
-#define ISC_FILE_H 1
+#pragma once
 
 /*! \file isc/file.h */
 
 #include <stdbool.h>
 #include <stdio.h>
+#include <sys/stat.h>
 
 #include <isc/lang.h>
-#include <isc/stat.h>
 #include <isc/types.h>
 
 ISC_LANG_BEGINDECLS
@@ -101,16 +102,8 @@ isc_result_t
 isc_file_openuniqueprivate(char *templet, FILE **fp);
 isc_result_t
 isc_file_openuniquemode(char *templet, int mode, FILE **fp);
-isc_result_t
-isc_file_bopenunique(char *templet, FILE **fp);
-isc_result_t
-isc_file_bopenuniqueprivate(char *templet, FILE **fp);
-isc_result_t
-isc_file_bopenuniquemode(char *templet, int mode, FILE **fp);
 /*!<
  * \brief Create and open a file with a unique name based on 'templet'.
- *	isc_file_bopen*() open the file in binary mode in Windows.
- *	isc_file_open*() open the file in text mode in Windows.
  *
  * Notes:
  *\li	'template' is a reserved work in C++.  If you want to complain
@@ -294,7 +287,7 @@ isc_file_absolutepath(const char *filename, char *path, size_t pathlen);
  */
 
 isc_result_t
-isc_file_truncate(const char *filename, isc_offset_t size);
+isc_file_truncate(const char *filename, off_t size);
 /*%<
  * Truncate/extend the file specified to 'size' bytes.
  */
@@ -311,8 +304,8 @@ isc_result_t
 isc_file_splitpath(isc_mem_t *mctx, const char *path, char **dirname,
 		   char const **basename);
 /*%<
- * Split a path into dirname and basename.  If 'path' contains no slash
- * (or, on windows, backslash), then '*dirname' is set to ".".
+ * Split a path into dirname and basename.  If 'path' contains no slash,
+ * then '*dirname' is set to ".".
  *
  * Allocates memory for '*dirname', which can be freed with isc_mem_free().
  *
@@ -340,22 +333,6 @@ isc_file_getsizefd(int fd, off_t *size);
  *
  * Returns:
  * - ISC_R_SUCCESS on success
- */
-
-void *
-isc_file_mmap(void *addr, size_t len, int prot, int flags, int fd,
-	      off_t offset);
-/*%<
- * Portable front-end to mmap().  If mmap() is not defined on this
- * platform, then we simulate it by calling malloc() and read().
- * (In this event, the addr, prot, and flags parameters are ignored).
- */
-
-int
-isc_file_munmap(void *addr, size_t len);
-/*%<
- * Portable front-end to munmap().  If munmap() is not defined on
- * this platform, then we simply free the memory.
  */
 
 isc_result_t
@@ -394,5 +371,3 @@ isc_file_isdirwritable(const char *path);
  */
 
 ISC_LANG_ENDDECLS
-
-#endif /* ISC_FILE_H */

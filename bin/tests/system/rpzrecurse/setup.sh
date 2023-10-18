@@ -1,9 +1,11 @@
 #!/bin/sh
-#
+
 # Copyright (C) Internet Systems Consortium, Inc. ("ISC")
 #
+# SPDX-License-Identifier: MPL-2.0
+#
 # This Source Code Form is subject to the terms of the Mozilla Public
-# License, v. 2.0. If a copy of the MPL was not distributed with this
+# License, v. 2.0.  If a copy of the MPL was not distributed with this
 # file, you can obtain one at https://mozilla.org/MPL/2.0/.
 #
 # See the COPYRIGHT file distributed with this work for additional
@@ -25,7 +27,7 @@ while getopts "DNx" c; do
 	*) echo "$USAGE" 1>&2; exit 1;;
     esac
 done
-shift `expr $OPTIND - 1 || true`
+shift $((OPTIND - 1))
 if test "$#" -ne 0; then
     echo "$USAGE" 1>&2
     exit 1
@@ -44,6 +46,11 @@ copy_setports ns3/named1.conf.in ns3/named.conf
 
 copy_setports ns4/named.conf.in ns4/named.conf
 
+# decide whether to test DNSRPS
+$SHELL ../ckdnsrps.sh $TEST_DNSRPS $DEBUG
+test -z "$(grep 'dnsrps-enable yes' dnsrps.conf)" && TEST_DNSRPS=
+touch dnsrps.cache
+
 # setup policy zones for a 64-zone test
 i=1
 while test $i -le 64
@@ -57,29 +64,7 @@ do
     while test $j -le $i
     do
 	echo "name$j A 10.53.0.$i" >> ns2/db.max$i.local
-	j=`expr $j + 1`
+	j=$((j + 1))
     done
-    i=`expr $i + 1`
+    i=$((i + 1))
 done
-
-# decide whether to test DNSRPS
-$SHELL ../ckdnsrps.sh $TEST_DNSRPS $DEBUG
-test -z "`grep 'dnsrps-enable yes' dnsrps.conf`" && TEST_DNSRPS=
-
-CWD=`pwd`
-cat <<EOF >dnsrpzd.conf
-PID-FILE $CWD/dnsrpzd.pid;
-
-include $CWD/dnsrpzd-license-cur.conf
-
-zone "policy" { type master; file "`pwd`/ns3/policy.db"; };
-EOF
-sed -n -e 's/^ *//' -e "/zone.*.*master/s@file \"@&$CWD/ns2/@p" ns2/*.conf \
-    >>dnsrpzd.conf
-
-# Run dnsrpzd to get the license and prime the static policy zones
-if test -n "$TEST_DNSRPS"; then
-    DNSRPZD="`../rpz/dnsrps -p`"
-    "$DNSRPZD" -D./dnsrpzd.rpzf -S./dnsrpzd.sock -C./dnsrpzd.conf \
-		-w 0 -dddd -L stdout >./dnsrpzd.run 2>&1
-fi

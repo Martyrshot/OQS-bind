@@ -1,6 +1,8 @@
 /*
  * Copyright (C) Internet Systems Consortium, Inc. ("ISC")
  *
+ * SPDX-License-Identifier: MPL-2.0
+ *
  * This Source Code Form is subject to the terms of the Mozilla Public
  * License, v. 2.0. If a copy of the MPL was not distributed with this
  * file, you can obtain one at https://mozilla.org/MPL/2.0/.
@@ -9,8 +11,7 @@
  * information regarding copyright ownership.
  */
 
-#ifndef ISC_REGEX_H
-#define ISC_REGEX_H 1
+#pragma once
 
 /*! \file isc/regex.h */
 
@@ -30,5 +31,3 @@ isc_regex_validate(const char *expression);
  */
 
 ISC_LANG_ENDDECLS
-
-#endif /* ISC_REGEX_H */

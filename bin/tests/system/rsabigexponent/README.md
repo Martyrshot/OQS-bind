@@ -1,6 +1,13 @@
 Copyright (C) Internet Systems Consortium, Inc. ("ISC")
 
-See COPYRIGHT in the source root or https://isc.org/copyright.html for terms.
+SPDX-License-Identifier: MPL-2.0
+
+This Source Code Form is subject to the terms of the Mozilla Public
+License, v. 2.0.  If a copy of the MPL was not distributed with this
+file, you can obtain one at https://mozilla.org/MPL/2.0/.
+
+See the COPYRIGHT file distributed with this work for additional
+information regarding copyright ownership.
 
 The `rsabigexponent` test is used to `check max-rsa-exponent-size`.
 
@@ -22,3 +29,11 @@ Do **not** remove `bigkey.c` as it may be needed to generate a new
 
 `bigkey` is used to both test that we are not running under PKCS#11 and
 generate a `DNSKEY` key with a large RSA exponent.
+
+To regenerate `ns2/example.db.bad` comment out the range test in
+opensslrsa_parse before signing the zone with a ZSK key generated
+by `bigkey`.
+
+        if (BN_num_bits(e) > RSA_MAX_PUBEXP_BITS) {
+                DST_RET(ISC_R_RANGE);
+        }

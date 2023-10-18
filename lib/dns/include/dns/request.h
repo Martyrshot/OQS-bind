@@ -1,6 +1,8 @@
 /*
  * Copyright (C) Internet Systems Consortium, Inc. ("ISC")
  *
+ * SPDX-License-Identifier: MPL-2.0
+ *
  * This Source Code Form is subject to the terms of the Mozilla Public
  * License, v. 2.0. If a copy of the MPL was not distributed with this
  * file, you can obtain one at https://mozilla.org/MPL/2.0/.
@@ -9,8 +11,7 @@
  * information regarding copyright ownership.
  */
 
-#ifndef DNS_REQUEST_H
-#define DNS_REQUEST_H 1
+#pragma once
 
 /*****
 ***** Module Info
@@ -35,27 +36,23 @@
 
 #include <stdbool.h>
 
-#include <isc/event.h>
+#include <isc/job.h>
 #include <isc/lang.h>
+#include <isc/tls.h>
 
 #include <dns/types.h>
+
+#undef DNS_REQUEST_TRACE
 
 #define DNS_REQUESTOPT_TCP     0x00000001U
 #define DNS_REQUESTOPT_CASE    0x00000002U
 #define DNS_REQUESTOPT_FIXEDID 0x00000004U
-#define DNS_REQUESTOPT_SHARE   0x00000008U
-
-typedef struct dns_requestevent {
-	ISC_EVENT_COMMON(struct dns_requestevent);
-	isc_result_t   result;
-	dns_request_t *request;
-} dns_requestevent_t;
+#define DNS_REQUESTOPT_LARGE   0x00000008U
 
 ISC_LANG_BEGINDECLS
 
 isc_result_t
-dns_requestmgr_create(isc_mem_t *mctx, isc_timermgr_t *timermgr,
-		      isc_socketmgr_t *socketmgr, isc_taskmgr_t *taskmgr,
+dns_requestmgr_create(isc_mem_t *mctx, isc_loopmgr_t *loopmgr,
 		      dns_dispatchmgr_t *dispatchmgr,
 		      dns_dispatch_t *dispatchv4, dns_dispatch_t *dispatchv6,
 		      dns_requestmgr_t **requestmgrp);
@@ -65,12 +62,6 @@ dns_requestmgr_create(isc_mem_t *mctx, isc_timermgr_t *timermgr,
  * Requires:
  *
  *\li	'mctx' is a valid memory context.
- *
- *\li	'timermgr' is a valid timer manager.
- *
- *\li	'socketmgr' is a valid socket manager.
- *
- *\li	'taskmgr' is a valid task manager.
  *
  *\li	'dispatchv4' is a valid dispatcher with an IPv4 UDP socket, or is NULL.
  *
@@ -90,30 +81,6 @@ dns_requestmgr_create(isc_mem_t *mctx, isc_timermgr_t *timermgr,
  */
 
 void
-dns_requestmgr_whenshutdown(dns_requestmgr_t *requestmgr, isc_task_t *task,
-			    isc_event_t **eventp);
-/*%<
- * Send '*eventp' to 'task' when 'requestmgr' has completed shutdown.
- *
- * Notes:
- *
- *\li	It is not safe to detach the last reference to 'requestmgr' until
- *	shutdown is complete.
- *
- * Requires:
- *
- *\li	'requestmgr' is a valid request manager.
- *
- *\li	'task' is a valid task.
- *
- *\li	*eventp is a valid event.
- *
- * Ensures:
- *
- *\li	*eventp == NULL.
- */
-
-void
 dns_requestmgr_shutdown(dns_requestmgr_t *requestmgr);
 /*%<
  * Start the shutdown process for 'requestmgr'.
@@ -128,79 +95,29 @@ dns_requestmgr_shutdown(dns_requestmgr_t *requestmgr);
  *\li	'requestmgr' is a valid requestmgr.
  */
 
-void
-dns_requestmgr_attach(dns_requestmgr_t *source, dns_requestmgr_t **targetp);
-/*%<
- *	Attach to the request manager.  dns_requestmgr_shutdown() must not
- *	have been called on 'source' prior to calling dns_requestmgr_attach().
- *
- * Requires:
- *
- *\li	'source' is a valid requestmgr.
- *
- *\li	'targetp' to be non NULL and '*targetp' to be NULL.
- */
-
-void
-dns_requestmgr_detach(dns_requestmgr_t **requestmgrp);
-/*%<
- *	Detach from the given requestmgr.  If this is the final detach
- *	requestmgr will be destroyed.  dns_requestmgr_shutdown() must
- *	be called before the final detach.
- *
- * Requires:
- *
- *\li	'*requestmgrp' is a valid requestmgr.
- *
- * Ensures:
- *\li	'*requestmgrp' is NULL.
- */
+#if DNS_REQUEST_TRACE
+#define dns_requestmgr_ref(ptr) \
+	dns_requestmgr__ref(ptr, __func__, __FILE__, __LINE__)
+#define dns_requestmgr_unref(ptr) \
+	dns_requestmgr__unref(ptr, __func__, __FILE__, __LINE__)
+#define dns_requestmgr_attach(ptr, ptrp) \
+	dns_requestmgr__attach(ptr, ptrp, __func__, __FILE__, __LINE__)
+#define dns_requestmgr_detach(ptrp) \
+	dns_requestmgr__detach(ptrp, __func__, __FILE__, __LINE__)
+ISC_REFCOUNT_TRACE_DECL(dns_requestmgr);
+#else
+ISC_REFCOUNT_DECL(dns_requestmgr);
+#endif
 
 isc_result_t
 dns_request_create(dns_requestmgr_t *requestmgr, dns_message_t *message,
-		   const isc_sockaddr_t *address, unsigned int options,
-		   dns_tsigkey_t *key, unsigned int timeout, isc_task_t *task,
-		   isc_taskaction_t action, void *arg,
+		   const isc_sockaddr_t *srcaddr,
+		   const isc_sockaddr_t *destaddr, dns_transport_t *transport,
+		   isc_tlsctx_cache_t *tlsctx_cache, unsigned int options,
+		   dns_tsigkey_t *key, unsigned int timeout,
+		   unsigned int udptimeout, unsigned int udpretries,
+		   isc_loop_t *loop, isc_job_cb cb, void *arg,
 		   dns_request_t **requestp);
-/*%<
- * Create and send a request.
- *
- * Notes:
- *
- *\li	'message' will be rendered and sent to 'address'.  If the
- *	#DNS_REQUESTOPT_TCP option is set, TCP will be used,
- *	#DNS_REQUESTOPT_SHARE option is set too, connecting TCP
- *	(vs. connected) will be shared too.  The request
- *	will timeout after 'timeout' seconds.
- *
- *\li	If the #DNS_REQUESTOPT_CASE option is set, use case sensitive
- *	compression.
- *
- *\li	When the request completes, successfully, due to a timeout, or
- *	because it was canceled, a completion event will be sent to 'task'.
- *
- * Requires:
- *
- *\li	'message' is a valid DNS message.
- *
- *\li	'address' is a valid sockaddr.
- *
- *\li	'timeout' > 0
- *
- *\li	'task' is a valid task.
- *
- *\li	requestp != NULL && *requestp == NULL
- */
-
-isc_result_t
-dns_request_createvia(dns_requestmgr_t *requestmgr, dns_message_t *message,
-		      const isc_sockaddr_t *srcaddr,
-		      const isc_sockaddr_t *destaddr, isc_dscp_t dscp,
-		      unsigned int options, dns_tsigkey_t *key,
-		      unsigned int timeout, unsigned int udptimeout,
-		      unsigned int udpretries, isc_task_t *task,
-		      isc_taskaction_t action, void *arg,
-		      dns_request_t **requestp);
 /*%<
  * Create and send a request.
  *
@@ -216,8 +133,11 @@ dns_request_createvia(dns_requestmgr_t *requestmgr, dns_message_t *message,
  *\li	If the #DNS_REQUESTOPT_CASE option is set, use case sensitive
  *	compression.
  *
+ *\li	If the #DNS_REQUESTOPT_LARGE option is set, use a large
+ *	compression context to accommodate more names.
+ *
  *\li	When the request completes, successfully, due to a timeout, or
- *	because it was canceled, a completion event will be sent to 'task'.
+ *	because it was canceled, a completion callback will run on 'loop'.
  *
  * Requires:
  *
@@ -231,7 +151,7 @@ dns_request_createvia(dns_requestmgr_t *requestmgr, dns_message_t *message,
  *
  *\li	'timeout' > 0
  *
- *\li	'task' is a valid task.
+ *\li	'loop' is a valid loop.
  *
  *\li	requestp != NULL && *requestp == NULL
  */
@@ -239,11 +159,12 @@ dns_request_createvia(dns_requestmgr_t *requestmgr, dns_message_t *message,
 isc_result_t
 dns_request_createraw(dns_requestmgr_t *requestmgr, isc_buffer_t *msgbuf,
 		      const isc_sockaddr_t *srcaddr,
-		      const isc_sockaddr_t *destaddr, isc_dscp_t dscp,
-		      unsigned int options, unsigned int timeout,
-		      unsigned int udptimeout, unsigned int udpretries,
-		      isc_task_t *task, isc_taskaction_t action, void *arg,
-		      dns_request_t **requestp);
+		      const isc_sockaddr_t *destaddr,
+		      dns_transport_t	   *transport,
+		      isc_tlsctx_cache_t *tlsctx_cache, unsigned int options,
+		      unsigned int timeout, unsigned int udptimeout,
+		      unsigned int udpretries, isc_loop_t *loop, isc_job_cb cb,
+		      void *arg, dns_request_t **requestp);
 /*!<
  * \brief Create and send a request.
  *
@@ -257,7 +178,7 @@ dns_request_createraw(dns_requestmgr_t *requestmgr, isc_buffer_t *msgbuf,
  *	at 'udptimeout' intervals if non-zero or if 'udpretries' is not zero.
  *
  *\li	When the request completes, successfully, due to a timeout, or
- *	because it was canceled, a completion event will be sent to 'task'.
+ *	because it was canceled, a completion callback will run in 'loop'.
  *
  * Requires:
  *
@@ -271,7 +192,7 @@ dns_request_createraw(dns_requestmgr_t *requestmgr, isc_buffer_t *msgbuf,
  *
  *\li	'timeout' > 0
  *
- *\li	'task' is a valid task.
+ *\li	'loop' is a valid loop.
  *
  *\li	requestp != NULL && *requestp == NULL
  */
@@ -358,6 +279,31 @@ dns_request_destroy(dns_request_t **requestp);
  *\li	*requestp == NULL
  */
 
-ISC_LANG_ENDDECLS
+void *
+dns_request_getarg(dns_request_t *request);
+/*%<
+ * Return the value of 'arg' that was passed in when 'request' was
+ * created.
+ */
 
-#endif /* DNS_REQUEST_H */
+isc_result_t
+dns_request_getresult(dns_request_t *request);
+/*%<
+ * Get the result code of 'request'. (This is to be called by the
+ * completion handler.)
+ */
+
+#if DNS_REQUEST_TRACE
+#define dns_request_ref(ptr) dns_request__ref(ptr, __func__, __FILE__, __LINE__)
+#define dns_request_unref(ptr) \
+	dns_request__unref(ptr, __func__, __FILE__, __LINE__)
+#define dns_request_attach(ptr, ptrp) \
+	dns_request__attach(ptr, ptrp, __func__, __FILE__, __LINE__)
+#define dns_request_detach(ptrp) \
+	dns_request__detach(ptrp, __func__, __FILE__, __LINE__)
+ISC_REFCOUNT_TRACE_DECL(dns_request);
+#else
+ISC_REFCOUNT_DECL(dns_request);
+#endif
+
+ISC_LANG_ENDDECLS

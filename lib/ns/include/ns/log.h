@@ -1,6 +1,8 @@
 /*
  * Copyright (C) Internet Systems Consortium, Inc. ("ISC")
  *
+ * SPDX-License-Identifier: MPL-2.0
+ *
  * This Source Code Form is subject to the terms of the Mozilla Public
  * License, v. 2.0. If a copy of the MPL was not distributed with this
  * file, you can obtain one at https://mozilla.org/MPL/2.0/.
@@ -9,17 +11,16 @@
  * information regarding copyright ownership.
  */
 
-#ifndef NS_LOG_H
-#define NS_LOG_H 1
+#pragma once
 
 /*! \file */
 
 #include <isc/log.h>
 #include <isc/types.h>
 
-LIBNS_EXTERNAL_DATA extern isc_log_t *	     ns_lctx;
-LIBNS_EXTERNAL_DATA extern isc_logcategory_t ns_categories[];
-LIBNS_EXTERNAL_DATA extern isc_logmodule_t   ns_modules[];
+extern isc_log_t	*ns_lctx;
+extern isc_logcategory_t ns_categories[];
+extern isc_logmodule_t	 ns_modules[];
 
 #define NS_LOGCATEGORY_CLIENT	       (&ns_categories[0])
 #define NS_LOGCATEGORY_NETWORK	       (&ns_categories[1])
@@ -69,4 +70,3 @@ ns_log_setcontext(isc_log_t *lctx);
  * Requires:
  *\li	lctx is a valid logging context.
  */
-#endif /* NS_LOG_H */
