@@ -238,8 +238,8 @@ opensslfalcon512_verify(dst_context_t *dctx, const isc_region_t *sig) {
 		DST_RET(dst__openssl_toresult3(
 			dctx->category, "EVP_DigestVerifyInit", ISC_R_FAILURE));
 	}
-
-	status = EVP_DigestVerify(ctx, sig->base, sig->length, tbsreg.base,
+	// TODO use siglen until updated to fixed sized falcon signatures
+	status = EVP_DigestVerify(ctx, sig->base, siglen, tbsreg.base,
 				  tbsreg.length);
 
 	switch (status) {
