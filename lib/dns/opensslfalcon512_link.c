@@ -91,6 +91,7 @@ opensslfalcon512_createctx(dst_key_t *key, dst_context_t *dctx) {
 	const falcon512_alginfo_t *alginfo =
 		opensslfalcon512_alg_info(dctx->key->key_alg);
 	UNUSED(key);
+	
 	REQUIRE(alginfo != NULL);
 
 	isc_buffer_allocate(dctx->mctx, &buf, 64);
@@ -106,6 +107,7 @@ opensslfalcon512_destroyctx(dst_context_t *dctx) {
 		opensslfalcon512_alg_info(dctx->key->key_alg);
 
 	REQUIRE(alginfo != NULL);
+	
 	if (buf != NULL) {
 		isc_buffer_free(&buf);
 	}
@@ -149,8 +151,8 @@ opensslfalcon512_sign(dst_context_t *dctx, isc_buffer_t *sig) {
 	EVP_PKEY *pkey = key->keydata.pkeypair.priv;
 	EVP_MD_CTX *ctx = EVP_MD_CTX_new();
 	isc_buffer_t *buf = (isc_buffer_t *)dctx->ctxdata.generic;
-	const falcon512_alginfo_t *alginfo = opensslfalcon512_alg_info(key->key_alg);
 	size_t siglen;
+	const falcon512_alginfo_t *alginfo = opensslfalcon512_alg_info(key->key_alg);
 
 	REQUIRE(alginfo != NULL);
 
@@ -181,7 +183,8 @@ opensslfalcon512_sign(dst_context_t *dctx, isc_buffer_t *sig) {
 		DST_RET(dst__openssl_toresult3(dctx->category, "EVP_DigestSign",
 					       DST_R_SIGNFAILURE));
 	}
-	siglen = DNS_SIG_FALCON512SIZE;
+	// TODO once updated, remove the following line to avoid bugs.
+	siglen = alginfo->sig_size;
 	isc_buffer_add(sig, (unsigned int)siglen);
 	ret = ISC_R_SUCCESS;
 
@@ -191,7 +194,6 @@ err:
 	dctx->ctxdata.generic = NULL;
 
 	return (ret);
-
 }
 
 static isc_result_t
@@ -237,7 +239,7 @@ opensslfalcon512_verify(dst_context_t *dctx, const isc_region_t *sig) {
 			dctx->category, "EVP_DigestVerifyInit", ISC_R_FAILURE));
 	}
 
-	status = EVP_DigestVerify(ctx, sig->base, siglen, tbsreg.base,
+	status = EVP_DigestVerify(ctx, sig->base, sig->len, tbsreg.base,
 				  tbsreg.length);
 
 	switch (status) {
@@ -266,13 +268,13 @@ opensslfalcon512_generate(dst_key_t *key, int unused, void (*callback)(int)) {
 	isc_result_t ret;
 	EVP_PKEY *pkey = NULL;
 	EVP_PKEY_CTX *ctx = NULL;
-	const falcon512_alginfo_t *alginfo = opensslfalcon512_alg_info(key->key_alg);
 	int status;
+	const falcon512_alginfo_t *alginfo = opensslfalcon512_alg_info(key->key_alg);
 
-	REQUIRE(alginfo != NULL);
 	UNUSED(unused);
 	UNUSED(callback);
-	key->key_size = alginfo->key_size;
+	
+	REQUIRE(alginfo != NULL);
 
 	ctx = EVP_PKEY_CTX_new_id(EVP_PKEY_FALCON512, NULL);
 	if (ctx == NULL) {
@@ -304,10 +306,10 @@ err:
 
 static isc_result_t
 opensslfalcon512_todns(const dst_key_t *key, isc_buffer_t *data) {
-	const falcon512_alginfo_t *alginfo = opensslfalcon512_alg_info(key->key_alg);
 	EVP_PKEY *pkey = key->keydata.pkeypair.pub;
 	isc_region_t r;
 	size_t len;
+	const falcon512_alginfo_t *alginfo = opensslfalcon512_alg_info(key->key_alg);
 
 	REQUIRE(pkey != NULL);
 	REQUIRE(alginfo != NULL);
@@ -327,11 +329,11 @@ opensslfalcon512_todns(const dst_key_t *key, isc_buffer_t *data) {
 
 static isc_result_t
 opensslfalcon512_fromdns(dst_key_t *key, isc_buffer_t *data) {
-	const falcon512_alginfo_t *alginfo = opensslfalcon512_alg_info(key->key_alg);
 	isc_result_t ret;
 	isc_region_t r;
 	size_t len;
 	EVP_PKEY *pkey = NULL;
+	const falcon512_alginfo_t *alginfo = opensslfalcon512_alg_info(key->key_alg);
 
 	REQUIRE(alginfo != NULL);
 
@@ -350,12 +352,10 @@ opensslfalcon512_fromdns(dst_key_t *key, isc_buffer_t *data) {
 	key->keydata.pkeypair.pub = pkey;
 	key->key_size = len * 8;
 	return (ISC_R_SUCCESS);
-
 }
 
 static isc_result_t
 opensslfalcon512_tofile(const dst_key_t *key, const char *directory) {
-	const falcon512_alginfo_t *alginfo = opensslfalcon512_alg_info(key->key_alg);
 	isc_result_t ret;
 	dst_private_t priv;
 	unsigned char *pubbuf = NULL;
@@ -363,6 +363,7 @@ opensslfalcon512_tofile(const dst_key_t *key, const char *directory) {
 	size_t publen;
 	size_t privlen;
 	int i;
+	const falcon512_alginfo_t *alginfo = opensslfalcon512_alg_info(key->key_alg);
 
 	REQUIRE(alginfo != NULL);
 
@@ -430,7 +431,6 @@ typedef struct
 
 static isc_result_t
 opensslfalcon512_parse(dst_key_t *key, isc_lex_t *lexer, dst_key_t *pub) {
-	const falcon512_alginfo_t *alginfo = opensslfalcon512_alg_info(key->key_alg);
 	dst_private_t priv;
 	isc_result_t ret;
 	int i, privkey_index, pubkey_index = -1;
@@ -438,9 +438,12 @@ opensslfalcon512_parse(dst_key_t *key, isc_lex_t *lexer, dst_key_t *pub) {
 	EVP_PKEY *pkey = NULL, *pubpkey = NULL;
 	size_t len;
 	isc_mem_t *mctx = key->mctx;
+	const falcon512_alginfo_t *alginfo = opensslfalcon512_alg_info(key->key_alg);
+	
 	UNUSED(engine);
 	UNUSED(label);
 	UNUSED(pubpkey);
+	
 	REQUIRE(alginfo != NULL);
 
 	/* read private key file */
