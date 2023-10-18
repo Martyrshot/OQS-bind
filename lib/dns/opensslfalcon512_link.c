@@ -102,7 +102,6 @@ opensslfalcon512_createctx(dst_key_t *key, dst_context_t *dctx) {
 static void
 opensslfalcon512_destroyctx(dst_context_t *dctx) {
 	isc_buffer_t *buf = (isc_buffer_t *)dctx->ctxdata.generic;
-
 	const falcon512_alginfo_t *alginfo =
 		opensslfalcon512_alg_info(dctx->key->key_alg);
 
