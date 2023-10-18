@@ -89,7 +89,9 @@ openssldilithium2_createctx(dst_key_t *key, dst_context_t *dctx) {
 	isc_buffer_t *buf = NULL;
 	const dilithium2_alginfo_t *alginfo =
 		openssldilithium2_alg_info(dctx->key->key_alg);
+
 	UNUSED(key);
+
 	REQUIRE(alginfo != NULL);
 
 	isc_buffer_allocate(dctx->mctx, &buf, 64);

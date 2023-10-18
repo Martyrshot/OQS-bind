@@ -90,8 +90,9 @@ opensslfalcon512_createctx(dst_key_t *key, dst_context_t *dctx) {
 	isc_buffer_t *buf = NULL;
 	const falcon512_alginfo_t *alginfo =
 		opensslfalcon512_alg_info(dctx->key->key_alg);
+
 	UNUSED(key);
-	
+
 	REQUIRE(alginfo != NULL);
 
 	isc_buffer_allocate(dctx->mctx, &buf, 64);
