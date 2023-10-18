@@ -38,7 +38,7 @@
 		goto err; \
 	}
 
-#define DILITHIUM2_PRIVATE_KEYSIZE 2528
+#define DILITHIUM2_PRIVATEKEYSIZE 2528
 
 typedef struct dilithium2_alginfo {
 	int pkey_type;
@@ -46,7 +46,7 @@ typedef struct dilithium2_alginfo {
 } dilithium2_alginfo_t;
 
 static const dilithium2_alginfo_t *
-dilithium2_alg_info(unsigned int key_alg) {
+openssldilithium2_alg_info(unsigned int key_alg) {
 	if (key_alg == DST_ALG_FALCON512) {
 		static const dilithium2_alginfo_t dilithium2_alginfo = {
 			.pkey_type = EVP_PKEY_DILITHIUM2,
@@ -314,7 +314,7 @@ openssldilithium2_fromdns(dst_key_t *key, isc_buffer_t *data) {
 	}
 
 	len = r.length;
-	ret = raw_to_ossl(alginfo, 0, r.base, &len, &pkey);
+	ret = raw_key_to_ossl(alginfo, 0, r.base, &len, &pkey);
 	if (ret != ISC_R_SUCCESS) {
 		return ret;
 	}
@@ -476,7 +476,8 @@ openssldilithium2_parse(dst_key_t *key, isc_lex_t *lexer, dst_key_t *pub) {
 		return (dst__openssl_toresult(ISC_R_NOSPACE));
 	}
 	memcpy(oqs_key->pubkey, priv.elements[pubkey_index].data, len);
-	key->keydata.pkey = pkey;
+	key->keydata.pkeypair.priv = pkey;
+	key->keydata.pkeypair.pub = pkey;
 	key->key_size = priv.elements[pubkey_index].length;
 	ret = ISC_R_SUCCESS;
 
