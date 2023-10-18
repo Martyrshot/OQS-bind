@@ -210,6 +210,7 @@ libdns_la_SOURCES =			\
 	opensslrsa_link.c		\
 	opensslfalcon512_link.c         \
 	openssldilithium2_link.c        \
+	opensslsphincssha256128s_link.c \
 	order.c				\
 	peer.c				\
 	private.c			\
