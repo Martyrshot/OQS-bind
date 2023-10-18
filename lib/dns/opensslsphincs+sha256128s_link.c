@@ -49,7 +49,7 @@ static const sphincssha256128s_alginfo_t *
 opensslsphincssha256128s_alg_info(unsigned int key_alg) {
 	if (key_alg == DST_ALG_SPHINCSSHA256128S) {
 		static const sphincssha256128s_alginfo_t sphincssha256128s_alginfo = {
-			.pkey_type = EVP_PKEY_SPHINCSSHA256128S,
+			.pkey_type = EVP_PKEY_SPHINCSSHA256128SROBUST,
 			.key_size = DNS_KEY_SPHINCSSHA256128SSIZE,
 			.priv_key_size = SPHINCSSHA256128S_PRIVATEKEYSIZE,
 			.sig_size = DNS_SIG_SPHINCSSHA256128SSIZE,
