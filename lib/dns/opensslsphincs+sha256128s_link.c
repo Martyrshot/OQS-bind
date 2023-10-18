@@ -162,7 +162,6 @@ opensslsphincssha256128s_sign(dst_context_t *dctx, isc_buffer_t *sig) {
 	}
 
 	siglen = alginfo->sig_size;
-
 	isc_buffer_availableregion(sig, &sigreg);
 	if (sigreg.length < (unsigned int)siglen) {
 		DST_RET(ISC_R_NOSPACE);
@@ -177,6 +176,7 @@ opensslsphincssha256128s_sign(dst_context_t *dctx, isc_buffer_t *sig) {
 		DST_RET(dst__openssl_toresult3(dctx->category, "EVP_DigestSign",
 					       DST_R_SIGNFAILURE));
 	}
+	REQUIRE(siglen == alginfo->sig_size);
 	isc_buffer_add(sig, (unsigned int)siglen);
 	ret = ISC_R_SUCCESS;
 
@@ -383,18 +383,16 @@ opensslsphincssha256128s_tofile(const dst_key_t *key, const char *directory) {
 	if (dst__openssl_keypair_isprivate(key)) {
 		privbuf = isc_mem_get(key->mctx, privlen);
 		if (EVP_PKEY_get_raw_private_key(key->keydata.pkeypair.priv, privbuf,
-						 &privlen) != 1) {
+						 &privlen) != 1)
 			DST_RET(dst__openssl_toresult(ISC_R_FAILURE));
-		}
 		priv.elements[i].tag = TAG_SPHINCSSHA256128S_PRIVATEKEY;
 		priv.elements[i].length = privlen;
 		priv.elements[i].data = privbuf;
 		i++;
 		pubbuf = isc_mem_get(key->mctx, publen);
 		if (EVP_PKEY_get_raw_public_key(key->keydata.pkeypair.pub, pubbuf,
-						 &publen) != 1) {
+						 &publen) != 1)
 			DST_RET(dst__openssl_toresult(ISC_R_FAILURE));
-		}
 		priv.elements[i].tag = TAG_SPHINCSSHA256128S_PUBLICKEY;
 		priv.elements[i].length = publen;
 		priv.elements[i].data = pubbuf;
