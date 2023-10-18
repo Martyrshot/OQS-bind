@@ -105,7 +105,7 @@ opensslfalcon512_destroyctx(dst_context_t *dctx) {
 
 	const falcon512_alginfo_t *alginfo =
 		opensslfalcon512_alg_info(dctx->key->key_alg);
-	
+
 	REQUIRE(alginfo != NULL);
 	if (buf != NULL) {
 		isc_buffer_free(&buf);
@@ -122,7 +122,7 @@ opensslfalcon512_adddata(dst_context_t *dctx, const isc_region_t *data) {
 	isc_result_t result;
 	const falcon512_alginfo_t *alginfo =
 		opensslfalcon512_alg_info(dctx->key->key_alg);
-	
+
 	REQUIRE(alginfo != NULL);
 
 	result = isc_buffer_copyregion(buf, data);
@@ -205,7 +205,7 @@ opensslfalcon512_verify(dst_context_t *dctx, const isc_region_t *sig) {
 	EVP_MD_CTX *ctx = EVP_MD_CTX_new();
 	isc_buffer_t *buf = (isc_buffer_t *)dctx->ctxdata.generic;
 	const falcon512_alginfo_t *alginfo = opensslfalcon512_alg_info(key->key_alg);
-	
+
 	REQUIRE(alginfo != NULL);
 
 	if (ctx == NULL) {
@@ -280,7 +280,7 @@ opensslfalcon512_generate(dst_key_t *key, int unused, void (*callback)(int)) {
 		return (dst__openssl_toresult2("EVP_PKEY_CTX_new_id",
 							DST_R_OPENSSLFAILURE));
 	}
-	
+
 	status = EVP_PKEY_keygen_init(ctx);
 	if (status != 1) {
 		DST_RET(dst__openssl_toresult2("EVP_PKEY_keygen_init",
@@ -494,7 +494,7 @@ opensslfalcon512_parse(dst_key_t *key, isc_lex_t *lexer, dst_key_t *pub) {
 	if (pkey == NULL) {
 		return (dst__openssl_toresult(ret));
 	}
-	
+
 	len = priv.elements[pubkey_index].length;
 	REQUIRE(len == alginfo->key_size);
 	OQS_KEY *oqs_key = EVP_PKEY_get0(pkey);
