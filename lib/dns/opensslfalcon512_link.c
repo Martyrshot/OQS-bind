@@ -33,13 +33,6 @@
 #include "dst_openssl.h"
 #include "dst_parse.h"
 
-#ifndef NID_X9_62_prime256v1
-#error "P-256 group is not known (NID_X9_62_prime256v1)"
-#endif /* ifndef NID_X9_62_prime256v1 */
-#ifndef NID_secp384r1
-#error "P-384 group is not known (NID_secp384r1)"
-#endif /* ifndef NID_secp384r1 */
-
 #define DST_RET(a)        \
 	{                 \
 		ret = a;  \
@@ -438,6 +431,7 @@ typedef struct
 
 static isc_result_t
 opensslfalcon512_parse(dst_key_t *key, isc_lex_t *lexer, dst_key_t *pub) {
+	const falcon512_alginfo_t *alginfo = opensslfalcon512_alg_info(key->key_alg);
 	dst_private_t priv;
 	isc_result_t ret;
 	int i, privkey_index, pubkey_index = -1;
@@ -448,7 +442,7 @@ opensslfalcon512_parse(dst_key_t *key, isc_lex_t *lexer, dst_key_t *pub) {
 	UNUSED(engine);
 	UNUSED(label);
 	UNUSED(pubpkey);
-	REQUIRE(key->key_alg == DST_ALG_FALCON512);
+	REQUIRE(alginfo != NULL);
 
 	/* read private key file */
 	ret = dst__privstruct_parse(key, DST_ALG_FALCON512, lexer, mctx, &priv);
@@ -495,12 +489,14 @@ opensslfalcon512_parse(dst_key_t *key, isc_lex_t *lexer, dst_key_t *pub) {
 		DST_RET(DST_R_INVALIDPUBLICKEY);
 	}
 	len = priv.elements[privkey_index].length;
+	REQUIRE(len == alginfo->priv_key_size);
 	pkey = EVP_PKEY_new_raw_private_key(EVP_PKEY_FALCON512, NULL, priv.elements[privkey_index].data, len);
 	if (pkey == NULL) {
 		return (dst__openssl_toresult(ret));
 	}
 	
 	len = priv.elements[pubkey_index].length;
+	REQUIRE(len == alginfo->key_size);
 	OQS_KEY *oqs_key = EVP_PKEY_get0(pkey);
 	oqs_key->pubkey = OPENSSL_secure_malloc(len);
 	if (oqs_key->pubkey == NULL) {
