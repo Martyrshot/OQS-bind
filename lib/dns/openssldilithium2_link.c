@@ -47,7 +47,7 @@ typedef struct dilithium2_alginfo {
 
 static const dilithium2_alginfo_t *
 openssldilithium2_alg_info(unsigned int key_alg) {
-	if (key_alg == DST_ALG_FALCON512) {
+	if (key_alg == DST_ALG_DILITHIUM2) {
 		static const dilithium2_alginfo_t dilithium2_alginfo = {
 			.pkey_type = EVP_PKEY_DILITHIUM2,
 			.key_size = DNS_KEY_DILITHIUM2SIZE,
