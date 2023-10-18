@@ -200,7 +200,7 @@ openssldilithium2_verify(dst_context_t *dctx, const isc_region_t *sig) {
 		return (ISC_R_NOMEMORY);
 	}
 
-	if (sig->length != alginfo->siglen) {
+	if (sig->length != alginfo->sig_size) {
 		return (DST_R_VERIFYFAILURE);
 	}
 	isc_buffer_usedregion(buf, &tbsreg);
@@ -253,13 +253,13 @@ openssldilithium2_generate(dst_key_t *key, int unused, void (*callback)(int)) {
 							DST_R_OPENSSLFAILURE));
 	}
 
-	status = EVP_PKEY_keygen_init(pkctx);
+	status = EVP_PKEY_keygen_init(ctx);
 	if (status != 1) {
 		DST_RET(dst__openssl_toresult2("EVP_PKEY_keygen_init",
 						DST_R_OPENSSLFAILURE));
 	}
 
-	status = EVP_PKEY_keygen(pkctx, &pkey);
+	status = EVP_PKEY_keygen(ctx, &pkey);
 	if (status != 1) {
 		DST_RET(dst__openssl_toresult2("EVP_PKEY_keygen",
 						DST_R_OPENSSLFAILURE));
@@ -277,7 +277,7 @@ err:
 
 static isc_result_t
 openssldilithium2_todns(const dst_key_t *key, isc_buffer_t *data) {
-	EVP_PKEY *pkey = key->keydata.pkey;
+	EVP_PKEY *pkey = key->keydata.pkeypair.pub;
 	isc_region_t r;
 	size_t len;
 	const dilithium2_alginfo_t *alginfo = openssldilithium2_alg_info(key->key_alg);
@@ -430,8 +430,8 @@ openssldilithium2_parse(dst_key_t *key, isc_lex_t *lexer, dst_key_t *pub) {
 		if (pub == NULL) {
 			DST_RET(DST_R_INVALIDPRIVATEKEY);
 		}
-		key->keydata.pkeypair.priv = pub->keydata.pkey.priv;
-		key->keydata.pkeypair.pub = pub->keydata.pkey.pub;
+		key->keydata.pkeypair.priv = pub->keydata.pkeypair.priv;
+		key->keydata.pkeypair.pub = pub->keydata.pkeypair.pub;
 		pub->keydata.pkeypair.priv = NULL;
 		pub->keydata.pkeypair.pub = NULL;
 		DST_RET(ISC_R_SUCCESS);
