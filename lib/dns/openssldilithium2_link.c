@@ -210,7 +210,7 @@ openssldilithium2_verify(dst_context_t *dctx, const isc_region_t *sig) {
 			dctx->category, "EVP_DigestVerifyInit", ISC_R_FAILURE));
 	}
 
-	status = EVP_DigestVerify(ctx, sig->base, sig->len, tbsreg.base,
+	status = EVP_DigestVerify(ctx, sig->base, sig->length, tbsreg.base,
 				  tbsreg.length);
 
 	switch (status) {
@@ -252,6 +252,7 @@ openssldilithium2_generate(dst_key_t *key, int unused, void (*callback)(int)) {
 		return (dst__openssl_toresult2("EVP_PKEY_CTX_new_id",
 							DST_R_OPENSSLFAILURE));
 	}
+
 	status = EVP_PKEY_keygen_init(pkctx);
 	if (status != 1) {
 		DST_RET(dst__openssl_toresult2("EVP_PKEY_keygen_init",
@@ -263,10 +264,12 @@ openssldilithium2_generate(dst_key_t *key, int unused, void (*callback)(int)) {
 		DST_RET(dst__openssl_toresult2("EVP_PKEY_keygen",
 						DST_R_OPENSSLFAILURE));
 	}
+
 	key->key_size = alginfo->key_size * 8;
 	key->keydata.pkeypair.priv = pkey;
 	key->keydata.pkeypair.pub = pkey;
 	ret = ISC_R_SUCCESS;
+
 err:
 	EVP_PKEY_CTX_free(pkctx);
 	return (ret);
@@ -297,6 +300,7 @@ openssldilithium2_todns(const dst_key_t *key, isc_buffer_t *data) {
 
 static isc_result_t
 openssldilithium2_fromdns(dst_key_t *key, isc_buffer_t *data) {
+	isc_result_t ret;
 	isc_region_t r;
 	size_t len;
 	EVP_PKEY *pkey = NULL;
@@ -367,6 +371,7 @@ openssldilithium2_tofile(const dst_key_t *key, const char *directory) {
 	}
 	priv.nelements = i;
 	ret = dst__privstruct_writefile(key, &priv, directory);
+
 err:
 	if (privbuf != NULL) {
 		isc_mem_put(key->mctx, privbuf, privlen);

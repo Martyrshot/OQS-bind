@@ -239,7 +239,7 @@ opensslfalcon512_verify(dst_context_t *dctx, const isc_region_t *sig) {
 			dctx->category, "EVP_DigestVerifyInit", ISC_R_FAILURE));
 	}
 
-	status = EVP_DigestVerify(ctx, sig->base, sig->len, tbsreg.base,
+	status = EVP_DigestVerify(ctx, sig->base, sig->length, tbsreg.base,
 				  tbsreg.length);
 
 	switch (status) {
