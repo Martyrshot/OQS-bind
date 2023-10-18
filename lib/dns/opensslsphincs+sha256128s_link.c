@@ -48,11 +48,11 @@ typedef struct sphincssha256128s_alginfo {
 static const sphincssha256128s_alginfo_t *
 opensslsphincssha256128s_alg_info(unsigned int key_alg) {
 	if (key_alg == DST_ALG_SPHINCSSHA256128S) {
-		static const sphincssha256128s_t sphincssha256128s_alginfo = {
+		static const sphincssha256128s_alginfo_t sphincssha256128s_alginfo = {
 			.pkey_type = EVP_PKEY_SPHINCSSHA256128S,
-			.key_size = DNS_KEY_SPHINCSSHA256128S,
+			.key_size = DNS_KEY_SPHINCSSHA256128SSIZE,
 			.priv_key_size = SPHINCSSHA256128S_PRIVATEKEYSIZE,
-			.sig_size = DNS_SIG_SPHINCSSHA256128S,
+			.sig_size = DNS_SIG_SPHINCSSHA256128SSIZE,
 		};
 		return &sphincssha256128s_alginfo;
 	}
@@ -216,7 +216,7 @@ opensslsphincssha256128s_verify(dst_context_t *dctx, const isc_region_t *sig) {
 			dctx->category, "EVP_DigestVerifyInit", ISC_R_FAILURE));
 	}
 
-	status = EVP_DigestVerify(ctx, sig->base, siglen, tbsreg.base,
+	status = EVP_DigestVerify(ctx, sig->base, sig->length, tbsreg.base,
 				  tbsreg.length);
 
 	switch (status) {
@@ -266,7 +266,7 @@ opensslsphincssha256128s_generate(dst_key_t *key, int unused, void (*callback)(i
 						DST_R_OPENSSLFAILURE));
 	}
 	
-	status = EVP_PKEY_keygen(ptx, &pkey)
+	status = EVP_PKEY_keygen(ctx, &pkey);
 	if (status != 1) {
 		DST_RET(dst__openssl_toresult2("EVP_PKEY_keygen",
 						DST_R_OPENSSLFAILURE));
@@ -284,7 +284,7 @@ err:
 
 static isc_result_t
 opensslsphincssha256128s_todns(const dst_key_t *key, isc_buffer_t *data) {
-	EVP_PKEY *pkey = key->keydata.pkey;
+	EVP_PKEY *pkey = key->keydata.pkeypair.pub;
 	isc_region_t r;
 	size_t len;
 	const sphincssha256128s_alginfo_t *alginfo =
@@ -370,7 +370,7 @@ opensslsphincssha256128s_tofile(const dst_key_t *key, const char *directory) {
 	publen = alginfo->key_size;
 	privlen = alginfo->priv_key_size;
 	if (key->keydata.pkeypair.pub == NULL || key->keydata.pkeypair.priv == NULL) {
-		return (DST_NULLKEY);
+		return (DST_R_NULLKEY);
 	}
 
 	if (key->external) {
@@ -479,10 +479,7 @@ opensslsphincssha256128s_parse(dst_key_t *key, isc_lex_t *lexer, dst_key_t *pub)
 
 	len = priv.elements[privkey_index].length;
 	REQUIRE(len == alginfo->priv_key_size);
-	if (len < SPHINCSSHA256128S_PUBLICKEY_SIZE) {
-		return (DST_R_INVALIDPRIVATEKEY);
-	}
-	pkey = EVP_PKEY_new_raw_private_key(EVP_PKEY_SPHINCSSHA256128SROBUST, NULL, priv.elements[privkey_index].data, len);
+	pkey = EVP_PKEY_new_raw_private_key(alginfo->pkey_type, NULL, priv.elements[privkey_index].data, len);
 	if (pkey == NULL) {
 		return (dst__openssl_toresult(ret));
 	}
