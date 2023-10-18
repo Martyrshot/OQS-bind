@@ -39,7 +39,7 @@
 		goto err; \
 	}
 
-#define FALCON512_PRIVATE_KEYSIZE 1281
+#define FALCON512_PRIVATEKEYSIZE 1281
 
 typedef struct falcon512_alginfo {
 	int pkey_type;
@@ -52,7 +52,7 @@ opensslfalcon512_alg_info(unsigned int key_alg) {
 		static const falcon512_alginfo_t falcon512_alginfo = {
 			.pkey_type = EVP_PKEY_FALCON512,
 			.key_size = DNS_KEY_FALCON512SIZE,
-			.priv_key_size = FALCON512_PRIVATE_KEYSIZE,
+			.priv_key_size = FALCON512_PRIVATEKEYSIZE,
 			.sig_size = DNS_SIG_FALCON512SIZE,
 		};
 		return &falcon512_alginfo;
