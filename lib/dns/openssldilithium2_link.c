@@ -271,7 +271,7 @@ openssldilithium2_generate(dst_key_t *key, int unused, void (*callback)(int)) {
 	ret = ISC_R_SUCCESS;
 
 err:
-	EVP_PKEY_CTX_free(pkctx);
+	EVP_PKEY_CTX_free(ctx);
 	return (ret);
 }
 
