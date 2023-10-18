@@ -107,6 +107,7 @@ openssldilithium2_destroyctx(dst_context_t *dctx) {
 		openssldilithium2_alg_info(dctx->key->key_alg);
 
 	REQUIRE(alginfo != NULL);
+	
 	if (buf != NULL) {
 		isc_buffer_free(&buf);
 	}
