@@ -492,7 +492,7 @@ opensslfalcon512_parse(dst_key_t *key, isc_lex_t *lexer, dst_key_t *pub) {
 	}
 	len = priv.elements[privkey_index].length;
 	REQUIRE(len == alginfo->priv_key_size);
-	pkey = EVP_PKEY_new_raw_private_key(alginfo->pkey->type, NULL, priv.elements[privkey_index].data, len);
+	pkey = EVP_PKEY_new_raw_private_key(alginfo->pkey_type, NULL, priv.elements[privkey_index].data, len);
 	if (pkey == NULL) {
 		return (dst__openssl_toresult(ret));
 	}
