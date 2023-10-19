@@ -42,7 +42,7 @@
 #define FALCON512_PRIVATEKEYSIZE 1281
 
 typedef struct falcon512_alginfo {
-	int pkey_type;
+	static const char *alg_name;
 	unsigned int key_size, priv_key_size, sig_size;
 } falcon512_alginfo_t;
 
@@ -50,7 +50,7 @@ static const falcon512_alginfo_t *
 opensslfalcon512_alg_info(unsigned int key_alg) {
 	if (key_alg == DST_ALG_FALCON512) {
 		static const falcon512_alginfo_t falcon512_alginfo = {
-			.pkey_type = EVP_PKEY_FALCON512,
+			.alg_name = "falcon512",
 			.key_size = DNS_KEY_FALCON512SIZE,
 			.priv_key_size = FALCON512_PRIVATEKEYSIZE,
 			.sig_size = DNS_SIG_FALCON512SIZE,
@@ -61,30 +61,67 @@ opensslfalcon512_alg_info(unsigned int key_alg) {
 }
 
 static isc_result_t
-raw_key_to_ossl(const falcon512_alginfo_t *alginfo, int private,
-		const unsigned char *key, size_t *key_len, EVP_PKEY **pkey) {
-	isc_result_t ret;
-	int pkey_type = alginfo->pkey_type;
+raw_pub_key_to_ossl(const falcon512_alginfo_t *alginfo, const unsigned char *pub_key, size_t *pub_key_len, EVP_PKEY **pkey) {
+	isc_result_t ret = DST_R_INVALIDPUBLICKEY;
+	static const char *alg_name = alginfo->alg_name;
 
-	ret = (private ? DST_R_INVALIDPRIVATEKEY : DST_R_INVALIDPUBLICKEY);
-	if (private) {
-		if (*key_len < alginfo->priv_key_size) {
+	if (pub_key != NULL) {
+		if (pub_key_len == NULL || *pub_key_len < alginfo->key_size) {
 			return (ret);
 		}
-		*pkey = EVP_PKEY_new_raw_private_key(pkey_type, NULL, key, alginfo->priv_key_size);
-	} else {
-		if (*key_len < alginfo->key_size) {
-			return (ret);
-		}
-		*pkey = EVP_PKEY_new_raw_public_key(pkey_type, NULL, key, alginfo->key_size);
+		*pkey = EVP_PKEY_new_raw_public_key_ex(NULL, alg_name, NULL, key, alginfo->key_size);
 	}
 	if (*pkey == NULL) {
 		return (dst__openssl_toresult(ret));
 	}
-	*key_len = (private ? alginfo->priv_key_size : alginfo->key_size);
+	*key_len = alginfo->key_size;
 	return (ISC_R_SUCCESS);
 }
+static isc_result_t
+raw_priv_key_to_ossl(const falcon512_alginfo_t *alginfo, const unsigned char *priv_key, size_t *priv_key_len, 
+			const unsigned char *pub_key, size_t *pub_key_len, EVP_PKEY **pkey) {
+	EVP_PKEY *pk = NULL;
+	EVP_PKEY_CTX *ctx = NULL;
+	OSSL_PARAM_BLD *param_bld = NULL;
+	OSSL_PARAM *params = NULL;
+	isc_result_t ret = DST_R_INVALIDPUBLICKEY;
 
+	if (pkey == NULL) {
+		return (ISC_R_NOMEMORY);
+	}
+	if ((param_bld = OSSL_PARAM_BLD_new()) == NULL
+		&& !OSSL_PARAM_BLD_push_octet_string(param_bld, "priv", priv_key, priv_key_len)
+		&& !OSSL_PARAM_BLD_push_octet_string(param_bld, "pub", pub_key, pub_key_len)) {
+		return (ISC_R_NOMEMORY);
+	}
+	params = OSSL_PARAM_BLD_to_param(param_bld);
+	if (params == NULL) {
+		goto param_err;
+	}
+	ctx = EVP_PKEY_CTX_new_from_name(NULL, alginfo->alg_name, NULL);
+	if (ctx == NULL) {
+		goto ctxt_err;
+	}
+	if (EVP_PKEY_fromdata_init(ctx) <= 0
+		|| EVP_PKEY_fromdata(ctx, &pk, EVP_PKEY_KEYPAIR, params) <= 0) {
+		goto fromdata_err;
+	}
+	if (pk == NULL) {
+		goto fromdata_err;
+	}
+	ret = ISC_R_SUCCESS;
+
+fromdata_err:
+	 EVP_PKEY_CTX_free(ctx);
+
+ctxt_err:
+	OSSL_PARAM_free(params);
+
+param_err:
+	OSSL_PARAM_BLD_free(param_bld);
+
+	return ret;
+}
 static isc_result_t
 opensslfalcon512_createctx(dst_key_t *key, dst_context_t *dctx) {
 	isc_buffer_t *buf = NULL;
@@ -344,7 +381,7 @@ opensslfalcon512_fromdns(dst_key_t *key, isc_buffer_t *data) {
 	}
 
 	len = r.length;
-	ret = raw_key_to_ossl(alginfo, 0, r.base, &len, &pkey);
+	ret = raw_pub_key_to_ossl(alginfo, r.base, &len, &pkey);
 	if (ret != ISC_R_SUCCESS) {
 		return ret;
 	}
@@ -412,24 +449,6 @@ err:
 	return (ret);
 }
 
-typedef struct
-{
-  /* OpenSSL NID */
-  int nid;
-  /* OQS signature context */
-  OQS_SIG *s;
-  /* OQS public key */
-  uint8_t *pubkey;
-  /* OQS private key */
-  uint8_t *privkey;
-  /* Classical key pair for hybrid schemes; either a private or public key depending on context */
-  EVP_PKEY *classical_pkey;
-  /* Security bits for the scheme */
-  int security_bits;
-  /* digest engine for CMS: */
-  EVP_MD_CTX * digest;
-} OQS_KEY;
-
 static isc_result_t
 opensslfalcon512_parse(dst_key_t *key, isc_lex_t *lexer, dst_key_t *pub) {
 	dst_private_t priv;
@@ -437,7 +456,7 @@ opensslfalcon512_parse(dst_key_t *key, isc_lex_t *lexer, dst_key_t *pub) {
 	int i, privkey_index, pubkey_index = -1;
 	const char *engine = NULL, *label = NULL;
 	EVP_PKEY *pkey = NULL, *pubpkey = NULL;
-	size_t len;
+	size_t pub_len, priv_len;
 	isc_mem_t *mctx = key->mctx;
 	const falcon512_alginfo_t *alginfo = opensslfalcon512_alg_info(key->key_alg);
 	
@@ -491,21 +510,15 @@ opensslfalcon512_parse(dst_key_t *key, isc_lex_t *lexer, dst_key_t *pub) {
 	if (pubkey_index < 0) {
 		DST_RET(DST_R_INVALIDPUBLICKEY);
 	}
-	len = priv.elements[privkey_index].length;
-	REQUIRE(len == alginfo->priv_key_size);
-	pkey = EVP_PKEY_new_raw_private_key(alginfo->pkey_type, NULL, priv.elements[privkey_index].data, len);
+	priv_len = priv.elements[privkey_index].length;
+	REQUIRE(priv_len == alginfo->priv_key_size);
+	pub_len = priv.elements[pubkey_index].length;
+	REQUIRE(pub_len == alginfo->pub_key_size);
+	raw_priv_key_to_ossl(alginfo, priv.elements[privkey_index].data, priv_len,
+				priv.elements[pubkey_index].data, pub_len, &pkey);
 	if (pkey == NULL) {
-		return (dst__openssl_toresult(ret));
+		DST_RET(DST_R_INVALIDPRIVATEKEY);
 	}
-
-	len = priv.elements[pubkey_index].length;
-	REQUIRE(len == alginfo->key_size);
-	OQS_KEY *oqs_key = EVP_PKEY_get0(pkey);
-	oqs_key->pubkey = OPENSSL_secure_malloc(len);
-	if (oqs_key->pubkey == NULL) {
-		return (dst__openssl_toresult(ISC_R_NOSPACE));
-	}
-	memcpy(oqs_key->pubkey, priv.elements[pubkey_index].data, len);
 	key->keydata.pkeypair.priv = pkey;
 	key->keydata.pkeypair.pub = pkey;
 	key->key_size = priv.elements[pubkey_index].length;
