@@ -314,7 +314,7 @@ opensslfalcon512_generate(dst_key_t *key, int unused, void (*callback)(int)) {
 	
 	REQUIRE(alginfo != NULL);
 
-	ctx = EVP_PKEY_CTX_new_id(alginfo->pkey_type, NULL);
+	ctx = EVP_PKEY_CTX_new_from_name(NULL, alginfo->alg_name, NULL);
 	if (ctx == NULL) {
 		return (dst__openssl_toresult2("EVP_PKEY_CTX_new_id",
 							DST_R_OPENSSLFAILURE));
