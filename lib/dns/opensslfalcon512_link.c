@@ -17,6 +17,7 @@
 #include <openssl/ecdsa.h>
 #include <openssl/err.h>
 #include <openssl/objects.h>
+#include <openssl/param_build.h>
 #if !defined(OPENSSL_NO_ENGINE)
 #include <openssl/engine.h>
 #endif
@@ -42,7 +43,7 @@
 #define FALCON512_PRIVATEKEYSIZE 1281
 
 typedef struct falcon512_alginfo {
-	static const char *alg_name;
+	const char *alg_name;
 	unsigned int key_size, priv_key_size, sig_size;
 } falcon512_alginfo_t;
 
@@ -69,12 +70,12 @@ raw_pub_key_to_ossl(const falcon512_alginfo_t *alginfo, const unsigned char *pub
 		if (pub_key_len == NULL || *pub_key_len < alginfo->key_size) {
 			return (ret);
 		}
-		*pkey = EVP_PKEY_new_raw_public_key_ex(NULL, alg_name, NULL, key, alginfo->key_size);
+		*pkey = EVP_PKEY_new_raw_public_key_ex(NULL, alg_name, NULL, pub_key, alginfo->key_size);
 	}
 	if (*pkey == NULL) {
 		return (dst__openssl_toresult(ret));
 	}
-	*key_len = alginfo->key_size;
+	*pub_key_len = alginfo->key_size;
 	return (ISC_R_SUCCESS);
 }
 static isc_result_t
@@ -514,8 +515,10 @@ opensslfalcon512_parse(dst_key_t *key, isc_lex_t *lexer, dst_key_t *pub) {
 	REQUIRE(priv_len == alginfo->priv_key_size);
 	pub_len = priv.elements[pubkey_index].length;
 	REQUIRE(pub_len == alginfo->pub_key_size);
-	raw_priv_key_to_ossl(alginfo, priv.elements[privkey_index].data, priv_len,
-				priv.elements[pubkey_index].data, pub_len, &pkey);
+	raw_priv_key_to_ossl(alginfo, priv.elements[privkey_index].data, &priv_len,
+				priv.elements[pubkey_index].data, &pub_len, &pkey);
+	REQUIRE(priv_len == alginfo->priv_key_size);
+	REQUIRE(pub_len == alginfo->pub_key_size);
 	if (pkey == NULL) {
 		DST_RET(DST_R_INVALIDPRIVATEKEY);
 	}
