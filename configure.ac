@@ -707,12 +707,11 @@ AX_SAVE_FLAGS([openssl])
 CFLAGS="$OPENSSL_CFLAGS $CFLAGS"
 LIBS="$OPENSSL_LIBS $LIBS"
 
-AC_MSG_CHECKING([for OpenSSL >= 1.0.0 or LibreSSL >= 2.7.0])
+AC_MSG_CHECKING([for OpenSSL >= 3.2.0])
 AC_COMPILE_IFELSE(
     [AC_LANG_PROGRAM([[#include <openssl/opensslv.h>]],
-		     [[#if (!defined(LIBRESSL_VERSION_NUMBER) && (OPENSSL_VERSION_NUMBER < 0x1000000fL)) || \\
-			   (defined(LIBRESSL_VERSION_NUMBER) && (LIBRESSL_VERSION_NUMBER < 0x02070000fL))
-		       #error OpenSSL >= 1.0.0 or LibreSSL >= 2.7.0 required
+		     [[#if (OPENSSL_VERSION_NUMBER < 0x30200000L)
+		       #error OpenSSL >= 3.2.0
 		       #endif
 		      ]])],
     [AC_MSG_RESULT([yes])],

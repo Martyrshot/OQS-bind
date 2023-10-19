@@ -60,7 +60,7 @@
 #include <isccfg/grammar.h>
 #include <isccfg/kaspconf.h>
 #include <isccfg/namedconf.h>
-#if OPENSSL_VERSION_NUMBER >= 0x30000000L && OPENSSL_API_LEVEL >= 30000
+#if OPENSSL_VERSION_NUMBER >= 0x30200000L && OPENSSL_API_LEVEL >= 30200
 #include <openssl/err.h>
 #include <openssl/provider.h>
 #endif
@@ -884,8 +884,8 @@ main(int argc, char **argv) {
 	unsigned char c;
 	int ch;
 	bool set_fips_mode = false;
-#if OPENSSL_VERSION_NUMBER >= 0x30000000L && OPENSSL_API_LEVEL >= 30000
-	OSSL_PROVIDER *fips = NULL, *base = NULL;
+#if OPENSSL_VERSION_NUMBER >= 0x30200000L && OPENSSL_API_LEVEL >= 30200
+	OSSL_PROVIDER *fips = NULL, *base = NULL, *oqs = NULL, *default_provider = NULL;
 #endif
 
 	keygen_ctx_t ctx = {
@@ -1156,7 +1156,7 @@ main(int argc, char **argv) {
 	}
 
 	if (set_fips_mode) {
-#if OPENSSL_VERSION_NUMBER >= 0x30000000L && OPENSSL_API_LEVEL >= 30000
+#if OPENSSL_VERSION_NUMBER >= 0x30200000L && OPENSSL_API_LEVEL >= 30200
 		fips = OSSL_PROVIDER_load(NULL, "fips");
 		if (fips == NULL) {
 			ERR_clear_error();
@@ -1175,6 +1175,25 @@ main(int argc, char **argv) {
 			}
 		}
 	}
+#if OPENSSL_VERSION_NUMBER >= 0x30200000L && OPENSSL_API_LEVEL >= 30200
+	oqs = OSSL_PROVIDER_load(NULL, "oqsprovider");
+	if (oqs == NULL) {
+		if (fips != NULL) {
+			OSSL_PROVIDER_unload(fips);
+		}
+		if (base != NULL) {
+			OSSL_PROVIDER_unload(base);
+		}
+		ERR_clear_error();
+		fatal("Failed to load oqsprovider");
+	}
+	default_provider = OSSL_PROVIDER_load(NULL, "default");
+	if (default_provider == NULL) {
+		OSSL_PROVIDER_unload(oqs);
+		ERR_clear_error();
+		fatal("Failed to load default provider");
+	}
+#endif
 
 	ret = dst_lib_init(mctx, engine);
 	if (ret != ISC_R_SUCCESS) {
@@ -1328,12 +1347,18 @@ main(int argc, char **argv) {
 	}
 	isc_mem_destroy(&mctx);
 
-#if OPENSSL_VERSION_NUMBER >= 0x30000000L && OPENSSL_API_LEVEL >= 30000
+#if OPENSSL_VERSION_NUMBER >= 0x30200000L && OPENSSL_API_LEVEL >= 30200
 	if (base != NULL) {
 		OSSL_PROVIDER_unload(base);
 	}
 	if (fips != NULL) {
 		OSSL_PROVIDER_unload(fips);
+	}
+	if (oqs != NULL) {
+		OSSL_PROVIDER_unload(oqs);
+	}
+	if (default_provider != NULL) {
+		OSSL_PROVIDER_unload(default_provider);
 	}
 #endif
 	if (freeit != NULL) {
