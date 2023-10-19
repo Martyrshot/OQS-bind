@@ -95,6 +95,9 @@ typedef enum dst_algorithm {
 	DST_ALG_ECDSA384 = 14,
 	DST_ALG_ED25519 = 15,
 	DST_ALG_ED448 = 16,
+	DST_ALG_FALCON512 = 17,
+	DST_ALG_DILITHIUM2 = 18,
+	DST_ALG_SPHINCSSHA256128S = 19,
 
 	/*
 	 * Do not renumber HMAC algorithms as they are used externally to named
@@ -110,9 +113,6 @@ typedef enum dst_algorithm {
 	DST_ALG_HMACSHA384 = 164, /* XXXMPA */
 	DST_ALG_HMACSHA512 = 165, /* XXXMPA */
 	DST_ALG_HMAC_LAST = DST_ALG_HMACSHA512,
-	DST_ALG_FALCON512 = 249,
-	DST_ALG_DILITHIUM2 = 250,
-	DST_ALG_SPHINCSSHA256128S = 251,
 
 	DST_ALG_INDIRECT = 252,
 	DST_ALG_PRIVATE = 254,
