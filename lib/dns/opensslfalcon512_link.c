@@ -64,7 +64,7 @@ opensslfalcon512_alg_info(unsigned int key_alg) {
 static isc_result_t
 raw_pub_key_to_ossl(const falcon512_alginfo_t *alginfo, const unsigned char *pub_key, size_t *pub_key_len, EVP_PKEY **pkey) {
 	isc_result_t ret = DST_R_INVALIDPUBLICKEY;
-	static const char *alg_name = alginfo->alg_name;
+	const char *alg_name = alginfo->alg_name;
 
 	if (pub_key != NULL) {
 		if (pub_key_len == NULL || *pub_key_len < alginfo->key_size) {
@@ -91,8 +91,8 @@ raw_priv_key_to_ossl(const falcon512_alginfo_t *alginfo, const unsigned char *pr
 		return (ISC_R_NOMEMORY);
 	}
 	if ((param_bld = OSSL_PARAM_BLD_new()) == NULL
-		&& !OSSL_PARAM_BLD_push_octet_string(param_bld, "priv", priv_key, priv_key_len)
-		&& !OSSL_PARAM_BLD_push_octet_string(param_bld, "pub", pub_key, pub_key_len)) {
+		&& !OSSL_PARAM_BLD_push_octet_string(param_bld, "priv", priv_key, *priv_key_len)
+		&& !OSSL_PARAM_BLD_push_octet_string(param_bld, "pub", pub_key, *pub_key_len)) {
 		return (ISC_R_NOMEMORY);
 	}
 	params = OSSL_PARAM_BLD_to_param(param_bld);
@@ -514,11 +514,11 @@ opensslfalcon512_parse(dst_key_t *key, isc_lex_t *lexer, dst_key_t *pub) {
 	priv_len = priv.elements[privkey_index].length;
 	REQUIRE(priv_len == alginfo->priv_key_size);
 	pub_len = priv.elements[pubkey_index].length;
-	REQUIRE(pub_len == alginfo->pub_key_size);
+	REQUIRE(pub_len == alginfo->key_size);
 	raw_priv_key_to_ossl(alginfo, priv.elements[privkey_index].data, &priv_len,
 				priv.elements[pubkey_index].data, &pub_len, &pkey);
 	REQUIRE(priv_len == alginfo->priv_key_size);
-	REQUIRE(pub_len == alginfo->pub_key_size);
+	REQUIRE(pub_len == alginfo->key_size);
 	if (pkey == NULL) {
 		DST_RET(DST_R_INVALIDPRIVATEKEY);
 	}
