@@ -51,7 +51,7 @@ static const falcon512_alginfo_t *
 opensslfalcon512_alg_info(unsigned int key_alg) {
 	if (key_alg == DST_ALG_FALCON512) {
 		static const falcon512_alginfo_t falcon512_alginfo = {
-			.alg_name = "falcon512",
+			.alg_name = "Falcon512",
 			.key_size = DNS_KEY_FALCON512SIZE,
 			.priv_key_size = FALCON512_PRIVATEKEYSIZE,
 			.sig_size = DNS_SIG_FALCON512SIZE,
