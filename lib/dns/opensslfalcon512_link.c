@@ -110,6 +110,7 @@ raw_priv_key_to_ossl(const falcon512_alginfo_t *alginfo, const unsigned char *pr
 	if (pk == NULL) {
 		goto fromdata_err;
 	}
+	*pkey = pk
 	ret = ISC_R_SUCCESS;
 
 fromdata_err:
@@ -515,8 +516,11 @@ opensslfalcon512_parse(dst_key_t *key, isc_lex_t *lexer, dst_key_t *pub) {
 	REQUIRE(priv_len == alginfo->priv_key_size);
 	pub_len = priv.elements[pubkey_index].length;
 	REQUIRE(pub_len == alginfo->key_size);
-	raw_priv_key_to_ossl(alginfo, priv.elements[privkey_index].data, &priv_len,
-				priv.elements[pubkey_index].data, &pub_len, &pkey);
+	ret = raw_priv_key_to_ossl(alginfo, priv.elements[privkey_index].data,
+				&priv_len, priv.elements[pubkey_index].data, &pub_len, &pkey);
+	if (ret != ISC_R_SUCCESS) {
+		DST_RET(ret);
+	}
 	REQUIRE(priv_len == alginfo->priv_key_size);
 	REQUIRE(pub_len == alginfo->key_size);
 	if (pkey == NULL) {
@@ -525,7 +529,6 @@ opensslfalcon512_parse(dst_key_t *key, isc_lex_t *lexer, dst_key_t *pub) {
 	key->keydata.pkeypair.priv = pkey;
 	key->keydata.pkeypair.pub = pkey;
 	key->key_size = priv.elements[pubkey_index].length;
-	ret = ISC_R_SUCCESS;
 
 err:
 	dst__privstruct_free(&priv, mctx);
