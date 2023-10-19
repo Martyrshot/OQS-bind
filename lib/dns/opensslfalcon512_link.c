@@ -110,7 +110,7 @@ raw_priv_key_to_ossl(const falcon512_alginfo_t *alginfo, const unsigned char *pr
 	if (pk == NULL) {
 		goto fromdata_err;
 	}
-	*pkey = pk
+	*pkey = pk;
 	ret = ISC_R_SUCCESS;
 
 fromdata_err:
