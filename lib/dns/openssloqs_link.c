@@ -42,27 +42,27 @@
 
 #define FALCON512_PRIVATEKEYSIZE 1281
 
-typedef struct falcon512_alginfo {
+typedef struct oqs_alginfo {
 	const char *alg_name;
 	unsigned int key_size, priv_key_size, sig_size;
-} falcon512_alginfo_t;
+} oqs_alginfo_t;
 
-static const falcon512_alginfo_t *
-opensslfalcon512_alg_info(unsigned int key_alg) {
+static const oqs_alginfo_t *
+openssloqs_alg_info(unsigned int key_alg) {
 	if (key_alg == DST_ALG_FALCON512) {
-		static const falcon512_alginfo_t falcon512_alginfo = {
+		static const oqs_alginfo_t oqs_alginfo = {
 			.alg_name = "Falcon512",
 			.key_size = DNS_KEY_FALCON512SIZE,
 			.priv_key_size = FALCON512_PRIVATEKEYSIZE,
 			.sig_size = DNS_SIG_FALCON512SIZE,
 		};
-		return &falcon512_alginfo;
+		return &oqs_alginfo;
 	}
 	return NULL;
 }
 
 static isc_result_t
-raw_pub_key_to_ossl(const falcon512_alginfo_t *alginfo, const unsigned char *pub_key, size_t *pub_key_len, EVP_PKEY **pkey) {
+raw_pub_key_to_ossl(const oqs_alginfo_t *alginfo, const unsigned char *pub_key, size_t *pub_key_len, EVP_PKEY **pkey) {
 	isc_result_t ret = DST_R_INVALIDPUBLICKEY;
 	const char *alg_name = alginfo->alg_name;
 
@@ -79,7 +79,7 @@ raw_pub_key_to_ossl(const falcon512_alginfo_t *alginfo, const unsigned char *pub
 	return (ISC_R_SUCCESS);
 }
 static isc_result_t
-raw_priv_key_to_ossl(const falcon512_alginfo_t *alginfo, const unsigned char *priv_key, size_t *priv_key_len, 
+raw_priv_key_to_ossl(const oqs_alginfo_t *alginfo, const unsigned char *priv_key, size_t *priv_key_len, 
 			const unsigned char *pub_key, size_t *pub_key_len, EVP_PKEY **pkey) {
 	EVP_PKEY *pk = NULL;
 	EVP_PKEY_CTX *ctx = NULL;
@@ -125,10 +125,10 @@ param_err:
 	return ret;
 }
 static isc_result_t
-opensslfalcon512_createctx(dst_key_t *key, dst_context_t *dctx) {
+openssloqs_createctx(dst_key_t *key, dst_context_t *dctx) {
 	isc_buffer_t *buf = NULL;
-	const falcon512_alginfo_t *alginfo =
-		opensslfalcon512_alg_info(dctx->key->key_alg);
+	const oqs_alginfo_t *alginfo =
+		openssloqs_alg_info(dctx->key->key_alg);
 
 	UNUSED(key);
 
@@ -141,10 +141,10 @@ opensslfalcon512_createctx(dst_key_t *key, dst_context_t *dctx) {
 }
 
 static void
-opensslfalcon512_destroyctx(dst_context_t *dctx) {
+openssloqs_destroyctx(dst_context_t *dctx) {
 	isc_buffer_t *buf = (isc_buffer_t *)dctx->ctxdata.generic;
-	const falcon512_alginfo_t *alginfo =
-		opensslfalcon512_alg_info(dctx->key->key_alg);
+	const oqs_alginfo_t *alginfo =
+		openssloqs_alg_info(dctx->key->key_alg);
 
 	REQUIRE(alginfo != NULL);
 	
@@ -155,14 +155,14 @@ opensslfalcon512_destroyctx(dst_context_t *dctx) {
 }
 
 static isc_result_t
-opensslfalcon512_adddata(dst_context_t *dctx, const isc_region_t *data) {
+openssloqs_adddata(dst_context_t *dctx, const isc_region_t *data) {
 	isc_buffer_t *buf = (isc_buffer_t *)dctx->ctxdata.generic;
 	isc_buffer_t *nbuf = NULL;
 	isc_region_t r;
 	unsigned int length;
 	isc_result_t result;
-	const falcon512_alginfo_t *alginfo =
-		opensslfalcon512_alg_info(dctx->key->key_alg);
+	const oqs_alginfo_t *alginfo =
+		openssloqs_alg_info(dctx->key->key_alg);
 
 	REQUIRE(alginfo != NULL);
 
@@ -183,7 +183,7 @@ opensslfalcon512_adddata(dst_context_t *dctx, const isc_region_t *data) {
 }
 
 static isc_result_t
-opensslfalcon512_sign(dst_context_t *dctx, isc_buffer_t *sig) {
+openssloqs_sign(dst_context_t *dctx, isc_buffer_t *sig) {
 	isc_result_t ret;
 	dst_key_t *key = dctx->key;
 	isc_region_t tbsreg;
@@ -192,7 +192,7 @@ opensslfalcon512_sign(dst_context_t *dctx, isc_buffer_t *sig) {
 	EVP_MD_CTX *ctx = EVP_MD_CTX_new();
 	isc_buffer_t *buf = (isc_buffer_t *)dctx->ctxdata.generic;
 	size_t siglen;
-	const falcon512_alginfo_t *alginfo = opensslfalcon512_alg_info(key->key_alg);
+	const oqs_alginfo_t *alginfo = openssloqs_alg_info(key->key_alg);
 
 	REQUIRE(alginfo != NULL);
 
@@ -230,7 +230,7 @@ err:
 }
 
 static isc_result_t
-opensslfalcon512_verify(dst_context_t *dctx, const isc_region_t *sig) {
+openssloqs_verify(dst_context_t *dctx, const isc_region_t *sig) {
 	isc_result_t ret;
 	dst_key_t *key = dctx->key;
 	int status;
@@ -238,7 +238,7 @@ opensslfalcon512_verify(dst_context_t *dctx, const isc_region_t *sig) {
 	EVP_PKEY *pkey = key->keydata.pkeypair.pub;
 	EVP_MD_CTX *ctx = EVP_MD_CTX_new();
 	isc_buffer_t *buf = (isc_buffer_t *)dctx->ctxdata.generic;
-	const falcon512_alginfo_t *alginfo = opensslfalcon512_alg_info(key->key_alg);
+	const oqs_alginfo_t *alginfo = openssloqs_alg_info(key->key_alg);
 
 	REQUIRE(alginfo != NULL);
 
@@ -281,12 +281,12 @@ err:
 }
 
 static isc_result_t
-opensslfalcon512_generate(dst_key_t *key, int unused, void (*callback)(int)) {
+openssloqs_generate(dst_key_t *key, int unused, void (*callback)(int)) {
 	isc_result_t ret;
 	EVP_PKEY *pkey = NULL;
 	EVP_PKEY_CTX *ctx = NULL;
 	int status;
-	const falcon512_alginfo_t *alginfo = opensslfalcon512_alg_info(key->key_alg);
+	const oqs_alginfo_t *alginfo = openssloqs_alg_info(key->key_alg);
 
 	UNUSED(unused);
 	UNUSED(callback);
@@ -322,11 +322,11 @@ err:
 }
 
 static isc_result_t
-opensslfalcon512_todns(const dst_key_t *key, isc_buffer_t *data) {
+openssloqs_todns(const dst_key_t *key, isc_buffer_t *data) {
 	EVP_PKEY *pkey = key->keydata.pkeypair.pub;
 	isc_region_t r;
 	size_t len;
-	const falcon512_alginfo_t *alginfo = opensslfalcon512_alg_info(key->key_alg);
+	const oqs_alginfo_t *alginfo = openssloqs_alg_info(key->key_alg);
 
 	REQUIRE(pkey != NULL);
 	REQUIRE(alginfo != NULL);
@@ -345,12 +345,12 @@ opensslfalcon512_todns(const dst_key_t *key, isc_buffer_t *data) {
 }
 
 static isc_result_t
-opensslfalcon512_fromdns(dst_key_t *key, isc_buffer_t *data) {
+openssloqs_fromdns(dst_key_t *key, isc_buffer_t *data) {
 	isc_result_t ret;
 	isc_region_t r;
 	size_t len;
 	EVP_PKEY *pkey = NULL;
-	const falcon512_alginfo_t *alginfo = opensslfalcon512_alg_info(key->key_alg);
+	const oqs_alginfo_t *alginfo = openssloqs_alg_info(key->key_alg);
 
 	REQUIRE(alginfo != NULL);
 
@@ -372,7 +372,7 @@ opensslfalcon512_fromdns(dst_key_t *key, isc_buffer_t *data) {
 }
 
 static isc_result_t
-opensslfalcon512_tofile(const dst_key_t *key, const char *directory) {
+openssloqs_tofile(const dst_key_t *key, const char *directory) {
 	isc_result_t ret;
 	dst_private_t priv;
 	unsigned char *pubbuf = NULL;
@@ -380,7 +380,7 @@ opensslfalcon512_tofile(const dst_key_t *key, const char *directory) {
 	size_t publen;
 	size_t privlen;
 	int i;
-	const falcon512_alginfo_t *alginfo = opensslfalcon512_alg_info(key->key_alg);
+	const oqs_alginfo_t *alginfo = openssloqs_alg_info(key->key_alg);
 
 	REQUIRE(alginfo != NULL);
 
@@ -429,7 +429,7 @@ err:
 }
 
 static isc_result_t
-opensslfalcon512_parse(dst_key_t *key, isc_lex_t *lexer, dst_key_t *pub) {
+openssloqs_parse(dst_key_t *key, isc_lex_t *lexer, dst_key_t *pub) {
 	dst_private_t priv;
 	isc_result_t ret;
 	int i, privkey_index, pubkey_index = -1;
@@ -437,7 +437,7 @@ opensslfalcon512_parse(dst_key_t *key, isc_lex_t *lexer, dst_key_t *pub) {
 	EVP_PKEY *pkey = NULL, *pubpkey = NULL;
 	size_t pub_len, priv_len;
 	isc_mem_t *mctx = key->mctx;
-	const falcon512_alginfo_t *alginfo = opensslfalcon512_alg_info(key->key_alg);
+	const oqs_alginfo_t *alginfo = openssloqs_alg_info(key->key_alg);
 	
 	UNUSED(engine);
 	UNUSED(label);
@@ -511,24 +511,24 @@ err:
 	return (ret);
 }
 
-static dst_func_t opensslfalcon512_functions = {
-	opensslfalcon512_createctx,
+static dst_func_t openssloqs_functions = {
+	openssloqs_createctx,
 	NULL, /*%< createctx2 */
-	opensslfalcon512_destroyctx,
-	opensslfalcon512_adddata,
-	opensslfalcon512_sign,
-	opensslfalcon512_verify,
+	openssloqs_destroyctx,
+	openssloqs_adddata,
+	openssloqs_sign,
+	openssloqs_verify,
 	NULL, /*%< verify2 */
 	NULL, /*%< computesecret */
 	dst__openssl_keypair_compare,
 	NULL, /*%< paramcompare */
-	opensslfalcon512_generate,
+	openssloqs_generate,
 	dst__openssl_keypair_isprivate,
 	dst__openssl_keypair_destroy, 
-	opensslfalcon512_todns,   // called by dst_key_todns converts a dst_key to a buffer
-	opensslfalcon512_fromdns, // called by from buffer and constructs a key from dns
-	opensslfalcon512_tofile,
-	opensslfalcon512_parse,
+	openssloqs_todns,   // called by dst_key_todns converts a dst_key to a buffer
+	openssloqs_fromdns, // called by from buffer and constructs a key from dns
+	openssloqs_tofile,
+	openssloqs_parse,
 	NULL,			    /*%< cleanup */
 	NULL, 			    /*%< fromlabel */
 	NULL,			    /*%< dump */
@@ -536,10 +536,10 @@ static dst_func_t opensslfalcon512_functions = {
 };
 
 isc_result_t
-dst__opensslfalcon512_init(dst_func_t **funcp) {
+dst__openssloqs_init(dst_func_t **funcp) {
 	REQUIRE(funcp != NULL);
 	if (*funcp == NULL) {
-		*funcp = &opensslfalcon512_functions;
+		*funcp = &openssloqs_functions;
 	}
 	return (ISC_R_SUCCESS);
 }
