@@ -217,7 +217,7 @@ opensslfalcon512_sign(dst_context_t *dctx, isc_buffer_t *sig) {
 		DST_RET(dst__openssl_toresult3(dctx->category, "EVP_DigestSign",
 					       DST_R_SIGNFAILURE));
 	}
-	REQUIRE(siglen == alginfo->sig_size);
+	INSIST(siglen == alginfo->sig_size);
 	isc_buffer_add(sig, (unsigned int)siglen);
 	ret = ISC_R_SUCCESS;
 
@@ -490,16 +490,14 @@ opensslfalcon512_parse(dst_key_t *key, isc_lex_t *lexer, dst_key_t *pub) {
 		DST_RET(DST_R_INVALIDPUBLICKEY);
 	}
 	priv_len = priv.elements[privkey_index].length;
-	REQUIRE(priv_len == alginfo->priv_key_size);
 	pub_len = priv.elements[pubkey_index].length;
-	REQUIRE(pub_len == alginfo->key_size);
 	ret = raw_priv_key_to_ossl(alginfo, priv.elements[privkey_index].data,
 				&priv_len, priv.elements[pubkey_index].data, &pub_len, &pkey);
 	if (ret != ISC_R_SUCCESS) {
 		DST_RET(ret);
 	}
-	REQUIRE(priv_len == alginfo->priv_key_size);
-	REQUIRE(pub_len == alginfo->key_size);
+	INSIST(priv_len == alginfo->priv_key_size);
+	INSIST(pub_len == alginfo->key_size);
 	if (pkey == NULL) {
 		DST_RET(DST_R_INVALIDPRIVATEKEY);
 	}
