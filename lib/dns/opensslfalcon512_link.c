@@ -205,12 +205,6 @@ opensslfalcon512_sign(dst_context_t *dctx, isc_buffer_t *sig) {
 	if (sigreg.length < (unsigned int)siglen) {
 		DST_RET(ISC_R_NOSPACE);
 	}
-	// TODO update to newer liboqs so we don't have to do this gross hack anymore
-	// zero out buffer
-	unsigned char *_sig = sigreg.base;
-	for (size_t i = 0; i < siglen; i++) {
-		_sig[i] = 0;
-	}
 
 	isc_buffer_usedregion(buf, &tbsreg);
 
@@ -223,8 +217,7 @@ opensslfalcon512_sign(dst_context_t *dctx, isc_buffer_t *sig) {
 		DST_RET(dst__openssl_toresult3(dctx->category, "EVP_DigestSign",
 					       DST_R_SIGNFAILURE));
 	}
-	// TODO once updated, remove the following line to avoid bugs.
-	siglen = alginfo->sig_size;
+	REQUIRE(siglen == alginfo->sig_size);
 	isc_buffer_add(sig, (unsigned int)siglen);
 	ret = ISC_R_SUCCESS;
 
@@ -256,30 +249,14 @@ opensslfalcon512_verify(dst_context_t *dctx, const isc_region_t *sig) {
 	if (sig->length != alginfo->sig_size) {
 		return (DST_R_VERIFYFAILURE);
 	}
-
-	// TODO update to latest version of liboqs to remove this hack
-	unsigned char *_sig = sig->base;
-	int ending_key = -1;
-	size_t siglen = sig->length;
-        if (siglen == DNS_SIG_FALCON512SIZE) {
-                for (unsigned int i = 0; i < siglen; i++) {
-                        if (_sig[i] == 0 && ending_key == -1) ending_key = i;
-                        else if (_sig[i] == 0) continue;
-                        else ending_key = -1;
-                }
-        }
-        if (ending_key != -1) {
-                siglen = ending_key;
-        }
-
 	isc_buffer_usedregion(buf, &tbsreg);
 
 	if (EVP_DigestVerifyInit(ctx, NULL, NULL, NULL, pkey) != 1) {
 		DST_RET(dst__openssl_toresult3(
 			dctx->category, "EVP_DigestVerifyInit", ISC_R_FAILURE));
 	}
-	// TODO use siglen until updated to fixed sized falcon signatures
-	status = EVP_DigestVerify(ctx, sig->base, siglen, tbsreg.base,
+
+	status = EVP_DigestVerify(ctx, sig->base, sig->length, tbsreg.base,
 				  tbsreg.length);
 
 	switch (status) {
