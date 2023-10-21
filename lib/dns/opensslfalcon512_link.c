@@ -91,8 +91,8 @@ raw_priv_key_to_ossl(const falcon512_alginfo_t *alginfo, const unsigned char *pr
 		return (ISC_R_NOMEMORY);
 	}
 	if ((param_bld = OSSL_PARAM_BLD_new()) == NULL
-		&& !OSSL_PARAM_BLD_push_octet_string(param_bld, "priv", priv_key, *priv_key_len)
-		&& !OSSL_PARAM_BLD_push_octet_string(param_bld, "pub", pub_key, *pub_key_len)) {
+		|| !OSSL_PARAM_BLD_push_octet_string(param_bld, "priv", priv_key, *priv_key_len)
+		|| !OSSL_PARAM_BLD_push_octet_string(param_bld, "pub", pub_key, *pub_key_len)) {
 		return (ISC_R_NOMEMORY);
 	}
 	params = OSSL_PARAM_BLD_to_param(param_bld);
@@ -104,7 +104,7 @@ raw_priv_key_to_ossl(const falcon512_alginfo_t *alginfo, const unsigned char *pr
 		goto ctxt_err;
 	}
 	if (EVP_PKEY_fromdata_init(ctx) <= 0
-		|| EVP_PKEY_fromdata(ctx, &pk, EVP_PKEY_KEYPAIR, params) <= 0) {
+		|| EVP_PKEY_fromdata(ctx, &pk, EVP_PKEY_KEY_PARAMETERS, params) <= 0) {
 		goto fromdata_err;
 	}
 	if (pk == NULL) {
