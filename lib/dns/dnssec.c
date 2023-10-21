@@ -187,7 +187,7 @@ dns_dnssec_sign(const dns_name_t *name, dns_rdataset_t *set, dst_key_t *key,
 	dns_rdata_t tmpsigrdata;
 	dns_rdata_t *rdatas;
 	int nrdatas, i;
-	isc_buffer_t sigbuf, envbuf;
+	isc_buffer_t sigbuf, envbuf, tmp;
 	isc_region_t r;
 	dst_context_t *ctx = NULL;
 	isc_result_t ret;
