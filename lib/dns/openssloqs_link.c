@@ -412,7 +412,7 @@ openssloqs_tofile(const dst_key_t *key, const char *directory) {
 		if (EVP_PKEY_get_raw_private_key(key->keydata.pkeypair.priv, privbuf,
 						 &privlen) != 1)
 			DST_RET(dst__openssl_toresult(ISC_R_FAILURE));
-		priv.elements[i].tag = TAG_FALCON512_PRIVATEKEY;
+		priv.elements[i].tag = TAG_OQS_PRIVATEKEY;
 		priv.elements[i].length = privlen;
 		priv.elements[i].data = privbuf;
 		i++;
@@ -420,7 +420,7 @@ openssloqs_tofile(const dst_key_t *key, const char *directory) {
 		if (EVP_PKEY_get_raw_public_key(key->keydata.pkeypair.priv, pubbuf,
 						 &publen) != 1)
 			DST_RET(dst__openssl_toresult(ISC_R_FAILURE));
-		priv.elements[i].tag = TAG_FALCON512_PUBLICKEY;
+		priv.elements[i].tag = TAG_OQS_PUBLICKEY;
 		priv.elements[i].length = publen;
 		priv.elements[i].data = pubbuf;
 		i++;
@@ -456,7 +456,7 @@ openssloqs_parse(dst_key_t *key, isc_lex_t *lexer, dst_key_t *pub) {
 	REQUIRE(alginfo != NULL);
 
 	/* read private key file */
-	ret = dst__privstruct_parse(key, DST_ALG_FALCON512, lexer, mctx, &priv);
+	ret = dst__privstruct_parse(key, key->key_alg, lexer, mctx, &priv);
 	if (ret != ISC_R_SUCCESS) {
 		goto err;
 	}
@@ -477,16 +477,16 @@ openssloqs_parse(dst_key_t *key, isc_lex_t *lexer, dst_key_t *pub) {
 
 	for (i = 0; i < priv.nelements; i++) {
 		switch (priv.elements[i].tag) {
-		case TAG_FALCON512_ENGINE:
+		case TAG_OQS_ENGINE:
 			engine = (char *)priv.elements[i].data;
 			break;
-		case TAG_FALCON512_LABEL:
+		case TAG_OQS_LABEL:
 			label = (char *)priv.elements[i].data;
 			break;
-		case TAG_FALCON512_PRIVATEKEY:
+		case TAG_OQS_PRIVATEKEY:
 			privkey_index = i;
 			break;
-		case TAG_FALCON512_PUBLICKEY:
+		case TAG_OQS_PUBLICKEY:
 			pubkey_index = i;
 			break;
 		default:
