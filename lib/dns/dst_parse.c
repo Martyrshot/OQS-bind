@@ -108,10 +108,20 @@ static struct parse_map map[] = { { TAG_RSA_MODULUS, "Modulus:" },
 				  { TAG_HMACSHA512_KEY, "Key:" },
 				  { TAG_HMACSHA512_BITS, "Bits:" },
 
-				  { TAG_OQS_PRIVATEKEY, "PrivateKey:" },
-				  { TAG_OQS_PUBLICKEY, "PublicKey:" },
-				  { TAG_OQS_ENGINE, "Engine:" }, // Probably won't use for now
-				  { TAG_OQS_LABEL, "Label:" }, // Probably won't use for now
+				  { TAG_FALCON512_PRIVATEKEY, "PrivateKey:" },
+				  { TAG_FALCON512_PUBLICKEY, "PublicKey:" },
+				  { TAG_FALCON512_ENGINE, "Engine:" }, // Probably won't use for now
+				  { TAG_FALCON512_LABEL, "Label:" }, // Probably won't use for now
+				  
+				  { TAG_DILITHIUM2_PRIVATEKEY, "PrivateKey:" },
+				  { TAG_DILITHIUM2_PUBLICKEY, "PublicKey:" },
+				  { TAG_DILITHIUM2_ENGINE, "Engine:" }, // Probably won't use for now
+				  { TAG_DILITHIUM2_LABEL, "Label:" }, // Probably won't use for now
+				  
+				  { TAG_SPHINCSSHA256128S_PRIVATEKEY, "PrivateKey:" },
+				  { TAG_SPHINCSSHA256128S_PUBLICKEY, "PublicKey:" },
+				  { TAG_SPHINCSSHA256128S_ENGINE, "Engine:" }, // Probably won't use for now
+				  { TAG_SPHINCSSHA256128S_LABEL, "Label:" }, // Probably won't use for now
 				  
 				  { 0, NULL } };
 
