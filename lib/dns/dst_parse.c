@@ -341,7 +341,7 @@ check_oqs(const dst_private_t *priv, const unsigned int alg, bool external) {
 		have[i] = false;
 	}
 	for (j = 0; j < priv->nelements; j++) {
-		for (i = 0; i < PQS_NTAGS; i++) {
+		for (i = 0; i < OQS_NTAGS; i++) {
 			if (priv->elements[j].tag == TAG(alg, i)) {
 				break;
 			}

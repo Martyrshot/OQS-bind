@@ -43,28 +43,48 @@
 #define FALCON512_PRIVATEKEYSIZE 1281
 #define DILITHIUM2_PRIVATEKEYSIZE 2528
 
+typedef struct oqs_tags {
+	unsigned int ntags, private_key_tag, public_key_tag, engine_tag, label_tag;
+} oqs_tags_t;
+
 typedef struct oqs_alginfo {
 	const char *alg_name;
 	unsigned int key_size, priv_key_size, sig_size;
+	oqs_tags_t tags;
 } oqs_alginfo_t;
+
 
 static const oqs_alginfo_t *
 openssloqs_alg_info(unsigned int key_alg) {
 	if (key_alg == DST_ALG_FALCON512) {
 		static const oqs_alginfo_t oqs_alginfo = {
-			.alg_name = "Falcon512",
+			.alg_name = "falcon512",
 			.key_size = DNS_KEY_FALCON512SIZE,
 			.priv_key_size = FALCON512_PRIVATEKEYSIZE,
 			.sig_size = DNS_SIG_FALCON512SIZE,
+			.tags = {
+				.ntags = OQS_NTAGS,
+				.private_key_tag = TAG_FALCON512_PRIVATEKEY,
+				.public_key_tag = TAG_FALCON512_PUBLICKEY,
+				.engine_tag = TAG_FALCON512_ENGINE,
+				.label_tag = TAG_FALCON512_LABEL,
+			},
 		};
 		return &oqs_alginfo;
 	}
 	if (key_alg == DST_ALG_DILITHIUM2) {
 		static const oqs_alginfo_t oqs_alginfo = {
-			.alg_name = "Dilithium2",
+			.alg_name = "dilithium2",
 			.key_size = DNS_KEY_DILITHIUM2SIZE,
 			.priv_key_size = DILITHIUM2_PRIVATEKEYSIZE,
 			.sig_size = DNS_SIG_DILITHIUM2SIZE,
+			.tags = {
+				.ntags = OQS_NTAGS,
+				.private_key_tag = TAG_DILITHIUM2_PRIVATEKEY,
+				.public_key_tag = TAG_DILITHIUM2_PUBLICKEY,
+				.engine_tag = TAG_DILITHIUM2_ENGINE,
+				.label_tag = TAG_DILITHIUM2_LABEL,
+			},
 		};
 		return &oqs_alginfo;
 	}
@@ -412,7 +432,7 @@ openssloqs_tofile(const dst_key_t *key, const char *directory) {
 		if (EVP_PKEY_get_raw_private_key(key->keydata.pkeypair.priv, privbuf,
 						 &privlen) != 1)
 			DST_RET(dst__openssl_toresult(ISC_R_FAILURE));
-		priv.elements[i].tag = TAG_OQS_PRIVATEKEY;
+		priv.elements[i].tag = alginfo->tags.private_key_tag;
 		priv.elements[i].length = privlen;
 		priv.elements[i].data = privbuf;
 		i++;
@@ -420,7 +440,7 @@ openssloqs_tofile(const dst_key_t *key, const char *directory) {
 		if (EVP_PKEY_get_raw_public_key(key->keydata.pkeypair.priv, pubbuf,
 						 &publen) != 1)
 			DST_RET(dst__openssl_toresult(ISC_R_FAILURE));
-		priv.elements[i].tag = TAG_OQS_PUBLICKEY;
+		priv.elements[i].tag = alginfo->tags.public_key_tag;
 		priv.elements[i].length = publen;
 		priv.elements[i].data = pubbuf;
 		i++;
@@ -477,16 +497,16 @@ openssloqs_parse(dst_key_t *key, isc_lex_t *lexer, dst_key_t *pub) {
 
 	for (i = 0; i < priv.nelements; i++) {
 		switch (priv.elements[i].tag) {
-		case TAG_OQS_ENGINE:
+		case alginfo->tags.engine_tag:
 			engine = (char *)priv.elements[i].data;
 			break;
-		case TAG_OQS_LABEL:
+		case alginfo->tags.label_tag:
 			label = (char *)priv.elements[i].data;
 			break;
-		case TAG_OQS_PRIVATEKEY:
+		case alginfo->tags.private_key_tag:
 			privkey_index = i;
 			break;
-		case TAG_OQS_PUBLICKEY:
+		case alginfo->tags.public_key_tag:
 			pubkey_index = i;
 			break;
 		default:
