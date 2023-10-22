@@ -41,6 +41,7 @@
 	}
 
 #define FALCON512_PRIVATEKEYSIZE 1281
+#define DILITHIUM2_PRIVATEKEYSIZE 2528
 
 typedef struct oqs_alginfo {
 	const char *alg_name;
@@ -55,6 +56,15 @@ openssloqs_alg_info(unsigned int key_alg) {
 			.key_size = DNS_KEY_FALCON512SIZE,
 			.priv_key_size = FALCON512_PRIVATEKEYSIZE,
 			.sig_size = DNS_SIG_FALCON512SIZE,
+		};
+		return &oqs_alginfo;
+	}
+	if (key_alg == DST_ALG_DILITHIUM2) {
+		static const oqs_alginfo_t oqs_alginfo = {
+			.alg_name = "Dilithium2",
+			.key_size = DNS_KEY_DILITHIUM2SIZE,
+			.priv_key_size = DILITHIUM2_PRIVATEKEYSIZE,
+			.sig_size = DNS_SIG_DILITHIUM2SIZE,
 		};
 		return &oqs_alginfo;
 	}
