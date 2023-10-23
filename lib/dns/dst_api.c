@@ -230,6 +230,7 @@ dst_lib_init(isc_mem_t *mctx, const char *engine) {
 #endif /* HAVE_GSSAPI */
 	RETERR(dst__openssloqs_init(&dst_t_func[DST_ALG_FALCON512]));
 	RETERR(dst__openssloqs_init(&dst_t_func[DST_ALG_DILITHIUM2]));
+	RETERR(dst__openssloqs_init(&dst_t_func[DST_ALG_SPHINCSSHA256128S]));
 	
 	dst_initialized = true;
 	return (ISC_R_SUCCESS);
