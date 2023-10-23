@@ -228,9 +228,9 @@ dst_lib_init(isc_mem_t *mctx, const char *engine) {
 #if HAVE_GSSAPI
 	RETERR(dst__gssapi_init(&dst_t_func[DST_ALG_GSSAPI]));
 #endif /* HAVE_GSSAPI */
-	RETERR(dst__opensslfalcon512_init(&dst_t_func[DST_ALG_FALCON512]));
-	RETERR(dst__openssldilithium2_init(&dst_t_func[DST_ALG_DILITHIUM2]));
-	RETERR(dst__opensslsphincssha256128s_init(&dst_t_func[DST_ALG_SPHINCSSHA256128S]));
+	RETERR(dst__openssloqs_init(&dst_t_func[DST_ALG_FALCON512]));
+	RETERR(dst__openssloqs_init(&dst_t_func[DST_ALG_DILITHIUM2]));
+	RETERR(dst__openssloqs_init(&dst_t_func[DST_ALG_SPHINCSSHA256128S]));
 	
 	dst_initialized = true;
 	return (ISC_R_SUCCESS);

@@ -207,10 +207,8 @@ libdns_la_SOURCES =			\
 	openssl_shim.h			\
 	opensslecdsa_link.c		\
 	openssleddsa_link.c		\
+	openssloqs_link.c               \
 	opensslrsa_link.c		\
-	opensslfalcon512_link.c         \
-	openssldilithium2_link.c        \
-	opensslsphincs+sha256128s_link.c\
 	order.c				\
 	peer.c				\
 	private.c			\

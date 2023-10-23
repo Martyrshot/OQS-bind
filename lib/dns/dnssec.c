@@ -187,7 +187,7 @@ dns_dnssec_sign(const dns_name_t *name, dns_rdataset_t *set, dst_key_t *key,
 	dns_rdata_t tmpsigrdata;
 	dns_rdata_t *rdatas;
 	int nrdatas, i;
-	isc_buffer_t sigbuf, envbuf;
+	isc_buffer_t sigbuf, envbuf, tmp;
 	isc_region_t r;
 	dst_context_t *ctx = NULL;
 	isc_result_t ret;
@@ -195,6 +195,8 @@ dns_dnssec_sign(const dns_name_t *name, dns_rdataset_t *set, dst_key_t *key,
 	char data[256 + 8];
 	uint32_t flags;
 	unsigned int sigsize;
+	void *tmpsig;
+	unsigned int tmplen;
 	dns_fixedname_t fnewname;
 	dns_fixedname_t fsigner;
 
@@ -349,9 +351,18 @@ dns_dnssec_sign(const dns_name_t *name, dns_rdataset_t *set, dst_key_t *key,
 		goto cleanup_array;
 	}
 	isc_buffer_usedregion(&sigbuf, &r);
-	if (r.length != sig.siglen) {
+	if (r.length > sig.siglen) {
 		ret = ISC_R_NOSPACE;
 		goto cleanup_array;
+	} else {
+		tmpsig = sig.signature;
+		tmplen = sig.siglen;
+		sig.signature = isc_mem_get(mctx, r.length);
+		sig.siglen = r.length;
+		isc_buffer_init(&tmp, sig.signature, r.length);
+		isc_buffer_copyregion(&tmp, &r);
+		isc_mem_put(mctx, tmpsig, tmplen);
+		isc_buffer_usedregion(&tmp, &r);
 	}
 	ret = dns_rdata_fromstruct(sigrdata, sig.common.rdclass,
 				   sig.common.rdtype, &sig, buffer);

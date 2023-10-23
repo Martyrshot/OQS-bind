@@ -88,7 +88,7 @@
 #include <openssl/crypto.h>
 #include <openssl/evp.h>
 #include <openssl/opensslv.h>
-#if OPENSSL_VERSION_NUMBER >= 0x30000000L && OPENSSL_API_LEVEL >= 30000
+#if OPENSSL_VERSION_NUMBER >= 0x30200000L && OPENSSL_API_LEVEL >= 30200
 #include <openssl/err.h>
 #include <openssl/provider.h>
 #endif
@@ -153,8 +153,8 @@ static bool transferstuck = false;
 static bool disable6 = false;
 static bool disable4 = false;
 
-#if OPENSSL_VERSION_NUMBER >= 0x30000000L && OPENSSL_API_LEVEL >= 30000
-static OSSL_PROVIDER *fips = NULL, *base = NULL;
+#if OPENSSL_VERSION_NUMBER >= 0x30200000L && OPENSSL_API_LEVEL >= 30200
+static OSSL_PROVIDER *fips = NULL, *base = NULL, *oqs = NULL, *default_provider = NULL;
 #endif
 
 void
@@ -591,16 +591,11 @@ printversion(bool verbose) {
 	printf("compiled by Solaris Studio %x\n", __SUNPRO_C);
 #endif /* ifdef __SUNPRO_C */
 	printf("compiled with OpenSSL version: %s\n", OPENSSL_VERSION_TEXT);
-#if !defined(LIBRESSL_VERSION_NUMBER) && \
-	OPENSSL_VERSION_NUMBER >= 0x10100000L /* 1.1.0 or higher */
+#if OPENSSL_VERSION_NUMBER >= 0x30200000L /* 3.2.0 or higher */
 	printf("linked to OpenSSL version: %s\n",
 	       OpenSSL_version(OPENSSL_VERSION));
 
-#else  /* if !defined(LIBRESSL_VERSION_NUMBER) && OPENSSL_VERSION_NUMBER >= \
-	* 0x10100000L */
-	printf("linked to OpenSSL version: %s\n",
-	       SSLeay_version(SSLEAY_VERSION));
-#endif /* OPENSSL_VERSION_NUMBER >= 0x10100000L */
+#endif /* OPENSSL_VERSION_NUMBER >= 0x30200000L */
 	printf("compiled with libuv version: %d.%d.%d\n", UV_VERSION_MAJOR,
 	       UV_VERSION_MINOR, UV_VERSION_PATCH);
 	printf("linked to libuv version: %s\n", uv_version_string());
@@ -976,7 +971,7 @@ parse_command_line(int argc, char *argv[]) {
 			}
 			break;
 		case 'F':
-#if OPENSSL_VERSION_NUMBER >= 0x30000000L && OPENSSL_API_LEVEL >= 30000
+#if OPENSSL_VERSION_NUMBER >= 0x30200000L && OPENSSL_API_LEVEL >= 30200
 			fips = OSSL_PROVIDER_load(NULL, "fips");
 			if (fips == NULL) {
 				ERR_clear_error();
@@ -1177,19 +1172,12 @@ setup(void) {
 		      NAMED_LOGMODULE_MAIN, ISC_LOG_NOTICE,
 		      "compiled with OpenSSL version: %s",
 		      OPENSSL_VERSION_TEXT);
-#if !defined(LIBRESSL_VERSION_NUMBER) && \
-	OPENSSL_VERSION_NUMBER >= 0x10100000L /* 1.1.0 or higher */
+#if OPENSSL_VERSION_NUMBER >= 0x30200000L /* 3.2.0 or higher */
 	isc_log_write(named_g_lctx, NAMED_LOGCATEGORY_GENERAL,
 		      NAMED_LOGMODULE_MAIN, ISC_LOG_NOTICE,
 		      "linked to OpenSSL version: %s",
 		      OpenSSL_version(OPENSSL_VERSION));
-#else  /* if !defined(LIBRESSL_VERSION_NUMBER) && OPENSSL_VERSION_NUMBER >= \
-	* 0x10100000L */
-	isc_log_write(named_g_lctx, NAMED_LOGCATEGORY_GENERAL,
-		      NAMED_LOGMODULE_MAIN, ISC_LOG_NOTICE,
-		      "linked to OpenSSL version: %s",
-		      SSLeay_version(SSLEAY_VERSION));
-#endif /* OPENSSL_VERSION_NUMBER >= 0x10100000L */
+#endif /* OPENSSL_VERSION_NUMBER >= 0x30200000L */
 	isc_log_write(named_g_lctx, NAMED_LOGCATEGORY_GENERAL,
 		      NAMED_LOGMODULE_MAIN, ISC_LOG_NOTICE,
 		      "compiled with libuv version: %d.%d.%d", UV_VERSION_MAJOR,
@@ -1550,6 +1538,31 @@ main(int argc, char *argv[]) {
 
 	parse_command_line(argc, argv);
 
+	/*
+	 * Since providers may be loaded due to command line
+	 * arguments, load oqs and default providers now.
+	 * TODO: Maybe disable FIPS mode, or make oqs and FIPS
+	 *       mutually exclusive modes?
+	 */
+#if OPENSSL_VERSION_NUMER >= 0x30200000L && OPENSSL_API_LEVEL >= 30200
+	oqs = OSSL_PROVIDER_load(NULL, "oqsprovider");
+	if (oqs == NULL) {
+		if (fips != NULL) {
+			OSSL_PROVIDER_unload(fips);
+		}
+		if (base != NULL) {
+			OSSL_PROVIDER_unload(base);
+		}
+		ERR_clear_error();
+		named_main_earlyfatal("failed to load oqsprovider");
+	}
+	default_provider = OSSL_PROVIDER_load(NULL, "default");
+	if (default_provider == NULL) {
+		OSSL_PROVIDER_unload(oqs);
+		ERR_clear_error();
+		named_main_earlyfatal("Failed to load default provider");
+	}
+#endif /* if OPENSSL_VERSION_NUMER >= 0x30200000L && OPENSSL_API_LEVEL >= 30200 */
 #ifdef ENABLE_AFL
 	if (named_g_fuzz_type != isc_fuzz_none) {
 		named_fuzz_setup();
@@ -1640,12 +1653,18 @@ main(int argc, char *argv[]) {
 
 	named_os_shutdown();
 
-#if OPENSSL_VERSION_NUMBER >= 0x30000000L && OPENSSL_API_LEVEL >= 30000
+#if OPENSSL_VERSION_NUMBER >= 0x30200000L && OPENSSL_API_LEVEL >= 30200
 	if (base != NULL) {
 		OSSL_PROVIDER_unload(base);
 	}
 	if (fips != NULL) {
 		OSSL_PROVIDER_unload(fips);
+	}
+	if (oqs != NULL) {
+		OSSL_PROVIDER_unload(oqs);
+	}
+	if (default_provider != NULL) {
+		OSSL_PROVIDER_unload(default_provider);
 	}
 #endif
 
