@@ -293,7 +293,7 @@ openssloqs_verify(dst_context_t *dctx, const isc_region_t *sig) {
 		return (ISC_R_NOMEMORY);
 	}
 
-	if (sig->length != alginfo->sig_size) {
+	if (sig->length <= alginfo->sig_size) {
 		return (DST_R_VERIFYFAILURE);
 	}
 	isc_buffer_usedregion(buf, &tbsreg);
