@@ -29,6 +29,22 @@ jobs:
       with:
         packages: liburcu-dev libuv1-dev libssl-dev libnghttp2-dev libxml2-dev liblmdb-dev libjson-c-dev pkg-config autoconf automake autotools-dev libtool-bin libjemalloc-dev libedit-dev libcap-dev libidn2-dev libkrb5-dev libmaxminddb-dev zlib1g-dev python3-ply
         version: 1.0
+    - name: Install liboqs
+        run: |
+          git clone https://github.com/open-quantum-safe/liboqs.git
+          cd liboqs
+          mkdir build
+          cd build
+          cmake -GNinja .. && ninja && ninja test && ninja install
+    - name: Install Openssl3.2.0-alpha2
+        run: |
+          git clone --branch openssl-3.2.0-alpha2 https://github.com/openssl/openssl.git
+          cd openssl
+          ./Configure -lm && make && make install
+    - name: Install OQS-provider
+        run: |
+          git clone https://github.com/open-quantum-safe/oqs-provider.git
+          cmake -S . -B _build && cmake --build _build && ctest --test-dir _build && cmake --install _build
 
     # Initializes the CodeQL tools for scanning.
     - name: Initialize CodeQL
