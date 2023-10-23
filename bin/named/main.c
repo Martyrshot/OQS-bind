@@ -154,7 +154,8 @@ static bool disable6 = false;
 static bool disable4 = false;
 
 #if OPENSSL_VERSION_NUMBER >= 0x30200000L && OPENSSL_API_LEVEL >= 30200
-static OSSL_PROVIDER *fips = NULL, *base = NULL, *oqs = NULL, *default_provider = NULL;
+static OSSL_PROVIDER *fips = NULL, *base = NULL, *oqs = NULL,
+		     *default_provider = NULL;
 #endif
 
 void
@@ -1562,7 +1563,8 @@ main(int argc, char *argv[]) {
 		ERR_clear_error();
 		named_main_earlyfatal("Failed to load default provider");
 	}
-#endif /* if OPENSSL_VERSION_NUMER >= 0x30200000L && OPENSSL_API_LEVEL >= 30200 */
+#endif /* if OPENSSL_VERSION_NUMER >= 0x30200000L && OPENSSL_API_LEVEL >= \
+	  30200 */
 #ifdef ENABLE_AFL
 	if (named_g_fuzz_type != isc_fuzz_none) {
 		named_fuzz_setup();

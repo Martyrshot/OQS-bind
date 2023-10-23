@@ -106,11 +106,13 @@ static int nsec_datatype = dns_rdatatype_nsec;
 		     "dns_dbiterator_current()")
 
 #define IS_NSEC3  (nsec_datatype == dns_rdatatype_nsec3)
-#define OPTOUT(x) (((x)&DNS_NSEC3FLAG_OPTOUT) != 0)
+#define OPTOUT(x) (((x) & DNS_NSEC3FLAG_OPTOUT) != 0)
 
 #define REVOKE(x) ((dst_key_flags(x) & DNS_KEYFLAG_REVOKE) != 0)
 
-#define BUFSIZE	  8192 // OQS increased from 2049 to 8192 to account for SPHINCS+ 128S signatures.
+#define BUFSIZE \
+	8192 // OQS increased from 2049 to 8192 to account for SPHINCS+ 128S
+	     // signatures.
 #define MAXDSKEYS 8
 
 #define SIGNER_EVENTCLASS  ISC_EVENTCLASS(0x4453)
@@ -3372,7 +3374,8 @@ main(int argc, char *argv[]) {
 	bool nonsecify = false;
 	bool set_fips_mode = false;
 #if OPENSSL_VERSION_NUMBER >= 0x30200000L && OPENSSL_API_LEVEL >= 30200
-	OSSL_PROVIDER *fips = NULL, *base = NULL, *oqs = NULL, *default_provider = NULL;
+	OSSL_PROVIDER *fips = NULL, *base = NULL, *oqs = NULL,
+		      *default_provider = NULL;
 #endif
 
 	atomic_init(&shuttingdown, false);
