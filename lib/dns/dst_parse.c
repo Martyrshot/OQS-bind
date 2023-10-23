@@ -337,6 +337,15 @@ check_hmac_sha(const dst_private_t *priv, unsigned int ntags,
 	return (0);
 }
 
+// All of the OQS tags use the same indexes, so for sanity checking
+// we only need to use one of the algorithms tags. This is define is
+// to make the code below easier to read.
+
+#define TAG_OQS_LABEL TAG_FALCON512_LABEL
+#define TAG_OQS_ENGINE TAG_FALCON512_ENGINE
+#define TAG_OQS_PRIVATEKEY TAG_FALCON512_PRIVATEKEY
+#define TAG_OQS_PUBLICKEY TAG_FALCON512_PUBLICKEY
+
 static int
 check_oqs(const dst_private_t *priv, const unsigned int alg, bool external) {
 	int i, j;
