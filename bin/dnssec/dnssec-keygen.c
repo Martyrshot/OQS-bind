@@ -828,7 +828,6 @@ keygen(keygen_ctx_t *ctx, isc_mem_t *mctx, int argc, char **argv) {
 				}
 			}
 			dst_key_free(&key);
-
 		}
 	} while (conflict);
 
@@ -885,7 +884,8 @@ main(int argc, char **argv) {
 	int ch;
 	bool set_fips_mode = false;
 #if OPENSSL_VERSION_NUMBER >= 0x30200000L && OPENSSL_API_LEVEL >= 30200
-	OSSL_PROVIDER *fips = NULL, *base = NULL, *oqs = NULL, *default_provider = NULL;
+	OSSL_PROVIDER *fips = NULL, *base = NULL, *oqs = NULL,
+		      *default_provider = NULL;
 #endif
 
 	keygen_ctx_t ctx = {

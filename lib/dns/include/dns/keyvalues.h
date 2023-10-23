@@ -52,29 +52,29 @@
 #define DNS_KEYFLAG_RESERVEDMASK2 0xFFFF /*%< no bits defined here */
 
 /* The Algorithm field of the KEY and SIG RR's is an integer, {1..254} */
-#define DNS_KEYALG_RSAMD5	 	1 /*%< RSA with MD5 */
-#define DNS_KEYALG_RSA		 	1 /*%< Used just for tagging */
-#define DNS_KEYALG_DH_DEPRECATED 	2 /*%< deprecated */
-#define DNS_KEYALG_DSA		 	3 /*%< DSA KEY */
-#define DNS_KEYALG_NSEC3DSA	 	6
-#define DNS_KEYALG_DSS		 	DNS_ALG_DSA
-#define DNS_KEYALG_ECC		 	4
-#define DNS_KEYALG_RSASHA1	 	5
-#define DNS_KEYALG_NSEC3RSASHA1	 	7
-#define DNS_KEYALG_RSASHA256	 	8
-#define DNS_KEYALG_RSASHA512	 	10
-#define DNS_KEYALG_ECCGOST	 	12
-#define DNS_KEYALG_ECDSA256	 	13
-#define DNS_KEYALG_ECDSA384	 	14
-#define DNS_KEYALG_ED25519	 	15
-#define DNS_KEYALG_ED448	 	16
-#define DNS_KEYALG_FALCON512		17
-#define DNS_KEYALG_DILITHIUM2		18
-#define DNS_KEYALG_SPHINCSSHA256128S	19
-#define DNS_KEYALG_INDIRECT	 	252
-#define DNS_KEYALG_PRIVATEDNS	 	253
-#define DNS_KEYALG_PRIVATEOID	 	254 /*%< Key begins with OID giving alg */
-#define DNS_KEYALG_MAX		 	255
+#define DNS_KEYALG_RSAMD5	     1 /*%< RSA with MD5 */
+#define DNS_KEYALG_RSA		     1 /*%< Used just for tagging */
+#define DNS_KEYALG_DH_DEPRECATED     2 /*%< deprecated */
+#define DNS_KEYALG_DSA		     3 /*%< DSA KEY */
+#define DNS_KEYALG_NSEC3DSA	     6
+#define DNS_KEYALG_DSS		     DNS_ALG_DSA
+#define DNS_KEYALG_ECC		     4
+#define DNS_KEYALG_RSASHA1	     5
+#define DNS_KEYALG_NSEC3RSASHA1	     7
+#define DNS_KEYALG_RSASHA256	     8
+#define DNS_KEYALG_RSASHA512	     10
+#define DNS_KEYALG_ECCGOST	     12
+#define DNS_KEYALG_ECDSA256	     13
+#define DNS_KEYALG_ECDSA384	     14
+#define DNS_KEYALG_ED25519	     15
+#define DNS_KEYALG_ED448	     16
+#define DNS_KEYALG_FALCON512	     17
+#define DNS_KEYALG_DILITHIUM2	     18
+#define DNS_KEYALG_SPHINCSSHA256128S 19
+#define DNS_KEYALG_INDIRECT	     252
+#define DNS_KEYALG_PRIVATEDNS	     253
+#define DNS_KEYALG_PRIVATEOID	     254 /*%< Key begins with OID giving alg */
+#define DNS_KEYALG_MAX		     255
 
 /* Protocol values  */
 #define DNS_KEYPROTO_RESERVED 0
@@ -113,4 +113,4 @@
 #define DNS_KEY_DILITHIUM2SIZE 1312
 
 #define DNS_SIG_SPHINCSSHA256128SSIZE 7856
-#define DNS_KEY_SPHINCSSHA256128SSIZE 32 
+#define DNS_KEY_SPHINCSSHA256128SSIZE 32

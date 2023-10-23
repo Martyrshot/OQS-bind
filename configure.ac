@@ -697,12 +697,17 @@ AM_CONDITIONAL([USE_ISC_RWLOCK], [test "$enable_pthread_rwlock" != "yes"])
 CRYPTO=OpenSSL
 
 #
-# OpenSSL/LibreSSL is mandatory
+# OpenSSL is mandatory
 #
-PKG_CHECK_MODULES([OPENSSL], [libssl libcrypto], [PKG_CHECK_VERSION([OPENSSL_VERSION], [openssl])],
-		  [AX_CHECK_OPENSSL([:], [AC_MSG_FAILURE([OpenSSL/LibreSSL not found])])])
+AX_CHECK_OPENSSL([:], [AC_MSG_FAILURE([OpenSSL not found])])
 
 AX_SAVE_FLAGS([openssl])
+CFLAGS="$OPENSSL_CFLAGS $CFLAGS"
+LIBS="$OPENSSL_LIBS $LIBS"
+AC_MSG_NOTICE(["OPENSSL_CFLAGS=${OPENSSL_CFLAGS}"])
+AC_MSG_NOTICE(["OPENSSL_LIBS=${OPENSSL_LIBS}"])
+AC_MSG_NOTICE(["OPENSSL_LDFLAGS=${OPENSSL_LDFLAGS}"])
+AC_MSG_NOTICE(["OPENSSL_VERSION=${OPENSSL_VERSION}"])
 
 CFLAGS="$OPENSSL_CFLAGS $CFLAGS"
 LIBS="$OPENSSL_LIBS $LIBS"
@@ -718,7 +723,7 @@ AC_COMPILE_IFELSE(
     [AC_MSG_FAILURE([not found])])
 
 #
-# Check for functions added in OpenSSL or LibreSSL
+# Check for functions added in OpenSSL
 #
 
 AC_CHECK_FUNCS([BIO_read_ex BIO_write_ex])

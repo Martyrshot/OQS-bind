@@ -21,14 +21,49 @@ jobs:
         language: [ 'cpp' ]
 
     steps:
+    - name: Setup directories
+      run: |
+        mkdir $HOME/OQS-bind
+        mkdir $HOME/local_deps
+        mkdir $HOME/local_deps/oqs
+        mkdir $HOME/local_deps/ossl
+
     - name: Checkout repository
       uses: actions/checkout@v3
+      with:
+        path: ${{ runner.workspace }}/OQS-bind
 
     - name: Install build dependencies
       uses: awalsh128/cache-apt-pkgs-action@latest
       with:
-        packages: liburcu-dev libuv1-dev libssl-dev libnghttp2-dev libxml2-dev liblmdb-dev libjson-c-dev pkg-config autoconf automake autotools-dev libtool-bin libjemalloc-dev libedit-dev libcap-dev libidn2-dev libkrb5-dev libmaxminddb-dev zlib1g-dev python3-ply
+        packages: liburcu-dev libuv1-dev libssl-dev libnghttp2-dev libxml2-dev liblmdb-dev libjson-c-dev pkg-config autoconf automake autotools-dev libtool-bin libjemalloc-dev libedit-dev libcap-dev libidn2-dev libkrb5-dev libmaxminddb-dev zlib1g-dev python3-ply astyle cmake gcc ninja-build python3-pytest python3-pytest-xdist unzip xsltproc doxygen graphviz python3-yaml valgrind
+
         version: 1.0
+    - name: Install liboqs
+      run: |
+        git clone https://github.com/open-quantum-safe/liboqs.git
+        cd liboqs
+        mkdir build
+        cd build
+        cmake -GNinja .. -DCMAKE_INSTALL_PREFIX=$liboqs_DIR && ninja && ninja run_tests && ninja install
+      env:
+        liboqs_DIR: ${{ runner.workspace }}/local_deps/oqs
+    - name: Install Openssl3.2.0-alpha2
+      run: |
+        git clone --branch openssl-3.2.0-alpha2 https://github.com/openssl/openssl.git
+        cd openssl
+        ./Configure --prefix=$OPENSSL_ROOT_DIR --openssldir=$OPENSSL_ROOT_DIR no-docs -lm && make && make $NPROC install LIBDIR=lib
+      env:
+        OPENSSL_ROOT_DIR: ${{ runner.workspace }}/local_deps/ossl
+
+    - name: Install OQS-provider
+      run: |
+        git clone https://github.com/open-quantum-safe/oqs-provider.git
+        cd oqs-provider
+        cmake -S . -B _build && cmake --build _build && ctest --test-dir _build && cmake --install _build
+      env:
+        OPENSSL_ROOT_DIR: ${{ runner.workspace }}/local_deps/ossl
+        liboqs_DIR: ${{ runner.workspace }}/local_deps/oqs
 
     # Initializes the CodeQL tools for scanning.
     - name: Initialize CodeQL
@@ -36,18 +71,24 @@ jobs:
       with:
         languages: ${{ matrix.language }}
 
-    - name: Autobuild
-      uses: github/codeql-action/autobuild@v2
+    #- name: Autobuild
+      #uses: github/codeql-action/autobuild@v2
+      #env:
+      #  OPENSSL_ROOT_DIR: ${{ runner.workspace }}/local_deps/ossl
 
     # ℹ️ Command-line programs to run using the OS shell.
     # 📚 See https://docs.github.com/en/actions/using-workflows/workflow-syntax-for-github-actions#jobsjob_idstepsrun
 
     #   If the Autobuild fails above, remove it and uncomment the following three lines.
     #   modify them (or add more) to build your code if your project, please refer to the EXAMPLE below for guidance.
-
-    # - run: |
-    #   echo "Run, Build Application using script"
-    #   ./location_of_script_within_repo/buildscript.sh
+    - name: Build bind9
+      run: |
+        cd ${{ runner.workspace }}/OQS-bind
+        autoreconf -fi
+        ./configure CFLAGS="-Wl,--no-as-needed" LIBS="-ldl" --with-openssl=$OPENSSL_ROOT_DIR
+        make -j $NPROC
+      env:
+        OPENSSL_ROOT_DIR: ${{ runner.workspace }}/local_deps/ossl
 
     - name: Perform CodeQL Analysis
       uses: github/codeql-action/analyze@v2

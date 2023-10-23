@@ -70,60 +70,63 @@ struct parse_map {
 	const char *tag;
 };
 
-static struct parse_map map[] = { { TAG_RSA_MODULUS, "Modulus:" },
-				  { TAG_RSA_PUBLICEXPONENT, "PublicExponent:" },
-				  { TAG_RSA_PRIVATEEXPONENT, "PrivateExponent"
-							     ":" },
-				  { TAG_RSA_PRIME1, "Prime1:" },
-				  { TAG_RSA_PRIME2, "Prime2:" },
-				  { TAG_RSA_EXPONENT1, "Exponent1:" },
-				  { TAG_RSA_EXPONENT2, "Exponent2:" },
-				  { TAG_RSA_COEFFICIENT, "Coefficient:" },
-				  { TAG_RSA_ENGINE, "Engine:" },
-				  { TAG_RSA_LABEL, "Label:" },
+static struct parse_map map[] = {
+	{ TAG_RSA_MODULUS, "Modulus:" },
+	{ TAG_RSA_PUBLICEXPONENT, "PublicExponent:" },
+	{ TAG_RSA_PRIVATEEXPONENT, "PrivateExponent"
+				   ":" },
+	{ TAG_RSA_PRIME1, "Prime1:" },
+	{ TAG_RSA_PRIME2, "Prime2:" },
+	{ TAG_RSA_EXPONENT1, "Exponent1:" },
+	{ TAG_RSA_EXPONENT2, "Exponent2:" },
+	{ TAG_RSA_COEFFICIENT, "Coefficient:" },
+	{ TAG_RSA_ENGINE, "Engine:" },
+	{ TAG_RSA_LABEL, "Label:" },
 
-				  { TAG_ECDSA_PRIVATEKEY, "PrivateKey:" },
-				  { TAG_ECDSA_ENGINE, "Engine:" },
-				  { TAG_ECDSA_LABEL, "Label:" },
+	{ TAG_ECDSA_PRIVATEKEY, "PrivateKey:" },
+	{ TAG_ECDSA_ENGINE, "Engine:" },
+	{ TAG_ECDSA_LABEL, "Label:" },
 
-				  { TAG_EDDSA_PRIVATEKEY, "PrivateKey:" },
-				  { TAG_EDDSA_ENGINE, "Engine:" },
-				  { TAG_EDDSA_LABEL, "Label:" },
+	{ TAG_EDDSA_PRIVATEKEY, "PrivateKey:" },
+	{ TAG_EDDSA_ENGINE, "Engine:" },
+	{ TAG_EDDSA_LABEL, "Label:" },
 
-				  { TAG_HMACMD5_KEY, "Key:" },
-				  { TAG_HMACMD5_BITS, "Bits:" },
+	{ TAG_HMACMD5_KEY, "Key:" },
+	{ TAG_HMACMD5_BITS, "Bits:" },
 
-				  { TAG_HMACSHA1_KEY, "Key:" },
-				  { TAG_HMACSHA1_BITS, "Bits:" },
+	{ TAG_HMACSHA1_KEY, "Key:" },
+	{ TAG_HMACSHA1_BITS, "Bits:" },
 
-				  { TAG_HMACSHA224_KEY, "Key:" },
-				  { TAG_HMACSHA224_BITS, "Bits:" },
+	{ TAG_HMACSHA224_KEY, "Key:" },
+	{ TAG_HMACSHA224_BITS, "Bits:" },
 
-				  { TAG_HMACSHA256_KEY, "Key:" },
-				  { TAG_HMACSHA256_BITS, "Bits:" },
+	{ TAG_HMACSHA256_KEY, "Key:" },
+	{ TAG_HMACSHA256_BITS, "Bits:" },
 
-				  { TAG_HMACSHA384_KEY, "Key:" },
-				  { TAG_HMACSHA384_BITS, "Bits:" },
+	{ TAG_HMACSHA384_KEY, "Key:" },
+	{ TAG_HMACSHA384_BITS, "Bits:" },
 
-				  { TAG_HMACSHA512_KEY, "Key:" },
-				  { TAG_HMACSHA512_BITS, "Bits:" },
+	{ TAG_HMACSHA512_KEY, "Key:" },
+	{ TAG_HMACSHA512_BITS, "Bits:" },
 
-				  { TAG_FALCON512_PRIVATEKEY, "PrivateKey:" },
-				  { TAG_FALCON512_PUBLICKEY, "PublicKey:" },
-				  { TAG_FALCON512_ENGINE, "Engine:" }, // Probably won't use for now
-				  { TAG_FALCON512_LABEL, "Label:" }, // Probably won't use for now
-				  
-				  { TAG_DILITHIUM2_PRIVATEKEY, "PrivateKey:" },
-				  { TAG_DILITHIUM2_PUBLICKEY, "PublicKey:" },
-				  { TAG_DILITHIUM2_ENGINE, "Engine:" }, // Probably won't use for now
-				  { TAG_DILITHIUM2_LABEL, "Label:" }, // Probably won't use for now
-				  
-				  { TAG_SPHINCSSHA256128S_PRIVATEKEY, "PrivateKey:" },
-				  { TAG_SPHINCSSHA256128S_PUBLICKEY, "PublicKey:" },
-				  { TAG_SPHINCSSHA256128S_ENGINE, "Engine:" }, // Probably won't use for now
-				  { TAG_SPHINCSSHA256128S_LABEL, "Label:" }, // Probably won't use for now
-				  
-				  { 0, NULL } };
+	{ TAG_FALCON512_PRIVATEKEY, "PrivateKey:" },
+	{ TAG_FALCON512_PUBLICKEY, "PublicKey:" },
+	{ TAG_FALCON512_ENGINE, "Engine:" }, // Probably won't use for now
+	{ TAG_FALCON512_LABEL, "Label:" },   // Probably won't use for now
+
+	{ TAG_DILITHIUM2_PRIVATEKEY, "PrivateKey:" },
+	{ TAG_DILITHIUM2_PUBLICKEY, "PublicKey:" },
+	{ TAG_DILITHIUM2_ENGINE, "Engine:" }, // Probably won't use for now
+	{ TAG_DILITHIUM2_LABEL, "Label:" },   // Probably won't use for now
+
+	{ TAG_SPHINCSSHA256128S_PRIVATEKEY, "PrivateKey:" },
+	{ TAG_SPHINCSSHA256128S_PUBLICKEY, "PublicKey:" },
+	{ TAG_SPHINCSSHA256128S_ENGINE, "Engine:" }, // Probably won't use for
+						     // now
+	{ TAG_SPHINCSSHA256128S_LABEL, "Label:" }, // Probably won't use for now
+
+	{ 0, NULL }
+};
 
 static int
 find_value(const char *s, const unsigned int alg) {
@@ -341,10 +344,10 @@ check_hmac_sha(const dst_private_t *priv, unsigned int ntags,
 // we only need to use one of the algorithms tags. This is define is
 // to make the code below easier to read.
 
-#define TAG_OQS_LABEL TAG_FALCON512_LABEL
-#define TAG_OQS_ENGINE TAG_FALCON512_ENGINE
+#define TAG_OQS_LABEL	   TAG_FALCON512_LABEL
+#define TAG_OQS_ENGINE	   TAG_FALCON512_ENGINE
 #define TAG_OQS_PRIVATEKEY TAG_FALCON512_PRIVATEKEY
-#define TAG_OQS_PUBLICKEY TAG_FALCON512_PUBLICKEY
+#define TAG_OQS_PUBLICKEY  TAG_FALCON512_PUBLICKEY
 
 static int
 check_oqs(const dst_private_t *priv, const unsigned int alg, bool external) {
@@ -376,8 +379,8 @@ check_oqs(const dst_private_t *priv, const unsigned int alg, bool external) {
 	if (have[TAG_OQS_ENGINE & mask]) {
 		ok = have[TAG_OQS_LABEL & mask];
 	} else {
-		ok = have[TAG_OQS_PRIVATEKEY & mask]
-			&& have[TAG_OQS_PUBLICKEY & mask];
+		ok = have[TAG_OQS_PRIVATEKEY & mask] &&
+		     have[TAG_OQS_PUBLICKEY & mask];
 	}
 	return (ok ? 0 : -1);
 }

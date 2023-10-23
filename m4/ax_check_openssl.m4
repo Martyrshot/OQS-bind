@@ -52,22 +52,24 @@ AC_DEFUN([AX_CHECK_OPENSSL], [
               ;;
             esac
         ], [
-            # if pkg-config is installed and openssl has installed a .pc file,
-            # then use that information and don't search ssldirs
-            AC_CHECK_TOOL([PKG_CONFIG], [pkg-config])
-            if test x"$PKG_CONFIG" != x""; then
-                OPENSSL_LDFLAGS=`$PKG_CONFIG openssl --libs-only-L 2>/dev/null`
-                if test $? = 0; then
-                    OPENSSL_LIBS=`$PKG_CONFIG openssl --libs-only-l 2>/dev/null`
-                    OPENSSL_CFLAGS=`$PKG_CONFIG openssl --cflags-only-I 2>/dev/null`
-                    OPENSSL_VERSION=`$PKG_CONFIG openssl --modversion 2>/dev/null`
-                    found=true
+            # if ssldirs is set, do not try to use pkg-config to locate openssl
+            if test x"$ssldirs" != x""; then
+                # if pkg-config is installed and openssl has installed a .pc file,
+                # then use that information and don't search ssldirs
+                AC_CHECK_TOOL([PKG_CONFIG], [pkg-config])
+                if test x"$PKG_CONFIG" != x""; then
+                    OPENSSL_LDFLAGS=`$PKG_CONFIG openssl --libs-only-L 2>/dev/null`
+                    if test $? = 0; then
+                        OPENSSL_LIBS=`$PKG_CONFIG openssl --libs-only-l 2>/dev/null`
+                        OPENSSL_CFLAGS=`$PKG_CONFIG openssl --cflags-only-I 2>/dev/null`
+                        OPENSSL_VERSION=`$PKG_CONFIG openssl --modversion 2>/dev/null`
+                        found=true
+                    fi
                 fi
-            fi
-
-            # no such luck; use some default ssldirs
-            if ! $found; then
-                ssldirs="/usr/local/ssl /usr/lib/ssl /usr/ssl /usr/pkg /usr/local /usr"
+                # no such luck; use some default ssldirs
+                if ! $found; then
+                    ssldirs="/usr/local/ssl /usr/lib/ssl /usr/ssl /usr/pkg /usr/local /usr"
+                fi
             fi
         ]
         )
@@ -104,7 +106,6 @@ AC_DEFUN([AX_CHECK_OPENSSL], [
     # being careful not to pollute the global LIBS, LDFLAGS, and CPPFLAGS
 
     AC_MSG_CHECKING([whether compiling and linking against OpenSSL works])
-    echo "Trying link with OPENSSL_LDFLAGS=$OPENSSL_LDFLAGS;" \
         "OPENSSL_LIBS=$OPENSSL_LIBS; OPENSSL_CFLAGS=$OPENSSL_CFLAGS" >&AS_MESSAGE_LOG_FD
 
     save_LIBS="$LIBS"
