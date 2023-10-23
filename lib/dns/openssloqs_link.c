@@ -497,16 +497,24 @@ openssloqs_parse(dst_key_t *key, isc_lex_t *lexer, dst_key_t *pub) {
 
 	for (i = 0; i < priv.nelements; i++) {
 		switch (priv.elements[i].tag) {
-		case alginfo->tags.engine_tag:
+		case TAG_FALCON512_ENGINE:
+		case TAG_DILITHIUM2_ENGINE:
+		case TAG_SPHINCSSHA256128S_ENGINE:
 			engine = (char *)priv.elements[i].data;
 			break;
-		case alginfo->tags.label_tag:
+		case TAG_FALCON512_LABEL:
+		case TAG_DILITHIUM2_LABEL:
+		case TAG_SPHINCSSHA256128S_LABEL:
 			label = (char *)priv.elements[i].data;
 			break;
-		case alginfo->tags.private_key_tag:
+		case TAG_FALCON512_PRIVATEKEY:
+		case TAG_DILITHIUM2_PRIVATEKEY:
+		case TAG_SPHINCSSHA256128S_PRIVATEKEY:
 			privkey_index = i;
 			break;
-		case alginfo->tags.public_key_tag:
+		case TAG_FALCON512_PUBLICKEY:
+		case TAG_DILITHIUM2_PUBLICKEY:
+		case TAG_SPHINCSSHA256128S_PUBLICKEY:
 			pubkey_index = i;
 			break;
 		default:
