@@ -80,7 +80,7 @@
  *** Types
  ***/
 
-#define NS_CLIENT_TCP_BUFFER_SIZE  65535
+#define NS_CLIENT_TCP_BUFFER_SIZE 65535
 // OQS updated from 4096 to 8192
 #define NS_CLIENT_SEND_BUFFER_SIZE 8192
 
@@ -182,13 +182,13 @@ struct ns_client {
 	uint16_t	extflags;
 	int16_t		ednsversion; /* -1 noedns */
 	uint16_t	additionaldepth;
-	void (*cleanup)(ns_client_t *);
-	ns_query_t    query;
-	isc_time_t    requesttime;
-	isc_stdtime_t now;
-	isc_time_t    tnow;
-	dns_name_t    signername; /*%< [T]SIG key name */
-	dns_name_t   *signer;	  /*%< NULL if not valid sig */
+	void		(*cleanup)(ns_client_t *);
+	ns_query_t	query;
+	isc_time_t	requesttime;
+	isc_stdtime_t	now;
+	isc_time_t	tnow;
+	dns_name_t	signername; /*%< [T]SIG key name */
+	dns_name_t     *signer;	    /*%< NULL if not valid sig */
 
 	isc_sockaddr_t peeraddr;
 	bool	       peeraddr_valid;

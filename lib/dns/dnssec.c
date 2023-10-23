@@ -1155,7 +1155,7 @@ dns_dnssec_verifymessage(isc_buffer_t *source, dns_message_t *msg,
 	dns_rdata_toregion(&rdata, &r);
 	r.length -= sig.siglen;
 	RETERR(dst_context_adddata(ctx, &r));
-	
+
 	/*
 	 * If this is a response, digest the query.
 	 */

@@ -29,7 +29,6 @@
 
 #include <dns/keyvalues.h>
 
-
 #include "dst_internal.h"
 #include "dst_openssl.h"
 #include "dst_parse.h"
@@ -40,12 +39,13 @@
 		goto err; \
 	}
 
-#define FALCON512_PRIVATEKEYSIZE 1281
-#define DILITHIUM2_PRIVATEKEYSIZE 2528
+#define FALCON512_PRIVATEKEYSIZE	 1281
+#define DILITHIUM2_PRIVATEKEYSIZE	 2528
 #define SPHINCSSHA256128S_PRIVATEKEYSIZE 64
 
 typedef struct oqs_tags {
-	unsigned int ntags, private_key_tag, public_key_tag, engine_tag, label_tag;
+	unsigned int ntags, private_key_tag, public_key_tag, engine_tag,
+		label_tag;
 } oqs_tags_t;
 
 typedef struct oqs_alginfo {
@@ -53,7 +53,6 @@ typedef struct oqs_alginfo {
 	unsigned int key_size, priv_key_size, sig_size;
 	oqs_tags_t tags;
 } oqs_alginfo_t;
-
 
 static const oqs_alginfo_t *
 openssloqs_alg_info(unsigned int key_alg) {
@@ -109,7 +108,8 @@ openssloqs_alg_info(unsigned int key_alg) {
 }
 
 static isc_result_t
-raw_pub_key_to_ossl(const oqs_alginfo_t *alginfo, const unsigned char *pub_key, size_t *pub_key_len, EVP_PKEY **pkey) {
+raw_pub_key_to_ossl(const oqs_alginfo_t *alginfo, const unsigned char *pub_key,
+		    size_t *pub_key_len, EVP_PKEY **pkey) {
 	isc_result_t ret = DST_R_INVALIDPUBLICKEY;
 	const char *alg_name = alginfo->alg_name;
 
@@ -117,7 +117,8 @@ raw_pub_key_to_ossl(const oqs_alginfo_t *alginfo, const unsigned char *pub_key, 
 		if (pub_key_len == NULL || *pub_key_len < alginfo->key_size) {
 			return (ret);
 		}
-		*pkey = EVP_PKEY_new_raw_public_key_ex(NULL, alg_name, NULL, pub_key, alginfo->key_size);
+		*pkey = EVP_PKEY_new_raw_public_key_ex(
+			NULL, alg_name, NULL, pub_key, alginfo->key_size);
 	}
 	if (*pkey == NULL) {
 		return (dst__openssl_toresult(ret));
@@ -126,8 +127,10 @@ raw_pub_key_to_ossl(const oqs_alginfo_t *alginfo, const unsigned char *pub_key, 
 	return (ISC_R_SUCCESS);
 }
 static isc_result_t
-raw_priv_key_to_ossl(const oqs_alginfo_t *alginfo, const unsigned char *priv_key, size_t *priv_key_len, 
-			const unsigned char *pub_key, size_t *pub_key_len, EVP_PKEY **pkey) {
+raw_priv_key_to_ossl(const oqs_alginfo_t *alginfo,
+		     const unsigned char *priv_key, size_t *priv_key_len,
+		     const unsigned char *pub_key, size_t *pub_key_len,
+		     EVP_PKEY **pkey) {
 	EVP_PKEY *pk = NULL;
 	EVP_PKEY_CTX *ctx = NULL;
 	OSSL_PARAM_BLD *param_bld = NULL;
@@ -137,9 +140,12 @@ raw_priv_key_to_ossl(const oqs_alginfo_t *alginfo, const unsigned char *priv_key
 	if (pkey == NULL) {
 		return (ISC_R_NOMEMORY);
 	}
-	if ((param_bld = OSSL_PARAM_BLD_new()) == NULL
-		|| !OSSL_PARAM_BLD_push_octet_string(param_bld, "priv", priv_key, *priv_key_len)
-		|| !OSSL_PARAM_BLD_push_octet_string(param_bld, "pub", pub_key, *pub_key_len)) {
+	if ((param_bld = OSSL_PARAM_BLD_new()) == NULL ||
+	    !OSSL_PARAM_BLD_push_octet_string(param_bld, "priv", priv_key,
+					      *priv_key_len) ||
+	    !OSSL_PARAM_BLD_push_octet_string(param_bld, "pub", pub_key,
+					      *pub_key_len))
+	{
 		return (ISC_R_NOMEMORY);
 	}
 	params = OSSL_PARAM_BLD_to_param(param_bld);
@@ -150,8 +156,9 @@ raw_priv_key_to_ossl(const oqs_alginfo_t *alginfo, const unsigned char *priv_key
 	if (ctx == NULL) {
 		goto ctxt_err;
 	}
-	if (EVP_PKEY_fromdata_init(ctx) <= 0
-		|| EVP_PKEY_fromdata(ctx, &pk, EVP_PKEY_KEY_PARAMETERS, params) <= 0) {
+	if (EVP_PKEY_fromdata_init(ctx) <= 0 ||
+	    EVP_PKEY_fromdata(ctx, &pk, EVP_PKEY_KEY_PARAMETERS, params) <= 0)
+	{
 		goto fromdata_err;
 	}
 	if (pk == NULL) {
@@ -161,7 +168,7 @@ raw_priv_key_to_ossl(const oqs_alginfo_t *alginfo, const unsigned char *priv_key
 	ret = ISC_R_SUCCESS;
 
 fromdata_err:
-	 EVP_PKEY_CTX_free(ctx);
+	EVP_PKEY_CTX_free(ctx);
 
 ctxt_err:
 	OSSL_PARAM_free(params);
@@ -174,8 +181,7 @@ param_err:
 static isc_result_t
 openssloqs_createctx(dst_key_t *key, dst_context_t *dctx) {
 	isc_buffer_t *buf = NULL;
-	const oqs_alginfo_t *alginfo =
-		openssloqs_alg_info(dctx->key->key_alg);
+	const oqs_alginfo_t *alginfo = openssloqs_alg_info(dctx->key->key_alg);
 
 	UNUSED(key);
 
@@ -190,11 +196,10 @@ openssloqs_createctx(dst_key_t *key, dst_context_t *dctx) {
 static void
 openssloqs_destroyctx(dst_context_t *dctx) {
 	isc_buffer_t *buf = (isc_buffer_t *)dctx->ctxdata.generic;
-	const oqs_alginfo_t *alginfo =
-		openssloqs_alg_info(dctx->key->key_alg);
+	const oqs_alginfo_t *alginfo = openssloqs_alg_info(dctx->key->key_alg);
 
 	REQUIRE(alginfo != NULL);
-	
+
 	if (buf != NULL) {
 		isc_buffer_free(&buf);
 	}
@@ -208,8 +213,7 @@ openssloqs_adddata(dst_context_t *dctx, const isc_region_t *data) {
 	isc_region_t r;
 	unsigned int length;
 	isc_result_t result;
-	const oqs_alginfo_t *alginfo =
-		openssloqs_alg_info(dctx->key->key_alg);
+	const oqs_alginfo_t *alginfo = openssloqs_alg_info(dctx->key->key_alg);
 
 	REQUIRE(alginfo != NULL);
 
@@ -260,7 +264,8 @@ openssloqs_sign(dst_context_t *dctx, isc_buffer_t *sig) {
 			dctx->category, "EVP_DigestSignInit", ISC_R_FAILURE));
 	}
 	if (EVP_DigestSign(ctx, sigreg.base, &siglen, tbsreg.base,
-			   tbsreg.length) != 1) {
+			   tbsreg.length) != 1)
+	{
 		DST_RET(dst__openssl_toresult3(dctx->category, "EVP_DigestSign",
 					       DST_R_SIGNFAILURE));
 	}
@@ -337,25 +342,25 @@ openssloqs_generate(dst_key_t *key, int unused, void (*callback)(int)) {
 
 	UNUSED(unused);
 	UNUSED(callback);
-	
+
 	REQUIRE(alginfo != NULL);
 
 	ctx = EVP_PKEY_CTX_new_from_name(NULL, alginfo->alg_name, NULL);
 	if (ctx == NULL) {
 		return (dst__openssl_toresult2("EVP_PKEY_CTX_new_id",
-							DST_R_OPENSSLFAILURE));
+					       DST_R_OPENSSLFAILURE));
 	}
 
 	status = EVP_PKEY_keygen_init(ctx);
 	if (status != 1) {
 		DST_RET(dst__openssl_toresult2("EVP_PKEY_keygen_init",
-						DST_R_OPENSSLFAILURE));
+					       DST_R_OPENSSLFAILURE));
 	}
 
 	status = EVP_PKEY_keygen(ctx, &pkey);
 	if (status != 1) {
 		DST_RET(dst__openssl_toresult2("EVP_PKEY_keygen",
-						DST_R_OPENSSLFAILURE));
+					       DST_R_OPENSSLFAILURE));
 	}
 
 	key->key_size = alginfo->key_size * 8;
@@ -433,7 +438,9 @@ openssloqs_tofile(const dst_key_t *key, const char *directory) {
 
 	publen = alginfo->key_size;
 	privlen = alginfo->priv_key_size;
-	if (key->keydata.pkeypair.pub == NULL || key->keydata.pkeypair.priv == NULL) {
+	if (key->keydata.pkeypair.pub == NULL ||
+	    key->keydata.pkeypair.priv == NULL)
+	{
 		return (DST_R_NULLKEY);
 	}
 
@@ -446,16 +453,16 @@ openssloqs_tofile(const dst_key_t *key, const char *directory) {
 
 	if (dst__openssl_keypair_isprivate(key)) {
 		privbuf = isc_mem_get(key->mctx, privlen);
-		if (EVP_PKEY_get_raw_private_key(key->keydata.pkeypair.priv, privbuf,
-						 &privlen) != 1)
+		if (EVP_PKEY_get_raw_private_key(key->keydata.pkeypair.priv,
+						 privbuf, &privlen) != 1)
 			DST_RET(dst__openssl_toresult(ISC_R_FAILURE));
 		priv.elements[i].tag = alginfo->tags.private_key_tag;
 		priv.elements[i].length = privlen;
 		priv.elements[i].data = privbuf;
 		i++;
 		pubbuf = isc_mem_get(key->mctx, publen);
-		if (EVP_PKEY_get_raw_public_key(key->keydata.pkeypair.priv, pubbuf,
-						 &publen) != 1)
+		if (EVP_PKEY_get_raw_public_key(key->keydata.pkeypair.priv,
+						pubbuf, &publen) != 1)
 			DST_RET(dst__openssl_toresult(ISC_R_FAILURE));
 		priv.elements[i].tag = alginfo->tags.public_key_tag;
 		priv.elements[i].length = publen;
@@ -485,11 +492,11 @@ openssloqs_parse(dst_key_t *key, isc_lex_t *lexer, dst_key_t *pub) {
 	size_t pub_len, priv_len;
 	isc_mem_t *mctx = key->mctx;
 	const oqs_alginfo_t *alginfo = openssloqs_alg_info(key->key_alg);
-	
+
 	UNUSED(engine);
 	UNUSED(label);
 	UNUSED(pubpkey);
-	
+
 	REQUIRE(alginfo != NULL);
 
 	/* read private key file */
@@ -547,7 +554,8 @@ openssloqs_parse(dst_key_t *key, isc_lex_t *lexer, dst_key_t *pub) {
 	priv_len = priv.elements[privkey_index].length;
 	pub_len = priv.elements[pubkey_index].length;
 	ret = raw_priv_key_to_ossl(alginfo, priv.elements[privkey_index].data,
-				&priv_len, priv.elements[pubkey_index].data, &pub_len, &pkey);
+				   &priv_len, priv.elements[pubkey_index].data,
+				   &pub_len, &pkey);
 	if (ret != ISC_R_SUCCESS) {
 		DST_RET(ret);
 	}
@@ -579,15 +587,17 @@ static dst_func_t openssloqs_functions = {
 	NULL, /*%< paramcompare */
 	openssloqs_generate,
 	dst__openssl_keypair_isprivate,
-	dst__openssl_keypair_destroy, 
-	openssloqs_todns,   // called by dst_key_todns converts a dst_key to a buffer
-	openssloqs_fromdns, // called by from buffer and constructs a key from dns
+	dst__openssl_keypair_destroy,
+	openssloqs_todns,   // called by dst_key_todns converts a dst_key to a
+			    // buffer
+	openssloqs_fromdns, // called by from buffer and constructs a key from
+			    // dns
 	openssloqs_tofile,
 	openssloqs_parse,
-	NULL,			    /*%< cleanup */
-	NULL, 			    /*%< fromlabel */
-	NULL,			    /*%< dump */
-	NULL,			    /*%< restore */
+	NULL, /*%< cleanup */
+	NULL, /*%< fromlabel */
+	NULL, /*%< dump */
+	NULL, /*%< restore */
 };
 
 isc_result_t
