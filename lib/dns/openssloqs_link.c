@@ -264,7 +264,7 @@ openssloqs_sign(dst_context_t *dctx, isc_buffer_t *sig) {
 		DST_RET(dst__openssl_toresult3(dctx->category, "EVP_DigestSign",
 					       DST_R_SIGNFAILURE));
 	}
-	INSIST(siglen == alginfo->sig_size);
+	INSIST(siglen <= alginfo->sig_size);
 	isc_buffer_add(sig, (unsigned int)siglen);
 	ret = ISC_R_SUCCESS;
 
