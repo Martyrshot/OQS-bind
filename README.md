@@ -1,7 +1,7 @@
 # OQS-Bind
 
 OQS-BIND is a forked version of ISC's [Bind9](https://gitlab.isc.org/isc-projects/bind9) DNS software
-which enables PQC DNS. The original Bind9 readme can be found [here](ORIGINAL_README.md). This fork
+which enables PQC DNS. The original Bind9 README can be found [here](ORIGINAL_README.md). This fork
 take advantage of [Open Quantum Safe](https://github.com/open-quantum-safe)'s
 [liboqs](https://github.com/open-quantum-safe/liboqs) and [oqs-provider](https://github.com/open-quantum-safe/oqs-provider).
 **NOTE:** OpenSSL 3.2 is **REQUIRED** to build and use OQS-Bind.
