@@ -2,7 +2,7 @@ name: "CodeQL"
 
 on:
   push:
-    branches: [ "bind-9.16", "bind-9.18", "main" ]
+    branches: [ "main" ]
   schedule:
     - cron: '39 8 * * 3'
 
@@ -48,9 +48,9 @@ jobs:
         cmake -GNinja .. -DCMAKE_INSTALL_PREFIX=$liboqs_DIR && ninja && ninja run_tests && ninja install
       env:
         liboqs_DIR: ${{ runner.workspace }}/local_deps/oqs
-    - name: Install Openssl3.2.0-alpha2
+    - name: Install Openssl3.2.0-beta1
       run: |
-        git clone --branch openssl-3.2.0-alpha2 https://github.com/openssl/openssl.git
+        git clone --branch openssl-3.2.0-beta1 https://github.com/openssl/openssl.git
         cd openssl
         ./Configure --prefix=$OPENSSL_ROOT_DIR --openssldir=$OPENSSL_ROOT_DIR no-docs -lm && make && make $NPROC install LIBDIR=lib
       env:
@@ -85,7 +85,7 @@ jobs:
       run: |
         cd ${{ runner.workspace }}/OQS-bind
         autoreconf -fi
-        ./configure CFLAGS="-Wl,--no-as-needed" LIBS="-ldl" --with-openssl=$OPENSSL_ROOT_DIR
+        ./configure --with-openssl=$OPENSSL_ROOT_DIR
         make -j $NPROC
       env:
         OPENSSL_ROOT_DIR: ${{ runner.workspace }}/local_deps/ossl
