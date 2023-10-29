@@ -39,7 +39,7 @@ jobs:
         version: 1.0
     - name: Install liboqs
       run: |
-        git clone https://github.com/open-quantum-safe/liboqs.git
+        git clone --branch 0.9.0 https://github.com/open-quantum-safe/liboqs.git
         cd liboqs
         mkdir build
         cd build
