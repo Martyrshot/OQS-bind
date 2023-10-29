@@ -37,7 +37,7 @@ jobs:
         packages: liburcu-dev libuv1-dev libssl-dev libnghttp2-dev libxml2-dev liblmdb-dev libjson-c-dev pkg-config autoconf automake autotools-dev libtool-bin libjemalloc-dev libedit-dev libcap-dev libidn2-dev libkrb5-dev libmaxminddb-dev zlib1g-dev python3-ply astyle cmake gcc ninja-build python3-pytest python3-pytest-xdist unzip xsltproc doxygen graphviz python3-yaml valgrind
 
         version: 1.0
-    - name: Install liboqs
+    - name: Install liboqs 0.9.0
       run: |
         git clone --branch 0.9.0 https://github.com/open-quantum-safe/liboqs.git
         cd liboqs
