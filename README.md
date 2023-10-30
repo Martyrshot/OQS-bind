@@ -1,7 +1,7 @@
 # OQS-Bind
 [![CodeQL](https://github.com/Martyrshot/OQS-bind/actions/workflows/codeql.yml/badge.svg)](https://github.com/Martyrshot/OQS-bind/actions/workflows/codeql.yml)
 
-OQS-BIND is a forked version of ISC's [Bind9](https://gitlab.isc.org/isc-projects/bind9) DNS software
+OQS-Bind is a forked version of ISC's [Bind9](https://gitlab.isc.org/isc-projects/bind9) DNS software
 which enables PQC DNS. The original Bind9 README can be found [here](ORIGINAL_README.md). This fork
 take advantage of [Open Quantum Safe](https://github.com/open-quantum-safe)'s
 [liboqs](https://github.com/open-quantum-safe/liboqs) and [oqs-provider](https://github.com/open-quantum-safe/oqs-provider).
