@@ -1184,13 +1184,13 @@ main(int argc, char **argv) {
 		if (base != NULL) {
 			OSSL_PROVIDER_unload(base);
 		}
+		ERR_print_errors_fp(stderr);
 		ERR_clear_error();
 		fatal("Failed to load oqsprovider");
 	}
 	default_provider = OSSL_PROVIDER_load(NULL, "default");
 	if (default_provider == NULL) {
 		OSSL_PROVIDER_unload(oqs);
-		ERR_print_errors_fp(stderr);
 		ERR_clear_error();
 		fatal("Failed to load default provider");
 	}
