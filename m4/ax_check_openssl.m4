@@ -53,7 +53,7 @@ AC_DEFUN([AX_CHECK_OPENSSL], [
             esac
         ], [
             # if ssldirs is set, do not try to use pkg-config to locate openssl
-            if test x"$ssldirs" != x""; then
+            if test x"$ssldirs" = x""; then
                 # if pkg-config is installed and openssl has installed a .pc file,
                 # then use that information and don't search ssldirs
                 AC_CHECK_TOOL([PKG_CONFIG], [pkg-config])
