@@ -17,6 +17,8 @@
 #include <stdbool.h>
 #include <stdlib.h>
 
+#include <openssl/opensslv.h>
+
 #include <isc/attributes.h>
 #include <isc/buffer.h>
 #include <isc/commandline.h>
