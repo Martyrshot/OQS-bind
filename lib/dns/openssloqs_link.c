@@ -122,7 +122,7 @@ raw_pub_key_to_ossl(const oqs_alginfo_t *alginfo, const unsigned char *pub_key,
 			NULL, alg_name, NULL, pub_key, *pub_key_len);
 	}
 	if (*pkey == NULL) {
-		printf("*pkey==NULL: %s\n", );
+		printf("*pkey==NULL\n");
 		ERR_print_errors_fp(stderr);
 		return (dst__openssl_toresult(ret));
 	}
