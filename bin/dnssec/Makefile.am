@@ -49,3 +49,13 @@ dnssec_signzone_LDADD =		\
 	$(LDADD)		\
 	$(LIBISCCFG_LIBS)	\
 	$(OPENSSL_LIBS)
+
+dnssec_dsfromkey_CPPFLAGS =	\
+	$(AM_CPPFLAGS)		\
+	$(LIBISCCFG_CFLAGS)	\
+	$(OPENSSL_CFLAGS)
+
+dnssec_dsfromkey_LDADD =	\
+	$(LDADD)		\
+	$(LIBISCCFG_LIBS)	\
+	$(OPENSSL_LIBS)
