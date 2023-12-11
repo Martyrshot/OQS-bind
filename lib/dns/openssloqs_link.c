@@ -115,17 +115,19 @@ raw_pub_key_to_ossl(const oqs_alginfo_t *alginfo, const unsigned char *pub_key,
 
 	if (pub_key != NULL) {
 		if (pub_key_len == NULL) {
+			printf("Failed pub_keyLen\n");
 			return (ret);
 		}
 		*pkey = EVP_PKEY_new_raw_public_key_ex(
 			NULL, alg_name, NULL, pub_key, *pub_key_len);
 	}
 	if (*pkey == NULL) {
+		printf("*pkey==NULL\n");
 		return (dst__openssl_toresult(ret));
 	}
-	*pub_key_len = alginfo->key_size;
 	return (ISC_R_SUCCESS);
 }
+
 static isc_result_t
 raw_priv_key_to_ossl(const oqs_alginfo_t *alginfo,
 		     const unsigned char *priv_key, size_t *priv_key_len,
