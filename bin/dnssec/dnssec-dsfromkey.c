@@ -466,8 +466,8 @@ main(int argc, char **argv) {
 	}
 	printf("before Loading providers\n");
 #if OPENSSL_VERSION_NUMBER >= 0x30200000L && OPENSSL_API_LEVEL >= 30200
-	printf("Loading providers\N");
-	oqs = OSSL_PROVIDER_load(OSSL_LIB_CTX_get0_global_default(), "oqsprovider") {
+	printf("Loading providers\n");
+	oqs = OSSL_PROVIDER_load(OSSL_LIB_CTX_get0_global_default(), "oqsprovider");
 	if (oqs == NULL) {
 		ERR_print_errors_fp(stderr);
 		ERR_clear_error();
