@@ -17,6 +17,8 @@
 #include <stdbool.h>
 #include <stdlib.h>
 
+#include <openssl/opensslv.h>
+
 #include <isc/attributes.h>
 #include <isc/buffer.h>
 #include <isc/commandline.h>
@@ -41,6 +43,10 @@
 #include <dns/rdataset.h>
 #include <dns/rdatasetiter.h>
 #include <dns/rdatatype.h>
+#if OPENSSL_VERSION_NUMBER >= 0x30200000L && OPENSSL_API_LEVEL >= 30200
+#include <openssl/err.h>
+#include <openssl/provider.h>
+#endif
 
 #include <dst/dst.h>
 
@@ -369,6 +375,9 @@ main(int argc, char **argv) {
 	isc_log_t *log = NULL;
 	dns_rdataset_t rdataset;
 	dns_rdata_t rdata;
+#if OPENSSL_VERSION_NUMBER >= 0x30200000L && OPENSSL_API_LEVEL >= 30200
+	OSSL_PROVIDER *oqs = NULL, *default_provider = NULL;
+#endif
 
 	dns_rdata_init(&rdata);
 
@@ -455,6 +464,21 @@ main(int argc, char **argv) {
 			exit(1);
 		}
 	}
+#if OPENSSL_VERSION_NUMBER >= 0x30200000L && OPENSSL_API_LEVEL >= 30200
+	oqs = OSSL_PROVIDER_load(OSSL_LIB_CTX_get0_global_default(), "oqsprovider");
+	if (oqs == NULL) {
+		ERR_print_errors_fp(stderr);
+		ERR_clear_error();
+		fatal("Failed to load oqsprovider");
+	}
+	default_provider = OSSL_PROVIDER_load(OSSL_LIB_CTX_get0_global_default(), "default");
+	if (default_provider == NULL) {
+		OSSL_PROVIDER_unload(oqs);
+		ERR_print_errors_fp(stderr);
+		ERR_clear_error();
+		fatal("Failed to load default provider");
+	}
+#endif
 
 	rdclass = strtoclass(classname);
 
@@ -540,6 +564,14 @@ main(int argc, char **argv) {
 		emits(showall, cds, &rdata);
 	}
 
+#if OPENSSL_VERSION_NUMBER >= 0x30200000L && OPENSSL_API_LEVEL >= 30200
+	if (oqs != NULL) {
+		OSSL_PROVIDER_unload(oqs);
+	}
+	if (default_provider != NULL) {
+		OSSL_PROVIDER_unload(default_provider);
+	}
+#endif
 	if (dns_rdataset_isassociated(&rdataset)) {
 		dns_rdataset_disassociate(&rdataset);
 	}
