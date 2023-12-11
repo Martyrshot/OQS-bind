@@ -463,15 +463,16 @@ main(int argc, char **argv) {
 		}
 	}
 #if OPENSSL_VERSION_NUMBER >= 0x30200000L && OPENSSL_API_LEVEL >= 30200
-	oqs = OSSL_PROVIDER_load(NULL, "oqsprovider") {
+	oqs = OSSL_PROVIDER_load(OSSL_LIB_CTX_get0_global_default(), "oqsprovider") {
 	if (oqs == NULL) {
 		ERR_print_errors_fp(stderr);
 		ERR_clear_error();
 		fatal("Failed to load oqsprovider");
 	}
-	default_provider = OSSL_PROVIDER_load(NULL, "default");
+	default_provider = OSSL_PROVIDER_load(OSSL_LIB_CTX_get0_global_default(), "default");
 	if (default_provider == NULL) {
 		OSSL_PROVIDER_unload(oqs);
+		ERR_print_errors_fp(stderr);
 		ERR_clear_error();
 		fatal("Failed to load default provider");
 	}
