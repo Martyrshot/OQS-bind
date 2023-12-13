@@ -4,8 +4,7 @@ AM_CPPFLAGS +=			\
 	$(LIBISC_CFLAGS)	\
 	$(LIBDNS_CFLAGS)	\
 	$(LIBNS_CFLAGS)		\
-	$(LIBISCCFG_CFLAGS)	\
-	$(OPENSSL_LIBS)
+	$(LIBISCCFG_CFLAGS)
 
 AM_CPPFLAGS +=			\
 	-DNAMED_CONFFILE=\"${sysconfdir}/named.conf\"
@@ -21,8 +20,7 @@ LDADD +=			\
 	$(LIBISC_LIBS)		\
 	$(LIBDNS_LIBS)		\
 	$(LIBNS_LIBS)		\
-	$(LIBISCCFG_LIBS)	\
-	$(OPENSSL_LIBS)
+	$(LIBISCCFG_LIBS)
 
 bin_PROGRAMS = named-checkconf named-checkzone
 
