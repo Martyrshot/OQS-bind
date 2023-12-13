@@ -591,14 +591,13 @@ main(int argc, char **argv) {
 	const char *conffile = NULL;
 	isc_mem_t *mctx = NULL;
 	isc_result_t result = ISC_R_SUCCESS;
-	bool cleanup_dst = true;
+	bool cleanup_dst = false;
 	bool load_zones = false;
 	bool list_zones = false;
 	bool print = false;
 	bool nodeprecate = false;
 	unsigned int flags = 0;
 	unsigned int checkflags = BIND_CHECK_PLUGINS | BIND_CHECK_ALGORITHMS;
-
 	isc_commandline_errprint = false;
 
 	/*
@@ -703,7 +702,6 @@ main(int argc, char **argv) {
 			CHECK(ISC_R_FAILURE);
 		}
 	}
-
 	if (((flags & CFG_PRINTER_XKEY) != 0) && !print) {
 		fprintf(stderr, "%s: -x cannot be used without -p\n", program);
 		CHECK(ISC_R_FAILURE);
