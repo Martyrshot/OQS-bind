@@ -717,14 +717,14 @@ main(int argc, char **argv) {
 	if (oqs == NULL) {
 		ERR_print_errors_fp(stderr);
 		ERR_clear_error();
-		fatal("Failed to load oqsprovider");
+		CHECK(ISC_R_FAILURE);
 	}
 	default_provider = OSSL_PROVIDER_load(OSSL_LIB_CTX_get0_global_default(), "default");
 	if (default_provider == NULL) {
 		OSSL_PROVIDER_unload(oqs);
 		ERR_print_errors_fp(stderr);
 		ERR_clear_error();
-		fatal("Failed to load default provider");
+		CHECK(ISC_R_FAILURE);
 	}
 #endif
 
