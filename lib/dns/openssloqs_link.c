@@ -421,7 +421,7 @@ openssloqs_fromdns(dst_key_t *key, isc_buffer_t *data) {
 
 	isc_buffer_forward(data, len);
 	key->keydata.pkeypair.pub = pkey;
-	key->key_size = len * 8;
+	key->key_size = len;
 	return (ISC_R_SUCCESS);
 }
 
