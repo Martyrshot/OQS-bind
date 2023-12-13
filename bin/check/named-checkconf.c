@@ -18,8 +18,6 @@
 #include <stdio.h>
 #include <stdlib.h>
 
-#include <openssl/opensslv.h>
-
 #include <isc/attributes.h>
 #include <isc/commandline.h>
 #include <isc/dir.h>
@@ -41,10 +39,6 @@
 #include <isccfg/check.h>
 #include <isccfg/grammar.h>
 #include <isccfg/namedconf.h>
-#if OPENSSL_VERSION_NUMBER >= 0x30200000L && OPENSSL_API_LEVEL >= 30200
-#include <openssl/err.h>
-#include <openssl/provider.h>
-#endif
 
 #include "check-tool.h"
 
@@ -597,17 +591,13 @@ main(int argc, char **argv) {
 	const char *conffile = NULL;
 	isc_mem_t *mctx = NULL;
 	isc_result_t result = ISC_R_SUCCESS;
-	bool cleanup_dst = true;
+	bool cleanup_dst = false;
 	bool load_zones = false;
 	bool list_zones = false;
 	bool print = false;
 	bool nodeprecate = false;
 	unsigned int flags = 0;
 	unsigned int checkflags = BIND_CHECK_PLUGINS | BIND_CHECK_ALGORITHMS;
-#if OPENSSL_VERSION_NUMBER >= 0x30200000L && OPENSSL_API_LEVEL >= 30200
-	OSSL_PROVIDER *oqs = NULL, *default_provider = NULL;
-#endif
-
 	isc_commandline_errprint = false;
 
 	/*
@@ -712,22 +702,6 @@ main(int argc, char **argv) {
 			CHECK(ISC_R_FAILURE);
 		}
 	}
-#if OPENSSL_VERSION_NUMBER >= 0x30200000L && OPENSSL_API_LEVEL >= 30200
-	oqs = OSSL_PROVIDER_load(OSSL_LIB_CTX_get0_global_default(), "oqsprovider");
-	if (oqs == NULL) {
-		ERR_print_errors_fp(stderr);
-		ERR_clear_error();
-		CHECK(ISC_R_FAILURE);
-	}
-	default_provider = OSSL_PROVIDER_load(OSSL_LIB_CTX_get0_global_default(), "default");
-	if (default_provider == NULL) {
-		OSSL_PROVIDER_unload(oqs);
-		ERR_print_errors_fp(stderr);
-		ERR_clear_error();
-		CHECK(ISC_R_FAILURE);
-	}
-#endif
-
 	if (((flags & CFG_PRINTER_XKEY) != 0) && !print) {
 		fprintf(stderr, "%s: -x cannot be used without -p\n", program);
 		CHECK(ISC_R_FAILURE);
@@ -771,14 +745,6 @@ main(int argc, char **argv) {
 	}
 
 cleanup:
-#if OPENSSL_VERSION_NUMBER >= 0x30200000L && OPENSSL_API_LEVEL >= 30200
-	if (oqs != NULL) {
-		OSSL_PROVIDER_unload(oqs);
-	}
-	if (default_provider != NULL) {
-		OSSL_PROVIDER_unload(default_provider);
-	}
-#endif
 	if (config != NULL) {
 		cfg_obj_destroy(parser, &config);
 	}
