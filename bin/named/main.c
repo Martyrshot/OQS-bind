@@ -1560,9 +1560,16 @@ main(int argc, char *argv[]) {
 	default_provider = OSSL_PROVIDER_load(OSSL_LIB_CTX_get0_global_default(), "default");
 	if (default_provider == NULL) {
 		OSSL_PROVIDER_unload(oqs);
+		if (fips != NULL) {
+			OSSL_PROVIDER_unload(fips);
+		}
+		if (base != NULL) {
+			OSSL_PROVIDER_unload(base);
+		}
 		ERR_clear_error();
 		named_main_earlyfatal("Failed to load default provider");
 	}
+	printf("loaded providers");
 #endif /* if OPENSSL_VERSION_NUMER >= 0x30200000L && OPENSSL_API_LEVEL >= \
 	  30200 */
 #ifdef ENABLE_AFL
