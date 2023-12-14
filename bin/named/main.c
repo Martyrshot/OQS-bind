@@ -1534,15 +1534,6 @@ main(int argc, char *argv[]) {
 	isc_assertion_setcallback(assertion_failed);
 	isc_error_setfatal(library_fatal_error);
 	isc_error_setunexpected(library_unexpected_error);
-
-	named_os_init(program_name);
-
-	printf("=============================================================");
-	printf("parsing...");
-	parse_command_line(argc, argv);
-	printf("parsing...done\n");
-	printf("=============================================================");
-
 	/*
 	 * Since providers may be loaded due to command line
 	 * arguments, load oqs and default providers now.
@@ -1578,6 +1569,11 @@ main(int argc, char *argv[]) {
 	printf("=============================================================\n");
 #endif /* if OPENSSL_VERSION_NUMER >= 0x30200000L && OPENSSL_API_LEVEL >= \
 	  30200 */
+
+	named_os_init(program_name);
+
+	parse_command_line(argc, argv);
+
 #ifdef ENABLE_AFL
 	if (named_g_fuzz_type != isc_fuzz_none) {
 		named_fuzz_setup();
