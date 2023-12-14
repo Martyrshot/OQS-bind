@@ -588,13 +588,13 @@ keygen(keygen_ctx_t *ctx, isc_mem_t *mctx, int argc, char **argv) {
 		ctx->size = 456;
 		break;
 	case DST_ALG_FALCON512:
-		ctx->size = 1281;
+		ctx->size = 7176;
 		break;
 	case DST_ALG_DILITHIUM2:
-		ctx->size = 2528;
+		ctx->size = 10496;
 		break;
 	case DST_ALG_SPHINCSSHA256128S:
-		ctx->size = 64;
+		ctx->size = 256;
 		break;
 	}
 
