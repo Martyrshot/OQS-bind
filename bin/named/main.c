@@ -1501,6 +1501,9 @@ main(int argc, char *argv[]) {
 #ifdef HAVE_GPERFTOOLS_PROFILER
 	(void)ProfilerStart(NULL);
 #endif /* ifdef HAVE_GPERFTOOLS_PROFILER */
+	printf("=============================================================\n");
+	printf("starting providers\n");
+	printf("=============================================================\n");
 
 	/*
 	 * Technically, this call is superfluous because on startup of the main
