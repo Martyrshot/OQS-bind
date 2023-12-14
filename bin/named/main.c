@@ -1537,7 +1537,11 @@ main(int argc, char *argv[]) {
 
 	named_os_init(program_name);
 
+	printf("=============================================================")
+	printf("parsing...");
 	parse_command_line(argc, argv);
+	printf("parsing...done\n");
+	printf("=============================================================")
 
 	/*
 	 * Since providers may be loaded due to command line
@@ -1569,7 +1573,9 @@ main(int argc, char *argv[]) {
 		ERR_clear_error();
 		named_main_earlyfatal("Failed to load default provider");
 	}
-	printf("loaded providers");
+	printf("=============================================================\n")
+	printf("loaded providers\n");
+	printf("=============================================================\n")
 #endif /* if OPENSSL_VERSION_NUMER >= 0x30200000L && OPENSSL_API_LEVEL >= \
 	  30200 */
 #ifdef ENABLE_AFL
