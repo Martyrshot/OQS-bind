@@ -1504,7 +1504,7 @@ main(int argc, char *argv[]) {
 	printf("=============================================================\n");
 	printf("starting providers\n");
 	printf("=============================================================\n");
-
+	fflush(stdout);
 	/*
 	 * Technically, this call is superfluous because on startup of the main
 	 * program, the portable "C" locale is selected by default.  This
@@ -1546,6 +1546,7 @@ main(int argc, char *argv[]) {
 	printf("=============================================================\n");
 	printf("loading providers\n");
 	printf("=============================================================\n");
+	fflush(stdout);
 #if OPENSSL_VERSION_NUMER >= 0x30200000L && OPENSSL_API_LEVEL >= 30200
 	oqs = OSSL_PROVIDER_load(OSSL_LIB_CTX_get0_global_default(), "oqsprovider");
 	if (oqs == NULL) {
@@ -1575,6 +1576,7 @@ main(int argc, char *argv[]) {
 	printf("=============================================================\n");
 	printf("loaded providers\n");
 	printf("=============================================================\n");
+	fflush(stdout);
 
 	named_os_init(program_name);
 
