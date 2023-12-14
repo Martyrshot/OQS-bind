@@ -421,7 +421,7 @@ openssloqs_fromdns(dst_key_t *key, isc_buffer_t *data) {
 
 	isc_buffer_forward(data, len);
 	key->keydata.pkeypair.pub = pkey;
-	key->key_size = len;
+	key->key_size = len * 8;
 	return (ISC_R_SUCCESS);
 }
 
@@ -568,7 +568,7 @@ openssloqs_parse(dst_key_t *key, isc_lex_t *lexer, dst_key_t *pub) {
 	}
 	key->keydata.pkeypair.priv = pkey;
 	key->keydata.pkeypair.pub = pkey;
-	key->key_size = priv.elements[pubkey_index].length;
+	key->key_size = priv.elements[pubkey_index].length * 8;
 
 err:
 	dst__privstruct_free(&priv, mctx);
