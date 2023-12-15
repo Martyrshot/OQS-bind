@@ -1583,7 +1583,7 @@ main(int argc, char *argv[]) {
 	 * TODO: Maybe disable FIPS mode, or make oqs and FIPS
 	 *       mutually exclusive modes?
 	 */
-#if OPENSSL_VERSION_NUMER >= 0x30200000L && OPENSSL_API_LEVEL >= 30200
+#if OPENSSL_VERSION_NUMBER >= 0x30200000L && OPENSSL_API_LEVEL >= 30200
 	printf("Loading oqsprovider...\n");
 	oqs = OSSL_PROVIDER_load(NULL, "oqsprovider");
 	if (oqs == NULL) {
@@ -1608,7 +1608,7 @@ main(int argc, char *argv[]) {
 		ERR_clear_error();
 		named_main_earlyfatal("Failed to load default provider");
 	}
-#endif /* if OPENSSL_VERSION_NUMER >= 0x30200000L && OPENSSL_API_LEVEL >= \
+#endif /* if OPENSSL_VERSION_NUMBER >= 0x30200000L && OPENSSL_API_LEVEL >= \
 	  30200 */
 
 	printf("===========================\n");
