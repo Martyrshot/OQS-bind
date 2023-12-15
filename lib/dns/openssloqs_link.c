@@ -118,7 +118,7 @@ raw_pub_key_to_ossl(const oqs_alginfo_t *alginfo, const unsigned char *pub_key,
 			return (ret);
 		}
 		*pkey = EVP_PKEY_new_raw_public_key_ex(
-			OSSL_LIB_CTX_get0_global_default(), 
+			NULL, 
 			alg_name, NULL, pub_key, *pub_key_len);
 	}
 	if (*pkey == NULL) {
