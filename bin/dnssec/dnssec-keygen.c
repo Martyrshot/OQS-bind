@@ -1160,12 +1160,12 @@ main(int argc, char **argv) {
 
 	if (set_fips_mode) {
 #if OPENSSL_VERSION_NUMBER >= 0x30200000L && OPENSSL_API_LEVEL >= 30200
-		fips = OSSL_PROVIDER_load(OSSL_LIB_CTX_get0_global_default(), "fips");
+		fips = OSSL_PROVIDER_load(NULL, "fips");
 		if (fips == NULL) {
 			ERR_clear_error();
 			fatal("Failed to load FIPS provider");
 		}
-		base = OSSL_PROVIDER_load(OSSL_LIB_CTX_get0_global_default(), "base");
+		base = OSSL_PROVIDER_load(NULL, "base");
 		if (base == NULL) {
 			OSSL_PROVIDER_unload(fips);
 			ERR_clear_error();
@@ -1179,7 +1179,7 @@ main(int argc, char **argv) {
 		}
 	}
 #if OPENSSL_VERSION_NUMBER >= 0x30200000L && OPENSSL_API_LEVEL >= 30200
-	oqs = OSSL_PROVIDER_load(OSSL_LIB_CTX_get0_global_default(), "oqsprovider");
+	oqs = OSSL_PROVIDER_load(NULL, "oqsprovider");
 	if (oqs == NULL) {
 		if (fips != NULL) {
 			OSSL_PROVIDER_unload(fips);
@@ -1191,7 +1191,7 @@ main(int argc, char **argv) {
 		ERR_clear_error();
 		fatal("Failed to load oqsprovider");
 	}
-	default_provider = OSSL_PROVIDER_load(OSSL_LIB_CTX_get0_global_default(), "default");
+	default_provider = OSSL_PROVIDER_load(NULL, "default");
 	if (default_provider == NULL) {
 		OSSL_PROVIDER_unload(oqs);
 		ERR_clear_error();
