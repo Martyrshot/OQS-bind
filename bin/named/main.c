@@ -1060,15 +1060,6 @@ create_managers(void) {
 	return (ISC_R_SUCCESS);
 }
 
-// TODO remove after debugging
-static int
-display_provider(OSSL_PROVIDER *provider, void *cbdata) {
-	UNUSED(cbdata);
-	printf("Provider loaded: %s\n", OSSL_PROVIDER_get0_name(provider));
-	return 1;
-}
-
-
 static void
 setup(void) {
 	isc_result_t result;
@@ -1331,17 +1322,11 @@ setup(void) {
 	named_server_create(named_g_mctx, &named_g_server);
 	ENSURE(named_g_server != NULL);
 	sctx = named_g_server->sctx;
-	// TODO remove debugging
-	printf("===========================\n");
-	printf("named setup:\n");
 	/*
 	 * Report supported algorithms now that dst_lib_init() has
 	 * been called via named_server_create().
 	 */
 	format_supported_algorithms(logit);
-	OSSL_PROVIDER_do_all(NULL, display_provider, NULL);
-	printf("===========================\n");
-	fflush(stdout);
 	/*
 	 * Modify server context according to command line options
 	 */
@@ -1584,7 +1569,6 @@ main(int argc, char *argv[]) {
 	 *       mutually exclusive modes?
 	 */
 #if OPENSSL_VERSION_NUMBER >= 0x30200000L && OPENSSL_API_LEVEL >= 30200
-	printf("Loading oqsprovider...\n");
 	oqs = OSSL_PROVIDER_load(NULL, "oqsprovider");
 	if (oqs == NULL) {
 		if (fips != NULL) {
@@ -1611,11 +1595,7 @@ main(int argc, char *argv[]) {
 #endif /* if OPENSSL_VERSION_NUMBER >= 0x30200000L && OPENSSL_API_LEVEL >= \
 	  30200 */
 
-	printf("===========================\n");
-	printf("calling setup:\n");
 	setup();
-	printf("===========================\n");
-	fflush(stdout);
 	isc_mem_setname(named_g_mctx, "main");
 	INSIST(named_g_server != NULL);
 
