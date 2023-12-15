@@ -1584,6 +1584,7 @@ main(int argc, char *argv[]) {
 	 *       mutually exclusive modes?
 	 */
 #if OPENSSL_VERSION_NUMER >= 0x30200000L && OPENSSL_API_LEVEL >= 30200
+	printf("Loading oqsprovider...\n");
 	oqs = OSSL_PROVIDER_load(NULL, "oqsprovider");
 	if (oqs == NULL) {
 		if (fips != NULL) {
