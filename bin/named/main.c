@@ -1062,8 +1062,9 @@ create_managers(void) {
 
 // TODO remove after debugging
 int display_provider(OSSL_PROVIDER *provider, void *cbdata) {
-   printf("Provider loaded: %s\n", OSSL_PROVIDER_get0_name(provider));
-   return 1;
+	UNUSED(cbdata);
+	printf("Provider loaded: %s\n", OSSL_PROVIDER_get0_name(provider));
+	return 1;
 }
 
 
