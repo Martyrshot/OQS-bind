@@ -1501,10 +1501,6 @@ main(int argc, char *argv[]) {
 #ifdef HAVE_GPERFTOOLS_PROFILER
 	(void)ProfilerStart(NULL);
 #endif /* ifdef HAVE_GPERFTOOLS_PROFILER */
-	printf("=============================================================\n");
-	printf("starting providers\n");
-	printf("=============================================================\n");
-	fflush(stdout);
 	/*
 	 * Technically, this call is superfluous because on startup of the main
 	 * program, the portable "C" locale is selected by default.  This
@@ -1537,46 +1533,6 @@ main(int argc, char *argv[]) {
 	isc_assertion_setcallback(assertion_failed);
 	isc_error_setfatal(library_fatal_error);
 	isc_error_setunexpected(library_unexpected_error);
-	/*
-	 * Since providers may be loaded due to command line
-	 * arguments, load oqs and default providers now.
-	 * TODO: Maybe disable FIPS mode, or make oqs and FIPS
-	 *       mutually exclusive modes?
-	 */
-	printf("=============================================================\n");
-	printf("loading providers\n");
-	printf("=============================================================\n");
-	fflush(stdout);
-#if OPENSSL_VERSION_NUMER >= 0x30200000L && OPENSSL_API_LEVEL >= 30200
-	oqs = OSSL_PROVIDER_load(NULL, "oqsprovider");
-	if (oqs == NULL) {
-		if (fips != NULL) {
-			OSSL_PROVIDER_unload(fips);
-		}
-		if (base != NULL) {
-			OSSL_PROVIDER_unload(base);
-		}
-		ERR_clear_error();
-		named_main_earlyfatal("failed to load oqsprovider");
-	}
-	default_provider = OSSL_PROVIDER_load(NULL, "default");
-	if (default_provider == NULL) {
-		OSSL_PROVIDER_unload(oqs);
-		if (fips != NULL) {
-			OSSL_PROVIDER_unload(fips);
-		}
-		if (base != NULL) {
-			OSSL_PROVIDER_unload(base);
-		}
-		ERR_clear_error();
-		named_main_earlyfatal("Failed to load default provider");
-	}
-#endif /* if OPENSSL_VERSION_NUMER >= 0x30200000L && OPENSSL_API_LEVEL >= \
-	  30200 */
-	printf("=============================================================\n");
-	printf("loaded providers\n");
-	printf("=============================================================\n");
-	fflush(stdout);
 
 	named_os_init(program_name);
 
@@ -1608,6 +1564,38 @@ main(int argc, char *argv[]) {
 						named_g_chrootdir);
 		}
 	}
+	/*
+	 * Since providers may be loaded due to command line
+	 * arguments, load oqs and default providers now.
+	 * TODO: Maybe disable FIPS mode, or make oqs and FIPS
+	 *       mutually exclusive modes?
+	 */
+#if OPENSSL_VERSION_NUMER >= 0x30200000L && OPENSSL_API_LEVEL >= 30200
+	oqs = OSSL_PROVIDER_load(NULL, "oqsprovider");
+	if (oqs == NULL) {
+		if (fips != NULL) {
+			OSSL_PROVIDER_unload(fips);
+		}
+		if (base != NULL) {
+			OSSL_PROVIDER_unload(base);
+		}
+		ERR_clear_error();
+		named_main_earlyfatal("failed to load oqsprovider");
+	}
+	default_provider = OSSL_PROVIDER_load(NULL, "default");
+	if (default_provider == NULL) {
+		OSSL_PROVIDER_unload(oqs);
+		if (fips != NULL) {
+			OSSL_PROVIDER_unload(fips);
+		}
+		if (base != NULL) {
+			OSSL_PROVIDER_unload(base);
+		}
+		ERR_clear_error();
+		named_main_earlyfatal("Failed to load default provider");
+	}
+#endif /* if OPENSSL_VERSION_NUMER >= 0x30200000L && OPENSSL_API_LEVEL >= \
+	  30200 */
 
 	setup();
 	isc_mem_setname(named_g_mctx, "main");
